@@ -64,7 +64,6 @@ func gracefulShutdown(app *app.App) error {
 	}()
 
 	<-ctx.Done()
-	log.Info().Msg("Shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -14,4 +14,11 @@ type DB interface {
 	ListAllVouchers() ([]Voucher, error)
 	CreateTransaction(transaction *Transaction) error
 	CreditUserBalance(userID int, amount float64) error
+	// Notification methods
+	CreateNotification(notification *Notification) error
+	GetUserNotifications(userID string, limit, offset int) ([]Notification, error)
+	MarkNotificationAsRead(notificationID uint, userID string) error
+	MarkAllNotificationsAsRead(userID string) error
+	GetUnreadNotificationCount(userID string) (int64, error)
+	DeleteNotification(notificationID uint, userID string) error
 }

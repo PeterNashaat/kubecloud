@@ -22,6 +22,14 @@ type Configuration struct {
 	TFChainURL           string             `json:"tfchain_url" validate:"required"`
 	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
 	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
+	Redis                Redis              `json:"redis" validate:"required,dive"`
+	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
+	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
+}
+
+type GridConfig struct {
+	Mnemonic string `json:"mne" validate:"required"`
+	Network  string `json:"net" validate:"required"`
 }
 
 // Server struct holds server's information
@@ -53,6 +61,14 @@ type MailSender struct {
 type TermsANDConditions struct {
 	DocumentLink string `json:"document_link" validate:"required"`
 	DocumentHash string `json:"document_hash" validate:"required"`
+}
+
+// Redis struct holds Redis connection information
+type Redis struct {
+	Host     string `json:"host" validate:"required"`
+	Port     int    `json:"port" validate:"required,min=1,max=65535"`
+	Password string `json:"password"`
+	DB       int    `json:"db" validate:"min=0"`
 }
 
 // ReadConfFile read configurations of json file
