@@ -45,9 +45,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	mailService := internal.NewMailService(config.MailSender.SendGridKey)
 
-	gridProxy := proxy.NewRetryingClient(proxy.NewClient(config.GridProxy.URL))
+	gridProxy := proxy.NewRetryingClient(proxy.NewClient(config.GridProxyURL))
 
-	manager := substrate.NewManager(config.TFChain.URL)
+	manager := substrate.NewManager(config.TFChainURL)
 	substrateClient, err := manager.Substrate()
 
 	if err != nil {

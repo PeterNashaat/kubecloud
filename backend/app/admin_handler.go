@@ -31,11 +31,11 @@ func (h *Handler) ListUsersHandler(c *gin.Context) {
 	users, err := h.db.ListAllUsers()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list all users")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
-	Success(c, http.StatusOK, "Users retrieved successfully", map[string]interface{}{
+	Success(c, http.StatusOK, "Users are retrieved successfully", map[string]interface{}{
 		"users": users,
 	})
 }
@@ -64,7 +64,7 @@ func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 	err = h.db.DeleteUserByID(ID)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("Failed to delete user")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -79,13 +79,13 @@ func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
 	var vouchers []models.Voucher
 	for i := 0; i < request.Count; i++ {
-		voucherCode := internal.GenerateRandomVoucher(h.config.Voucher.NameLength)
+		voucherCode := internal.GenerateRandomVoucher(h.config.VoucherNameLength)
 		timestampPart := fmt.Sprintf("%02d%02d", time.Now().Minute(), time.Now().Second())
 		fullCode := fmt.Sprintf("%s-%s", voucherCode, timestampPart)
 
@@ -98,7 +98,7 @@ func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 
 		if err := h.db.CreateVoucher(&voucher); err != nil {
 			log.Error().Err(err).Msg("failed to create voucher")
-			Error(c, http.StatusInternalServerError, "internal server error", "")
+			InternalServerError(c)
 			return
 		}
 
@@ -116,10 +116,10 @@ func (h *Handler) ListVouchersHandler(c *gin.Context) {
 	vouchers, err := h.db.ListAllVouchers()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list all vouchers")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
-	Success(c, http.StatusOK, "Vouchers Retrieved successfully", map[string]interface{}{
+	Success(c, http.StatusOK, "Vouchers are Retrieved successfully", map[string]interface{}{
 		"vouchers": vouchers,
 	})
 }
@@ -135,13 +135,13 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 	var request CreditRequestInput
 	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
 	ID, err := strconv.Atoi(userID)
 	if err != nil {
-		log.Error().Msg("invalid user ID or format")
+		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid user ID format", "")
 		return
 	}
@@ -149,7 +149,7 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 	user, err := h.db.GetUserByID(ID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -170,17 +170,17 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 
 	if err := h.db.CreateTransaction(&transaction); err != nil {
 		log.Error().Err(err).Msg("Failed to create credit transaction")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
 	if err := h.db.CreditUserBalance(user.ID, request.Amount); err != nil {
 		log.Error().Err(err).Msg("Failed to credit user")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
-	Success(c, http.StatusOK, "User credited successfully", map[string]interface{}{
+	Success(c, http.StatusOK, "User is credited successfully", map[string]interface{}{
 		"user":   user.Email,
 		"amount": request.Amount,
 		"memo":   request.Memo,

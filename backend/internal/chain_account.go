@@ -27,7 +27,7 @@ func SetupUserOnTFChain(client *substrate.Substrate, config Configuration) (mnem
 	}
 
 	// Activate account with activation service
-	if err := ActivateAccount(identity.Address(), config.ActivationService.URL); err != nil {
+	if err := ActivateAccount(identity.Address(), config.ActivationServiceURL); err != nil {
 		return "", 0, fmt.Errorf("activation failed: %w", err)
 	}
 
@@ -85,8 +85,6 @@ func ActivateAccount(substrateAccountID string, url string) error {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("activation failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
-
-	fmt.Println(resp.StatusCode)
 
 	return nil
 }

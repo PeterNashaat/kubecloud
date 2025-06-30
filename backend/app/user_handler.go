@@ -91,7 +91,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	err := h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to send verification code")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
 	if err != nil {
 		log.Error().Err(err).Msg("error hashing password")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -135,13 +135,13 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to setup user on TFChain")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
 	if err != nil {
 		log.Error().Err(err).Send()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error creating stripe account"})
+		InternalServerError(c)
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 			err = h.db.UpdateUserByID(&user)
 			if err != nil {
 				log.Error().Err(err).Send()
-				Error(c, http.StatusInternalServerError, "internal server error", "")
+				InternalServerError(c)
 				return
 			}
 		}
@@ -174,7 +174,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		err = h.db.RegisterUser(&user)
 		if err != nil {
 			log.Error().Err(err).Send()
-			Error(c, http.StatusInternalServerError, "internal server error", "")
+			InternalServerError(c)
 			return
 		}
 	}
@@ -192,7 +192,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -223,7 +223,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	err = h.db.UpdateUserVerification(user.ID, true)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 
 	}
@@ -232,7 +232,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	err = h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -240,7 +240,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	tokenPair, err := h.tokenManager.CreateTokenPair(user.ID, user.Username, user.Admin)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate token pair")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	Success(c, http.StatusCreated, "token pair generated", tokenPair)
@@ -253,7 +253,7 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 
 	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -277,7 +277,7 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	tokenPair, err := h.tokenManager.CreateTokenPair(user.ID, user.Username, user.Admin)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate token pair")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	Success(c, http.StatusCreated, "token pair generated", tokenPair)
@@ -290,7 +290,7 @@ func (h *Handler) RefreshTokenHandler(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -313,7 +313,7 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -332,7 +332,7 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed to send verification code")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -346,7 +346,7 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 
 	if err != nil {
 		log.Error().Err(err).Msg("error updating user data")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -363,7 +363,7 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -371,18 +371,18 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+			Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 			return
 
 		}
 		log.Error().Err(err).Msg("failed to get user by email")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 
 	}
 
 	if user.Code != request.Code {
-		Error(c, http.StatusBadRequest, "invalid code", "")
+		Error(c, http.StatusBadRequest, "Invalid code", "")
 		return
 	}
 
@@ -397,7 +397,7 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 	tokenPair, err := h.tokenManager.CreateTokenPair(user.ID, user.Username, isAdmin)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate token pair")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	Success(c, http.StatusCreated, "verification successful", tokenPair)
@@ -410,7 +410,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "invalid request format", err.Error())
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 
 		return
 	}
@@ -424,7 +424,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
 	if err != nil {
 		log.Error().Err(err).Msg("error hashing password")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -438,7 +438,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 
 	}
@@ -450,39 +450,39 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 func (h *Handler) ChargeBalance(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to extract user ID from context"})
+		Error(c, http.StatusBadRequest, "Failed to extract user ID from context", "")
 		return
 	}
 
 	var request ChargeBalanceInput
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		Error(c, http.StatusBadRequest, "Invalid request format", "")
 		return
 	}
 
 	if request.Amount <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Amount must be greater than zero"})
+		Error(c, http.StatusBadRequest, "Amount must be greater than zero", "")
 		return
 	}
 
 	ID, err := strconv.Atoi(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		Error(c, http.StatusBadRequest, "Invalid user ID", "")
 		return
 	}
 
 	user, err := h.db.GetUserByID(ID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		Error(c, http.StatusNotFound, "User not found", "")
 		return
 	}
 
 	paymentMethod, err := internal.CreatePaymentMethod("card", request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment method"})
+		InternalServerError(c)
 		return
 	}
 
@@ -491,14 +491,14 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("error attaching payment method to customer")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to attach payment method"})
+		InternalServerError(c)
 		return
 	}
 
 	intent, err := internal.CreatePaymentIntent(user.StripeCustomerID, paymentMethod.ID, h.config.Currency, request.Amount)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment intent")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment intent"})
+		InternalServerError(c)
 		return
 	}
 
@@ -507,12 +507,11 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	err = h.db.UpdateUserByID(&user)
 	if err != nil {
 		log.Error().Err(err).Msg("error updating user data")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user data"})
+		InternalServerError(c)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":           "Balance is charged successfully",
+	Success(c, http.StatusOK, "Balance is charged successfully", gin.H{
 		"payment_intent_id": intent.ID,
 		"new_balance":       user.CreditCardBalance,
 	})
