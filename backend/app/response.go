@@ -1,6 +1,10 @@
 package app
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 // APIResponse struct contains data returned from endpoints
 type APIResponse struct {
@@ -25,5 +29,14 @@ func Error(c *gin.Context, status int, message string, err string) {
 		Status:  status,
 		Message: message,
 		Error:   err,
+	})
+}
+
+// InternalServerError returns internal server error
+func InternalServerError(c *gin.Context) {
+	c.JSON(http.StatusInternalServerError, APIResponse{
+		Status:  http.StatusInternalServerError,
+		Message: "Internal server error",
+		Error:   "",
 	})
 }

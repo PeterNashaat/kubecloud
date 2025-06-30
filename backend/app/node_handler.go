@@ -44,7 +44,7 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 
 	nodes, count, err := h.proxyClient.Nodes(c.Request.Context(), filter, limit)
 	if err != nil {
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		log.Error().Msg("user ID not found in context")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		Error(c, http.StatusBadRequest, "user ID not found in context", "")
 		return
 	}
 
@@ -79,14 +79,14 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	userID, ok := userIDVal.(int)
 	if !ok {
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -97,7 +97,8 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	// validate user has enough balance for reserving node
 	nodes, _, err := h.proxyClient.Nodes(c.Request.Context(), filter, proxyTypes.Limit{})
 	if err != nil {
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		log.Error().Err(err).Send()
+		InternalServerError(c)
 		return
 	}
 
@@ -112,18 +113,18 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
 	contractID, err := h.substrateClient.CreateRentContract(identity, nodeID, nil)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
-	Success(c, http.StatusOK, "Node rented successfully", gin.H{
+	Success(c, http.StatusOK, "Node is rented successfully", gin.H{
 		"contract_id": contractID,
 		"node_id":     nodeID,
 	})
@@ -134,14 +135,14 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	userIDVal, exists := c.Get("user_id")
 	if !exists {
-		Error(c, http.StatusUnauthorized, "User ID not found in context", "")
+		Error(c, http.StatusBadRequest, "User ID is not found in context", "")
 		return
 	}
 
 	userID, ok := userIDVal.(int)
 	if !ok {
 		log.Error().Msg("Invalid user ID or type")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -155,7 +156,7 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -163,7 +164,7 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	fmt.Println(twinID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -177,11 +178,11 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	nodes, count, err := h.proxyClient.Nodes(c.Request.Context(), filter, limit)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
-	Success(c, http.StatusOK, "Nodes retrieved successfully", map[string]interface{}{
+	Success(c, http.StatusOK, "Nodes are retrieved successfully", map[string]interface{}{
 		"total": count,
 		"nodes": nodes,
 	})
@@ -198,14 +199,14 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 
 	userIDVal, exists := c.Get("user_id")
 	if !exists {
-		Error(c, http.StatusUnauthorized, "User ID not found in context", "")
+		Error(c, http.StatusBadRequest, "User ID is not found in context", "")
 		return
 	}
 
 	userID, ok := userIDVal.(int)
 	if !ok {
 		log.Error().Msg("Invalid user ID or type")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
@@ -219,14 +220,14 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 
 	contractID64, err := strconv.ParseUint(contractIDParam, 10, 32)
 	if err != nil {
 		log.Error().Msg("Invalid contract ID or type")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	contractID := uint32(contractID64)
@@ -234,7 +235,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	err = h.substrateClient.CancelContract(identity, uint64(contractID))
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	Success(c, http.StatusOK, "Node unreserved successfully", nil)
