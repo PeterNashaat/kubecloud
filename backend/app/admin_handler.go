@@ -48,20 +48,20 @@ func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 		return
 	}
 
-	authUserID := c.GetString("user_id")
-	if userID == authUserID {
-		Error(c, http.StatusForbidden, "Admins cannot delete their own account", "")
-		return
-	}
-
-	ID, err := strconv.Atoi(userID)
+	id, err := strconv.Atoi(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid user ID", err.Error())
 		return
 	}
 
-	err = h.db.DeleteUserByID(ID)
+	authUserID := c.GetInt("user_id")
+	if id == authUserID {
+		Error(c, http.StatusForbidden, "Admins cannot delete their own account", "")
+		return
+	}
+
+	err = h.db.DeleteUserByID(id)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("Failed to delete user")
 		InternalServerError(c)
@@ -139,14 +139,14 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		return
 	}
 
-	ID, err := strconv.Atoi(userID)
+	id, err := strconv.Atoi(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid user ID format", "")
 		return
 	}
 
-	user, err := h.db.GetUserByID(ID)
+	user, err := h.db.GetUserByID(id)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -154,15 +154,11 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 	}
 
 	// get admin ID from middleware context
-	adminID, exists := c.Get("user_id")
-	if !exists {
-		Error(c, http.StatusUnauthorized, "Admin ID not found in context", "")
-		return
-	}
+	adminID := c.GetInt("user_id")
 
 	transaction := models.Transaction{
 		UserID:    user.ID,
-		AdminID:   adminID.(int),
+		AdminID:   adminID,
 		Amount:    request.Amount,
 		Memo:      request.Memo,
 		CreatedAt: time.Now(),

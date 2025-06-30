@@ -63,18 +63,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		log.Error().Msg("user ID not found in context")
-		Error(c, http.StatusBadRequest, "user ID not found in context", "")
-		return
-	}
-
-	userID, ok := userIDVal.(int)
-	if !ok {
-		InternalServerError(c)
-		return
-	}
+	userID := c.GetInt("user_id")
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
@@ -115,23 +104,12 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 // ListReservedNodeHandler list reserved nodes for user on tfchain
 func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		Error(c, http.StatusBadRequest, "User ID is not found in context", "")
-		return
-	}
-
-	userID, ok := userIDVal.(int)
-	if !ok {
-		log.Error().Msg("Invalid user ID or type")
-		InternalServerError(c)
-		return
-	}
+	userID := c.GetInt("user_id")
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "User not found", "")
+		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
 
@@ -179,18 +157,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		Error(c, http.StatusBadRequest, "User ID is not found in context", "")
-		return
-	}
-
-	userID, ok := userIDVal.(int)
-	if !ok {
-		log.Error().Msg("Invalid user ID or type")
-		InternalServerError(c)
-		return
-	}
+	userID := c.GetInt("user_id")
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
