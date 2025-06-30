@@ -115,7 +115,7 @@
                   Available Nodes
                 </h2>
                 <div class="nodes-count">
-                  {{ filteredNodes.length }} of {{ availableNodes.length }} nodes
+                  {{ filteredNodes.length }} of {{ total }} nodes
                 </div>
               </div>
               <p class="card-description">
@@ -140,8 +140,8 @@
               <div v-else class="nodes-grid">
                 <div v-for="node in filteredNodes" :key="node.id" class="card node-card">
                   <div class="node-header">
-                    <h3 class="node-title">{{ node.name }}</h3>
-                    <div class="node-price">${{ node.price }}/month</div>
+                    <h3 class="node-title">{{ node.name || `Node #${node.id}` }}</h3>
+                    <div class="node-price">${{ node.price ?? 'N/A' }}/month</div>
                   </div>
                   <div class="node-location" v-if="node.location">
                     <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
@@ -150,15 +150,15 @@
                   <div class="node-specs">
                     <div class="spec-item">
                       <span class="spec-label">CPU:</span>
-                      <span class="spec-value">{{ node.cpu }} cores</span>
+                      <span class="spec-value">{{ node.resources?.cpu ?? 'N/A' }} cores</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">RAM:</span>
-                      <span class="spec-value">{{ node.ram }} GB</span>
+                      <span class="spec-value">{{ node.resources?.memory ?? 'N/A' }} GB</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">Storage:</span>
-                      <span class="spec-value">{{ node.storage }} GB</span>
+                      <span class="spec-value">{{ node.resources?.storage ?? 'N/A' }} GB</span>
                     </div>
                     <div class="spec-item" v-if="node.gpu">
                       <span class="spec-label">GPU:</span>
@@ -185,65 +185,28 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useNodes } from '../composables/useNodes'
 
-const availableNodes = [
-  {
-    id: 1,
-    name: 'Standard Node',
-    cpu: 8,
-    ram: 32,
-    storage: 500,
-    price: 180,
-    location: 'US East'
-  },
-  {
-    id: 2,
-    name: 'High-Memory Node',
-    cpu: 16,
-    ram: 64,
-    storage: 1000,
-    price: 350,
-    location: 'US West'
-  },
-  {
-    id: 3,
-    name: 'GPU Node',
-    cpu: 16,
-    ram: 64,
-    storage: 1000,
-    gpu: 'NVIDIA A100',
-    price: 450,
-    location: 'Europe'
-  },
-  {
-    id: 4,
-    name: 'Performance Node',
-    cpu: 32,
-    ram: 128,
-    storage: 2000,
-    price: 650,
-    location: 'Asia Pacific'
-  },
-  {
-    id: 5,
-    name: 'Budget Node',
-    cpu: 4,
-    ram: 16,
-    storage: 250,
-    price: 120,
-    location: 'US East'
-  },
-  {
-    id: 6,
-    name: 'Enterprise Node',
-    cpu: 64,
-    ram: 256,
-    storage: 4000,
-    gpu: 'NVIDIA H100',
-    price: 1200,
-    location: 'US West'
+const { nodes, total, loading, error, fetchNodes } = useNodes()
+
+onMounted(() => {
+  fetchNodes()
+  // Add scroll animation observer
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
   }
-]
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible')
+      }
+    })
+  }, observerOptions)
+  document.querySelectorAll('.fade-in').forEach(el => {
+    observer.observe(el)
+  })
+})
 
 // Filter options
 const cpuOptions = [
@@ -279,7 +242,6 @@ const locationOptions = [
   { title: 'Asia Pacific', value: 'Asia Pacific' }
 ]
 
-// Filter state
 const filters = ref({
   cpu: null,
   ram: null,
@@ -288,19 +250,16 @@ const filters = ref({
   location: null
 })
 
-// Computed filtered nodes
 const filteredNodes = computed(() => {
-  return availableNodes.filter(node => {
+  return nodes.value.filter(node => {
     // CPU filter
-    if (filters.value.cpu && node.cpu !== filters.value.cpu) {
+    if (filters.value.cpu && node.resources?.cpu !== filters.value.cpu) {
       return false
     }
-    
     // RAM filter
-    if (filters.value.ram && node.ram !== filters.value.ram) {
+    if (filters.value.ram && node.resources?.memory !== filters.value.ram) {
       return false
     }
-    
     // GPU filter
     if (filters.value.gpu) {
       if (filters.value.gpu === 'none' && node.gpu) {
@@ -310,17 +269,14 @@ const filteredNodes = computed(() => {
         return false
       }
     }
-    
     // Price range filter
-    if (node.price < filters.value.priceRange[0] || node.price > filters.value.priceRange[1]) {
+    if (typeof node.price === 'number' && (node.price < filters.value.priceRange[0] || node.price > filters.value.priceRange[1])) {
       return false
     }
-    
     // Location filter
     if (filters.value.location && node.location !== filters.value.location) {
       return false
     }
-    
     return true
   })
 })
@@ -339,26 +295,6 @@ const reserveNode = (nodeId: number) => {
   // Reservation logic here
   console.log(`Reserving node ${nodeId}`)
 }
-
-// Add scroll animation observer
-onMounted(() => {
-  const observerOptions = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible')
-      }
-    })
-  }, observerOptions)
-
-  document.querySelectorAll('.fade-in').forEach(el => {
-    observer.observe(el)
-  })
-})
 </script>
 
 <style scoped>

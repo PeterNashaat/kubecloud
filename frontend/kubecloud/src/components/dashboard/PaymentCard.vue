@@ -3,199 +3,284 @@
     <div class="dashboard-card-header">
       <div class="dashboard-card-title-section">
         <div class="dashboard-card-title-content">
-          <h3 class="dashboard-card-title">Payment Methods</h3>
-          <p class="dashboard-card-subtitle">Manage your payment methods and billing information</p>
+          <h3 class="dashboard-card-title">Add Funds</h3>
+          <p class="dashboard-card-subtitle">Add funds to your account balance</p>
         </div>
       </div>
     </div>
-    <div class="payment-methods">
-      <div v-for="method in paymentMethods" :key="method.id" class="payment-method-item list-item-interactive">
-        <div class="payment-method-content">
-          <div class="payment-method-info">
-            <div class="payment-method-icon">
-              <div v-if="method.name.toLowerCase().includes('paypal')" class="paypal-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                  <path d="M20.067 8.478c.492.315.844.825.844 1.478 0 .653-.352 1.163-.844 1.478-.492.315-1.163.478-1.844.478H16.5v-2.956h1.723c.681 0 1.352.163 1.844.478zM7.933 8.478c.492-.315 1.163-.478 1.844-.478H11.5v2.956H9.777c-.681 0-1.352-.163-1.844-.478-.492-.315-.844-.825-.844-1.478 0-.653.352-1.163.844-1.478z"/>
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.5 15.5v-2.956h1.723c.681 0 1.352-.163 1.844-.478.492-.315.844-.825.844-1.478 0-.653-.352-1.163-.844-1.478-.492-.315-1.163-.478-1.844-.478H10.5V8.5h3.723c1.362 0 2.704.326 3.688.956.984.63 1.688 1.65 1.688 2.956 0 1.306-.704 2.326-1.688 2.956-.984.63-2.326.956-3.688.956H10.5z"/>
-                </svg>
-              </div>
-              <v-icon v-else size="24" color="primary">{{ method.icon }}</v-icon>
-            </div>
-            <div class="payment-method-details">
-              <h3 class="payment-method-name">{{ method.name }}</h3>
-              <p class="payment-method-number">{{ method.maskedNumber }}</p>
-            </div>
-          </div>
-          <div class="payment-method-actions">
-            <v-btn variant="outlined" size="small" class="action-btn">Edit</v-btn>
-            <v-btn variant="outlined" size="small" class="action-btn">Remove</v-btn>
+    <div class="dashboard-card-content">
+      <div class="balance-section list-item-interactive">
+        <span class="balance-label">Current Balance:</span>
+        <span class="balance-value">$ {{ balance }}</span>
+      </div>
+      <div class="amount-section">
+        <label class="section-label">Amount</label>
+        <div class="amount-options">
+          <button
+            v-for="preset in presets"
+            :key="preset"
+            :class="['amount-btn', { selected: amount === preset }]"
+            @click="selectAmount(preset)"
+          >
+            {{ preset }}
+          </button>
+          <div class="custom-amount-wrapper">
+            <input
+              type="number"
+              min="1"
+              class="amount-input"
+              v-model.number="customAmount"
+              @focus="selectAmount('custom')"
+              :class="{ selected: amount === 'custom' }"
+              placeholder="Custom"
+            />
           </div>
         </div>
       </div>
-    </div>
-    <div class="add-payment-section">
-      <v-btn variant="outlined" class="add-payment-btn action-btn">
-        <v-icon icon="mdi-plus" size="20" class="mr-2"></v-icon>
-        Add Payment Method
-      </v-btn>
+      <div class="card-details-section">
+        <label class="section-label">Card Details</label>
+        <div class="card-details-fields">
+          <input
+            class="card-input"
+            type="text"
+            maxlength="19"
+            placeholder="Card Number"
+            v-model="cardNumber"
+          />
+          <input
+            class="card-input short"
+            type="text"
+            maxlength="5"
+            placeholder="mm/dd"
+            v-model="expiry"
+          />
+          <input
+            class="card-input short"
+            type="text"
+            maxlength="4"
+            placeholder="CVC"
+            v-model="cvc"
+          />
+        </div>
+      </div>
+      <div class="charge-section">
+        <button class="action-btn charge-btn" @click="chargeBalance" :disabled="loading">
+          Charge Balance
+        </button>
+      </div>
+      <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
+      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { defineProps } from 'vue'
-interface PaymentMethod {
-  id: string | number
-  name: string
-  maskedNumber: string
-  icon: string
-  iconColor: string
+import { ref } from 'vue'
+
+const balance = ref(100) // Placeholder, replace with real balance from backend
+const presets = [5, 10, 20, 50]
+const amount = ref<number | 'custom'>(5)
+const customAmount = ref<number | null>(null)
+const cardNumber = ref('')
+const expiry = ref('')
+const cvc = ref('')
+const loading = ref(false)
+const successMessage = ref('')
+const errorMessage = ref('')
+
+function selectAmount(val: number | 'custom') {
+  amount.value = val
+  if (val !== 'custom') customAmount.value = null
 }
-const props = defineProps<{ paymentMethods: PaymentMethod[] }>()
+
+function chargeBalance() {
+  loading.value = true
+  successMessage.value = ''
+  errorMessage.value = ''
+  // Simulate API call
+  setTimeout(() => {
+    loading.value = false
+    if (!getSelectedAmount() || !cardNumber.value || !expiry.value || !cvc.value) {
+      errorMessage.value = 'Please fill all fields.'
+      return
+    }
+    // Simulate success
+    successMessage.value = 'Balance charged successfully!'
+    // Optionally update balance here
+  }, 1200)
+}
+
+function getSelectedAmount() {
+  return amount.value === 'custom' ? customAmount.value : amount.value
+}
 </script>
 
 <style scoped>
-.payment-methods {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  margin-bottom: var(--space-10);
+.dashboard-card {
+  background: var(--color-bg-card, #182235);
+  border-radius: var(--radius-xl, 1.25rem);
+  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.08);
+  padding: var(--space-8);
+  margin-bottom: var(--space-8);
+  border: 1px solid var(--color-border, #334155);
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.dashboard-card-header {
+  margin-bottom: var(--space-6);
 }
 
-.payment-method-item {
-  padding: var(--space-8);
+.dashboard-card-title {
+  font-size: var(--font-size-xl, 1.5rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text, #fff);
+  margin: 0 0 var(--space-2) 0;
+}
+.dashboard-card-subtitle {
+  font-size: var(--font-size-base, 1rem);
+  color: var(--color-primary, #38BDF8);
+  font-weight: var(--font-weight-medium, 500);
+  opacity: 0.9;
+  margin: 0;
+}
+.dashboard-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.balance-section {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: var(--space-2);
+  padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: rgba(30, 41, 59, 0.7);
   border: 1px solid var(--color-border);
   transition: background 0.18s, border-color 0.18s;
 }
-
-.payment-method-item:hover {
+.balance-section.list-item-interactive:hover {
   background: rgba(30, 41, 59, 0.85);
   border-color: var(--color-border-light);
 }
-
-.payment-method-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-12);
+.balance-label {
+  font-weight: 500;
+  color: var(--color-text-secondary, #CBD5E1);
 }
-
-.payment-method-info {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  flex: 1;
-  min-width: 0;
+.balance-value {
+  font-weight: 700;
+  color: var(--color-success, #10B981);
+  font-size: 1.2rem;
 }
-
-.payment-method-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-md);
-  background: rgba(59, 130, 246, 0.07);
-  color: var(--color-primary);
-  flex-shrink: 0;
+.amount-section {
+  margin-bottom: 0;
 }
-
-.payment-method-details {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
+.section-label {
+  font-weight: 500;
+  color: var(--color-text-secondary, #CBD5E1);
+  margin-bottom: 0.5rem;
+  display: block;
 }
-
-.payment-method-name {
-  font-weight: var(--font-weight-semibold);
+.amount-options {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.amount-btn {
+  background: var(--color-bg-btn, #232f47);
+  border: 1.5px solid var(--color-border, #334155);
+  border-radius: 0.75rem;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  color: var(--color-primary, #38BDF8);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  outline: none;
+}
+.amount-btn.selected,
+.amount-btn:focus {
+  background: var(--color-primary, #38BDF8);
+  color: #fff;
+  border-color: var(--color-primary, #38BDF8);
+}
+.amount-input {
+  width: 80px;
+  padding: 0.5rem 0.7rem;
+  border: 1.5px solid var(--color-border, #334155);
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: var(--color-primary, #38BDF8);
+  background: var(--color-bg-btn, #232f47);
+  outline: none;
+  font-weight: 500;
+  margin-left: 0.2rem;
+}
+.amount-input.selected,
+.amount-input:focus {
+  border-color: var(--color-primary, #38BDF8);
+  background: #fff;
+  color: var(--color-primary, #38BDF8);
+}
+.card-details-section {
+  margin-bottom: 0;
+}
+.card-details-fields {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.card-input {
+  padding: 0.5rem 1rem;
+  border: 1.5px solid var(--color-border, #334155);
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: var(--color-primary, #38BDF8);
+  background: var(--color-bg-btn, #232f47);
+  outline: none;
+  width: 160px;
+  font-weight: 500;
+}
+.card-input.short {
+  width: 70px;
+}
+.card-input:focus {
+  border-color: var(--color-primary, #38BDF8);
+  background: #fff;
+  color: var(--color-primary, #38BDF8);
+}
+.charge-section {
+  margin-top: 0.5rem;
+}
+.charge-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
   color: var(--color-text);
-  font-size: var(--font-size-base);
-  margin: 0;
-  line-height: 1.2;
-}
-
-.payment-method-number {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin: 0;
-  line-height: 1.3;
-}
-
-.payment-method-actions {
-  display: flex;
-  gap: var(--space-4);
-  flex-shrink: 0;
-}
-
-.action-btn {
-  background: transparent !important;
-  border: 1px solid var(--color-border) !important;
-  color: var(--color-text) !important;
   font-weight: var(--font-weight-medium);
+  border-radius: 0.75rem;
+  padding: 0.7rem 2.5rem;
+  font-size: 1.1rem;
+  cursor: pointer;
   transition: background 0.18s, border-color 0.18s;
-  white-space: nowrap;
-  box-shadow: none !important;
+  box-shadow: none;
 }
-
-.action-btn:hover {
-  background: rgba(59, 130, 246, 0.07) !important;
-  border-color: var(--color-primary) !important;
-  color: var(--color-primary) !important;
+.charge-btn:hover {
+  background: rgba(59, 130, 246, 0.07);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
-
-.add-payment-section {
-  display: flex;
-  justify-content: center;
-  padding-top: var(--space-8);
-  border-top: 1px solid var(--color-border);
+.charge-btn:disabled {
+  background: #38BDF899;
+  cursor: not-allowed;
 }
-
-.add-payment-btn {
-  font-weight: var(--font-weight-medium);
-  height: 44px;
-  min-width: 220px;
+.success-message {
+  color: var(--color-success, #10B981);
+  margin-top: 1.2rem;
+  font-weight: 500;
 }
-
-@media (max-width: 960px) {
-  .payment-method-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-6);
-  }
-
-  .payment-method-actions {
-    align-self: stretch;
-    justify-content: flex-end;
-  }
-}
-
-@media (max-width: 600px) {
-  .payment-method-item {
-    padding: var(--space-5);
-  }
-
-  .payment-method-info {
-    gap: var(--space-4);
-  }
-
-  .payment-method-icon {
-    width: 44px;
-    height: 44px;
-  }
-
-  .payment-method-details {
-    gap: var(--space-2);
-  }
-
-  .payment-method-actions {
-    gap: var(--space-2);
-  }
-  
-  .add-payment-btn {
-    min-width: 100%;
-  }
+.error-message {
+  color: var(--color-error, #ef4444);
+  margin-top: 1.2rem;
+  font-weight: 500;
 }
 </style>
