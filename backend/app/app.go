@@ -73,6 +73,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 func (app *App) registerHandlers() {
 	v1 := app.router.Group("/api/v1")
 	{
+		v1.GET("/nodes", app.handlers.ListNodesHandler)
 		usersGroup := v1.Group("/user")
 		{
 			usersGroup.POST("/register", app.handlers.RegisterHandler)
@@ -86,9 +87,8 @@ func (app *App) registerHandlers() {
 			authGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
 			{
 				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
-				authGroup.GET("/nodes", app.handlers.ListNodesHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
-				authGroup.GET("/nodes/reserved", app.handlers.ListReservedNodeHandler)
+				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/unreserve/:contract-id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
 				authGroup.GET("/balance", app.handlers.GetUserBalance)

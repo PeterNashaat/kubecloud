@@ -113,3 +113,37 @@ func TransferTFTs(substrateClient *substrate.Substrate, usdcBalance uint64, user
 	return substrateClient.Transfer(systemIdentity, uint64(tftBalance), substrate.AccountID(userIdentity.PublicKey()))
 
 }
+
+// GetUserBalanceUSD gets balance of user in USD
+func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string) (float64, error) {
+	// Create identity from mnemonic
+	identity, err := substrate.NewIdentityFromSr25519Phrase(userMnemonic)
+	if err != nil {
+		return 0, err
+
+	}
+	account, err := substrate.FromAddress(identity.Address())
+	if err != nil {
+		return 0, err
+	}
+
+	// get balance in TFT
+	tftBalance, err := substrateClient.GetBalance(account)
+	if err != nil {
+		return 0, err
+	}
+
+	rawTFT := float64(tftBalance.Free.Int64())
+	tft := rawTFT / 1e7
+
+	// convert balance to USDC to show it to user
+	price, err := substrateClient.GetTFTPrice()
+	if err != nil {
+		return 0, err
+
+	}
+
+	usdcBalance := float64(tft) * (float64(price) / 1000)
+	return usdcBalance, nil
+
+}

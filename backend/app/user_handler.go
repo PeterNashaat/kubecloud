@@ -547,44 +547,14 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		return
 	}
 
-	// Create identity from mnemonic
-	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
+		InternalServerError(c)
 	}
-
-	account, err := substrate.FromAddress(identity.Address())
-	if err != nil {
-		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
-
-	// get balance in TFT
-	tftBalance, err := h.substrateClient.GetBalance(account)
-	if err != nil {
-		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
-
-	rawTFT := float64(tftBalance.Free.Int64())
-	tft := rawTFT / 1e7
-
-	// convert balance to USDC to show it to user
-	price, err := h.substrateClient.GetTFTPrice()
-	if err != nil {
-		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
-
-	usdcBalance := float64(tft) * (float64(price) / 1000)
 
 	Success(c, http.StatusOK, "Balance fetched", gin.H{
-		"balance_usd": usdcBalance,
+		"balance_usd": usdBalance,
 	})
 
 }

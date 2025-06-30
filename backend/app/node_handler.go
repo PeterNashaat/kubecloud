@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"kubecloud/internal"
 	"net/http"
 	"strconv"
 
@@ -101,19 +102,30 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		InternalServerError(c)
 		return
 	}
-
-	node := nodes[0]
-	userBalance := user.CreditCardBalance + user.CreditedBalance
-	if node.PriceUsd > userBalance {
-		Error(c, http.StatusPaymentRequired, "Insufficient balance", fmt.Sprintf("Node price is %.2f USD/Month, your balance is %.2f USD.  Please charge your balance first to proceed.", node.PriceUsd, userBalance))
+	if len(nodes) == 0 {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "No nodes are available for rent.","")
 		return
 	}
+	node := nodes[0]
 
 	// Create identity from mnemonic
 	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
+		return
+	}
+
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+	}
+
+	//TODO: check price in month constant
+	if usdBalance < node.PriceUsd/24/30 {
+		Error(c, http.StatusBadRequest, "You should at lease have enough balance for one hour", "")
 		return
 	}
 

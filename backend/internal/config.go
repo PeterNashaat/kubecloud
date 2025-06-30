@@ -22,6 +22,7 @@ type Configuration struct {
 	TFChainURL           string             `json:"tfchain_url" validate:"required"`
 	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
 	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
+	SystemAccount        GridAccount        `json:"system_account"`
 }
 
 // Server struct holds server's information
@@ -55,6 +56,12 @@ type TermsANDConditions struct {
 	DocumentHash string `json:"document_hash" validate:"required"`
 }
 
+// GridAccount holds data for system's account
+type GridAccount struct {
+	Mnemonics string `json:"mnemonics" validate:"required"`
+	Network   string `json:"network" validate:"required"`
+}
+
 // ReadConfFile read configurations of json file
 func ReadConfFile(path string) (Configuration, error) {
 	config := Configuration{}
@@ -76,7 +83,7 @@ func ReadConfFile(path string) (Configuration, error) {
 				fmt.Printf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
 			}
 		}
-		return Configuration{}, fmt.Errorf("Invalid configuration: %w", err)
+		return Configuration{}, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return config, nil
