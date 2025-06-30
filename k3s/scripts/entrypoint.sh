@@ -24,6 +24,10 @@ if [ -z "${K3S_URL}" ]; then
             ip route get $addr && EXTRA_ARGS="$EXTRA_ARGS --tls-san $addr"
         done
     done
+    if [ -z "${DUAL_STACK}" ]; then
+        EXTRA_ARGS="$EXTRA_ARGS --cluster-cidr=10.42.0.0/16,2001:cafe:42::/56"
+        EXTRA_ARGS="$EXTRA_ARGS --service-cidr=10.43.0.0/16,2001:cafe:43::/112"
+    fi
     exec k3s server --flannel-iface $K3S_FLANNEL_IFACE $EXTRA_ARGS 2>&1
 else
     exec k3s agent --flannel-iface $K3S_FLANNEL_IFACE $EXTRA_ARGS 2>&1
