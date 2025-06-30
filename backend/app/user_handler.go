@@ -479,7 +479,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	paymentMethod, err := internal.CreatePaymentMethod("card", request.PaymentToken)
+	paymentMethod, err := internal.CreatePaymentMethod(request.CardType, request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
 		InternalServerError(c)
