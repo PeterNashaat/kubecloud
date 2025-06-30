@@ -136,13 +136,37 @@ func (s *Sqlite) ListAllVouchers() ([]models.Voucher, error) {
 	return vouchers, nil
 }
 
+// GetVoucherByCode returns voucher by its code
+func (s *Sqlite) GetVoucherByCode(code string) (models.Voucher, error) {
+	var voucher models.Voucher
+	query := s.db.First(&voucher, "code = ?", code)
+	return voucher, query.Error
+}
+
+// RedeemVoucher updates status if voucher
+func (s *Sqlite) RedeemVoucher(code string) error {
+	result := s.db.Model(&models.Voucher{}).
+		Where("code = ?", code).
+		Update("redeemed", true)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no voucher found with Code %d", code)
+	}
+
+	return nil
+}
+
 // CreateTransaction creates a payment transaction
 func (s *Sqlite) CreateTransaction(transaction *models.Transaction) error {
 	return s.db.Create(transaction).Error
 }
 
 // CreditUserBalance add credited balance to user by its ID
-func (s *Sqlite) CreditUserBalance(userID int, amount float64) error {
+func (s *Sqlite) CreditUserBalance(userID int, amount uint64) error {
 	return s.db.Model(&models.User{}).
 		Where("id = ?", userID).
 		UpdateColumn("credited_balance", gorm.Expr("credited_balance + ?", amount)).

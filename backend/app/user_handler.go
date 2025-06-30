@@ -5,7 +5,6 @@ import (
 	"kubecloud/internal"
 	"kubecloud/models"
 	"net/http"
-	"strconv"
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -79,9 +78,9 @@ type ChangePasswordInput struct {
 
 // ChargeBalanceInput struct holds required data to charge users' balance
 type ChargeBalanceInput struct {
-	CardType     string  `json:"card_type" binding:"required"`
-	PaymentToken string  `json:"payment_method_id" binding:"required"`
-	Amount       float64 `json:"amount" binding:"required"`
+	CardType     string `json:"card_type" binding:"required"`
+	PaymentToken string `json:"payment_method_id" binding:"required"`
+	Amount       uint64 `json:"amount" binding:"required"`
 }
 
 // RegisterHandler registers user to the system
@@ -139,10 +138,11 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
+	fmt.Println(mnemonic)
 	customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
 	if err != nil {
 		log.Error().Err(err).Send()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error creating stripe account"})
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 
@@ -449,41 +449,42 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 }
 
 func (h *Handler) ChargeBalance(c *gin.Context) {
-	userID := c.GetString("user_id")
-	if userID == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to extract user ID from context"})
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		Error(c, http.StatusUnauthorized, "User ID not found in context", "")
+		return
+	}
+
+	userID, ok := userIDVal.(int)
+	if !ok {
+		log.Error().Msg("Invalid user ID or type")
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 
 	var request ChargeBalanceInput
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
 	if request.Amount <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Amount must be greater than zero"})
+		Error(c, http.StatusBadRequest, "Amount must be greater than zero", "")
 		return
 	}
 
-	ID, err := strconv.Atoi(userID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	user, err := h.db.GetUserByID(ID)
+	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		Error(c, http.StatusNotFound, "User not found", "")
 		return
 	}
 
 	paymentMethod, err := internal.CreatePaymentMethod("card", request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment method"})
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 
@@ -492,14 +493,14 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("error attaching payment method to customer")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to attach payment method"})
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 
 	intent, err := internal.CreatePaymentIntent(user.StripeCustomerID, paymentMethod.ID, h.config.Currency, request.Amount)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment intent")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment intent"})
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 
@@ -508,14 +509,157 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	err = h.db.UpdateUserByID(&user)
 	if err != nil {
 		log.Error().Err(err).Msg("error updating user data")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user data"})
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":           "Balance is charged successfully",
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	Success(c, http.StatusOK, "Balance is charged successfully", gin.H{
 		"payment_intent_id": intent.ID,
 		"new_balance":       user.CreditCardBalance,
 	})
+
+}
+
+// GetUserBalance returns user's balance in usd
+func (h *Handler) GetUserBalance(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		log.Error().Msg("user ID not found in context")
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	userID, ok := userIDVal.(int)
+	if !ok {
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "User not found", "")
+		return
+	}
+
+	// Create identity from mnemonic
+	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	account, err := substrate.FromAddress(identity.Address())
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	// get balance in TFT
+	tftBalance, err := h.substrateClient.GetBalance(account)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	rawTFT := float64(tftBalance.Free.Int64())
+	tft := rawTFT / 1e7
+
+	// convert balance to USDC to show it to user
+	price, err := h.substrateClient.GetTFTPrice()
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	usdcBalance := float64(tft) * (float64(price) / 1000)
+
+	Success(c, http.StatusOK, "Balance fetched", gin.H{
+		"balance_usd": usdcBalance,
+	})
+
+}
+
+func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
+	voucherCodeParam := c.Param("voucher_code")
+	if voucherCodeParam == "" {
+		Error(c, http.StatusBadRequest, "Voucher Code is required", "")
+		return
+	}
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		log.Error().Msg("user ID not found in context")
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	userID, ok := userIDVal.(int)
+	if !ok {
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "User not found", "")
+		return
+	}
+
+	// check voucher exists
+	voucher, err := h.db.GetVoucherByCode(voucherCodeParam)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "Voucher not found", "")
+		return
+	}
+
+	// check voucher not redeemed
+	if voucher.Redeemed {
+		Error(c, http.StatusBadRequest, "voucher is already redeemed", "")
+		return
+	}
+
+	// check on expiration time of voucher
+	if voucher.ExpiresAt.Before(time.Now()) {
+		Error(c, http.StatusBadRequest, "voucher is already expired", "")
+		return
+
+	}
+
+	err = h.db.RedeemVoucher(voucher.Code)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	user.CreditedBalance += voucher.Value
+	err = h.db.UpdateUserByID(&user)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	Success(c, http.StatusOK, "Voucher is Redeemed Successfully", nil)
 
 }

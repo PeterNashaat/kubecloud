@@ -22,6 +22,7 @@ type Configuration struct {
 	TFChain            TFChain            `json:"tfchain"`
 	TermsANDConditions TermsANDConditions `json:"terms_and_conditions"`
 	ActivationService  ActivationService  `json:"activation_service"`
+	SystemAccount      GridAccount        `json:"system_account"`
 }
 
 // Server struct holds server's information
@@ -72,6 +73,12 @@ type TermsANDConditions struct {
 // ActivationService struct hold url of tfgrid activation service
 type ActivationService struct {
 	URL string `json:"url" validate:"required"`
+}
+
+// GridAccount holds info of system's account on tfchain
+type GridAccount struct {
+	Mnemonics string `json:"mnemonics" validate:"required"`
+	Network   string `json:"network" validate:"required"`
 }
 
 // ReadConfFile read configurations of json file

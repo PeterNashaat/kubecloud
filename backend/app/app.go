@@ -91,6 +91,8 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/nodes/reserved", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/unreserve/:contract-id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
+				authGroup.GET("/balance", app.handlers.GetUserBalance)
+				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
 			}
 
 			adminGroup := usersGroup.Group("")

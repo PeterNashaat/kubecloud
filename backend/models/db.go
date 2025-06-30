@@ -12,6 +12,8 @@ type DB interface {
 	DeleteUserByID(userID int) error
 	CreateVoucher(voucher *Voucher) error
 	ListAllVouchers() ([]Voucher, error)
+	GetVoucherByCode(code string) (Voucher, error)
+	RedeemVoucher(code string) error
 	CreateTransaction(transaction *Transaction) error
-	CreditUserBalance(userID int, amount float64) error
+	CreditUserBalance(userID int, amount uint64) error
 }

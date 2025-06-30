@@ -32,7 +32,7 @@ func SetupUserOnTFChain(client *substrate.Substrate, config Configuration) (mnem
 	}
 
 	// Wait a few seconds for account activation to complete
-	time.Sleep(5 * time.Second)
+	time.Sleep(7 * time.Second)
 
 	if err := client.AcceptTermsAndConditions(identity, config.TermsANDConditions.DocumentLink, config.TermsANDConditions.DocumentHash); err != nil {
 		return "", 0, fmt.Errorf("accept terms failed: %w", err)
@@ -86,7 +86,30 @@ func ActivateAccount(substrateAccountID string, url string) error {
 		return fmt.Errorf("activation failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	fmt.Println(resp.StatusCode)
-
 	return nil
+}
+
+// TransferTFTs transfer balance to users' account
+func TransferTFTs(substrateClient *substrate.Substrate, usdcBalance uint64, userMnemonic, systemMnemonic string) error {
+	// Create identity of user from mnemonic
+	userIdentity, err := substrate.NewIdentityFromSr25519Phrase(userMnemonic)
+	if err != nil {
+		return err
+	}
+
+	// get tft price for conversion
+	price, err := substrateClient.GetTFTPrice()
+	if err != nil {
+		return err
+	}
+
+	tftBalance := float64(usdcBalance) / (float64(price) / 1000) * 1e7
+
+	// Create identity of system from mnemonic
+	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(systemMnemonic)
+	if err != nil {
+		return err
+	}
+	return substrateClient.Transfer(systemIdentity, uint64(tftBalance), substrate.AccountID(userIdentity.PublicKey()))
+
 }
