@@ -10,12 +10,18 @@ import (
 
 // Configuration struct holds all configs for the app
 type Configuration struct {
-	Server     Server     `json:"server" validate:"required,dive"`
-	Database   DB         `json:"database" validate:"required"`
-	JWT        JwtToken   `json:"token" validate:"required"`
-	Admins     []string   `json:"admins"`
-	MailSender MailSender `json:"mailSender"`
-	Voucher    Voucher    `json:"voucher"`
+	Server               Server             `json:"server" validate:"required,dive"`
+	Database             DB                 `json:"database" validate:"required"`
+	JWT                  JwtToken           `json:"token" validate:"required"`
+	Admins               []string           `json:"admins"`
+	MailSender           MailSender         `json:"mailSender"`
+	Currency             string             `json:"currency" validate:"required"`
+	StripeSecret         string             `json:"stripe_secret" validate:"required"`
+	VoucherNameLength    int                `json:"voucher_name_length"  validate:"required,gt=0"`
+	GridProxyURL         string             `json:"gridproxy_url" validate:"required"`
+	TFChainURL           string             `json:"tfchain_url" validate:"required"`
+	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
+	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
 }
 
 // Server struct holds server's information
@@ -43,8 +49,10 @@ type MailSender struct {
 	Timeout     int    `json:"timeout" validate:"min=30"`
 }
 
-type Voucher struct {
-	NameLength int `json:"name_length" validate:"required,gt=0"`
+// TermsANDConditions holds required data for accepting terms and conditions
+type TermsANDConditions struct {
+	DocumentLink string `json:"document_link" validate:"required"`
+	DocumentHash string `json:"document_hash" validate:"required"`
 }
 
 // ReadConfFile read configurations of json file
@@ -68,7 +76,7 @@ func ReadConfFile(path string) (Configuration, error) {
 				fmt.Printf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
 			}
 		}
-		return Configuration{}, fmt.Errorf("invalid configuration: %w", err)
+		return Configuration{}, fmt.Errorf("Invalid configuration: %w", err)
 	}
 
 	return config, nil

@@ -60,11 +60,13 @@ func (s *Sqlite) GetUserByID(userID int) (models.User, error) {
 
 // UpdateUserByID updates user data by its ID
 func (s *Sqlite) UpdateUserByID(user *models.User) error {
+	user.UpdatedAt = time.Now()
 	return s.db.Model(&models.User{}).
 		Where("id = ?", user.ID).
 		Updates(user).Error
 }
 
+// UpdatePassword updates password of user by its email
 func (s *Sqlite) UpdatePassword(email string, hashedPassword []byte) error {
 	result := s.db.Model(&models.User{}).
 		Where("email = ?", email).
@@ -84,6 +86,7 @@ func (s *Sqlite) UpdatePassword(email string, hashedPassword []byte) error {
 	return nil
 }
 
+// UpdateUserVerification updates verified status of user by its ID
 func (s *Sqlite) UpdateUserVerification(userID int, verified bool) error {
 	result := s.db.Model(&models.User{}).
 		Where("id = ?", userID).
