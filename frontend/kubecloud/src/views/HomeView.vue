@@ -2,6 +2,10 @@
 // Add scroll animation observer
 import { onMounted, ref } from 'vue'
 import FeatureGlobe from '@/components/features/FeatureGlobe.vue'
+import { useUserStore } from '@/stores/user'
+
+// Get user store for authentication state
+const userStore = useUserStore()
 
 // Animated stats with proper typing
 const stats = ref([
@@ -149,10 +153,20 @@ const features = [
             Join thousands of developers and DevOps engineers who trust KubeCloud for their production workloads.
           </p>
           <v-btn
+            v-if="userStore.isLoggedIn"
             variant="outlined"
             color="white"
             size="x-large"
-            to="/sign-up"
+            to="/deploy"
+          >
+            Deploy Cluster  
+          </v-btn>
+          <v-btn
+            v-else
+            variant="outlined"
+            color="white"
+            size="x-large"
+            to="/deploy"
           >
             Start Your Free Trial
           </v-btn>
@@ -197,13 +211,10 @@ const features = [
 
 .home-section {
   padding-top: 6rem;
-  padding-bottom: 6rem;
 }
 
 .cta-section {
-  padding-top: 8rem;
   padding-bottom: 8rem;
-  margin: 4rem 0 0 0;
 }
 
 /* Remove any margin between sections */
@@ -215,7 +226,6 @@ const features = [
 .home-section {
   position: relative;
   z-index: 2;
-  padding: 5rem 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -249,7 +259,7 @@ const features = [
 }
 
 .feature-cards-row {
-  margin: 1rem;
+  margin: 9rem;
 }
 
 .feature-col {

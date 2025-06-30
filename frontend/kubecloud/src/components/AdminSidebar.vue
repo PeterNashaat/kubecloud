@@ -33,7 +33,6 @@ const adminNavItems = [
   { key: 'overview', title: 'Overview', icon: 'mdi-view-dashboard' },
   { key: 'users', title: 'Users', icon: 'mdi-account-group' },
   { key: 'vouchers', title: 'Vouchers', icon: 'mdi-ticket-percent' },
-  { key: 'credits', title: 'Credits', icon: 'mdi-cash-plus' },
   { key: 'system', title: 'System', icon: 'mdi-cog' },
 ]
 

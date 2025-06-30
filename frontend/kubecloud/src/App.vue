@@ -1,32 +1,42 @@
 <template>
   <ErrorBoundary>
     <v-app class="kubecloud-app">
-      <!-- Floating Cloud Animation - Site-wide -->
-      <FloatingClouds />
+      <!-- Loading overlay while checking authentication -->
+      <div v-if="isInitializing" class="auth-loading-overlay">
+        <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+        <p class="loading-text">Initializing...</p>
+      </div>
 
-      <!-- Shared Moving Background - Persists across route changes -->
-      <UnifiedBackground :theme="currentTheme" />
+      <!-- Main app content -->
+      <template v-else>
+        <!-- Floating Cloud Animation - Site-wide -->
+        <FloatingClouds />
 
-      <!-- Navigation Bar -->
-      <NavBar v-if="!isAuthPage" />
+        <!-- Shared Moving Background - Persists across route changes -->
+        <UnifiedBackground :theme="currentTheme" />
 
-      <!-- Main Content Area -->
-      <v-main class="app-main">
-        <RouterView />
-      </v-main>
+        <!-- Navigation Bar -->
+        <NavBar v-if="!isAuthPage" />
 
-      <!-- Footer -->
-      <AppFooter v-if="!isAuthPage" />
+        <!-- Main Content Area -->
+        <v-main class="app-main">
+          <RouterView />
+        </v-main>
 
-      <!-- Global Notifications -->
-      <NotificationToast />
+        <!-- Footer -->
+        <AppFooter v-if="!isAuthPage" />
+
+        <!-- Global Notifications -->
+        <NotificationToast />
+      </template>
     </v-app>
   </ErrorBoundary>
 </template>
 
 <script lang="ts" setup>
 import { RouterView, useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useUserStore } from './stores/user'
 import NavBar from './components/NavBar.vue'
 import AppFooter from './components/AppFooter.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
@@ -35,10 +45,12 @@ import UnifiedBackground from './components/UnifiedBackground.vue'
 import FloatingClouds from './components/FloatingClouds.vue'
 
 const route = useRoute()
+const userStore = useUserStore()
+const isInitializing = ref(true)
 
 // Determine if current page is an authentication page
 const isAuthPage = computed(() => {
-  const authRoutes = ['/sign-in', '/sign-up']
+  const authRoutes = ['/sign-in', '/sign-up', '/register/verify']
   return authRoutes.includes(route.path)
 })
 
@@ -64,6 +76,21 @@ const currentTheme = computed(() => {
 
   return themeMap[path] || 'default'
 })
+
+// Initialize authentication state
+onMounted(async () => {
+  try {
+    // Initialize auth state (check localStorage for tokens)
+    userStore.initializeAuth()
+    
+    // Add a small delay to show loading state
+    await new Promise(resolve => setTimeout(resolve, 500))
+  } catch (error) {
+    console.error('Failed to initialize authentication:', error)
+  } finally {
+    isInitializing.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -78,6 +105,27 @@ const currentTheme = computed(() => {
   position: relative;
   z-index: 1;
   min-height: calc(100vh - 72px); /* Account for navbar height */
+}
+
+.auth-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-text {
+  margin-top: 1rem;
+  color: var(--color-text);
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 /* Responsive adjustments */

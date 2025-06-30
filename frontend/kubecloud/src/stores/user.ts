@@ -1,15 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { mockApi, mockUsers, MOCK_CONFIG } from '@/utils/mockData'
+import { authService, type LoginRequest, type RegisterRequest, type VerifyCodeRequest } from '@/utils/authService'
 
 export interface User {
   id: number
-  name: string
+  username: string
   email: string
-  role: 'admin' | 'user' | 'developer'
-  avatar?: string
-  createdAt: string
-  lastLogin: string
+  admin: boolean
+  verified: boolean
+  updated_at: string
+  credit_card_balance: number
+  credited_balance: number
 }
 
 export interface AuthState {
@@ -27,9 +28,8 @@ export const useUserStore = defineStore('user', () => {
   const error = ref<string | null>(null)
 
   // Computed properties
-  const isAdmin = computed(() => user.value?.role === 'admin')
-  const isLoggedIn = computed(() => !!user.value && !!token.value)
-  const isDeveloper = computed(() => user.value?.role === 'developer')
+  const isAdmin = computed(() => user.value?.admin)
+  const isLoggedIn = computed(() => !!token.value)
 
   // Actions
   const login = async (email: string, password: string) => {
@@ -37,28 +37,41 @@ export const useUserStore = defineStore('user', () => {
     error.value = null
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        // Mock login
-        await mockApi.post('/auth/login', { email, password })
-        
-        // Find user by email
-        const mockUser = mockUsers.find(u => u.email === email)
-        if (!mockUser) {
-          throw new Error('Invalid credentials')
+      const loginData: LoginRequest = { email, password }
+      const response = await authService.login(loginData)
+      
+      // Store tokens
+      authService.storeTokens(response.access_token, response.refresh_token)
+      
+      // Set token in store
+      token.value = response.access_token
+      
+      // Always decode user info from JWT
+      try {
+        const payload = JSON.parse(atob(response.access_token.split('.')[1]))
+        user.value = {
+          id: payload.user_id || 0,
+          username: payload.username || 'User',
+          email: payload.email || '',
+          admin: payload.admin || false,
+          verified: payload.verified ?? true,
+          updated_at: payload.updated_at || new Date().toISOString(),
+          credit_card_balance: payload.credit_card_balance || 0,
+          credited_balance: payload.credited_balance || 0
         }
-
-        user.value = mockUser
-        token.value = `mock-token-${Date.now()}`
-        
-        // Store in localStorage for persistence
-        localStorage.setItem('user', JSON.stringify(mockUser))
-        localStorage.setItem('token', token.value)
-      } else {
-        // Real API call would go here
-        // const response = await api.post('/auth/login', { email, password })
-        // user.value = response.data.user
-        // token.value = response.data.token
-        throw new Error('API not ready - use mock mode')
+        localStorage.setItem('user', JSON.stringify(user.value))
+      } catch (e) {
+        user.value = {
+          id: 0,
+          username: 'User',
+          email: '',
+          admin: false,
+          verified: true,
+          updated_at: new Date().toISOString(),
+          credit_card_balance: 0,
+          credited_balance: 0
+        }
+        localStorage.setItem('user', JSON.stringify(user.value))
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Login failed'
@@ -72,40 +85,80 @@ export const useUserStore = defineStore('user', () => {
     user.value = null
     token.value = null
     error.value = null
-    
     // Clear localStorage
+    authService.clearTokens()
     localStorage.removeItem('user')
-    localStorage.removeItem('token')
   }
 
-  const register = async (userData: Omit<User, 'id' | 'createdAt' | 'lastLogin'>) => {
+  const register = async (userData: Omit<User, 'id' | 'updated_at' | 'credit_card_balance' | 'credited_balance'>) => {
     isLoading.value = true
     error.value = null
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        // Mock registration
-        await mockApi.post('/auth/register', userData)
-        
-        const newUser: User = {
-          ...userData,
-          id: Date.now(),
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-        }
-
-        user.value = newUser
-        token.value = `mock-token-${Date.now()}`
-        
-        // Store in localStorage
-        localStorage.setItem('user', JSON.stringify(newUser))
-        localStorage.setItem('token', token.value)
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
+      const registerData: RegisterRequest = {
+        name: userData.username,
+        email: userData.email,
+        password: userData.username, // This should be the actual password from the form
+        confirm_password: userData.username // This should be the actual confirm password from the form
       }
+      
+      const response = await authService.register(registerData)
+      
+      // Registration requires email verification, so we don't log in immediately
+      return response
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Registration failed'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const verifyCode = async (email: string, code: number) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const verifyData: VerifyCodeRequest = { email, code }
+      const response = await authService.verifyCode(verifyData)
+      
+      // Store tokens
+      authService.storeTokens(response.access_token, response.refresh_token)
+      
+      // Set token in store
+      token.value = response.access_token
+      
+      // Always decode user info from JWT
+      try {
+        const payload = JSON.parse(atob(response.access_token.split('.')[1]))
+        user.value = {
+          id: payload.user_id || 0,
+          username: payload.username || 'User',
+          email: payload.email || '',
+          admin: payload.admin || false,
+          verified: payload.verified ?? true,
+          updated_at: payload.updated_at || new Date().toISOString(),
+          credit_card_balance: payload.credit_card_balance || 0,
+          credited_balance: payload.credited_balance || 0
+        }
+        localStorage.setItem('user', JSON.stringify(user.value))
+      } catch (e) {
+        user.value = {
+          id: 0,
+          username: 'User',
+          email: '',
+          admin: false,
+          verified: true,
+          updated_at: new Date().toISOString(),
+          credit_card_balance: 0,
+          credited_balance: 0
+        }
+        localStorage.setItem('user', JSON.stringify(user.value))
+      }
+      
+      return response
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Verification failed'
       throw err
     } finally {
       isLoading.value = false
@@ -119,16 +172,9 @@ export const useUserStore = defineStore('user', () => {
     error.value = null
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        // Mock profile update
-        await mockApi.put(`/users/${user.value.id}`, updates)
-        
-        user.value = { ...user.value, ...updates }
-        localStorage.setItem('user', JSON.stringify(user.value))
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
-      }
+      // TODO: Implement profile update API call
+      user.value = { ...user.value, ...updates }
+      localStorage.setItem('user', JSON.stringify(user.value))
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Profile update failed'
       throw err
@@ -138,18 +184,13 @@ export const useUserStore = defineStore('user', () => {
   }
 
   const refreshToken = async () => {
-    if (!token.value) return
+    const { refreshToken } = authService.getTokens()
+    if (!refreshToken) return
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        // Mock token refresh
-        await mockApi.post('/auth/refresh', { token: token.value })
-        token.value = `mock-token-${Date.now()}`
-        localStorage.setItem('token', token.value)
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
-      }
+      const response = await authService.refreshToken({ refresh_token: refreshToken })
+      authService.storeTokens(response.access_token, response.refresh_token)
+      token.value = response.access_token
     } catch (err) {
       // If refresh fails, logout user
       logout()
@@ -160,38 +201,21 @@ export const useUserStore = defineStore('user', () => {
   const initializeAuth = () => {
     // Check for stored auth data on app start
     const storedUser = localStorage.getItem('user')
-    const storedToken = localStorage.getItem('token')
+    const { accessToken } = authService.getTokens()
 
-    if (storedUser && storedToken) {
+    // Always set token if it exists in localStorage
+    if (accessToken) {
+      token.value = accessToken
+    }
+
+    // Set user data if it exists
+    if (storedUser) {
       try {
         user.value = JSON.parse(storedUser)
-        token.value = storedToken
       } catch (err) {
         // Clear invalid stored data
         localStorage.removeItem('user')
-        localStorage.removeItem('token')
       }
-    }
-  }
-
-  // Convenience methods for development
-  const loginAsAdmin = () => {
-    const adminUser = mockUsers.find(u => u.role === 'admin')
-    if (adminUser) {
-      user.value = adminUser
-      token.value = `mock-token-admin-${Date.now()}`
-      localStorage.setItem('user', JSON.stringify(adminUser))
-      localStorage.setItem('token', token.value)
-    }
-  }
-
-  const loginAsUser = () => {
-    const regularUser = mockUsers.find(u => u.role === 'user')
-    if (regularUser) {
-      user.value = regularUser
-      token.value = `mock-token-user-${Date.now()}`
-      localStorage.setItem('user', JSON.stringify(regularUser))
-      localStorage.setItem('token', token.value)
     }
   }
 
@@ -205,18 +229,14 @@ export const useUserStore = defineStore('user', () => {
     // Computed
     isAdmin,
     isLoggedIn,
-    isDeveloper,
 
     // Actions
     login,
     logout,
     register,
+    verifyCode,
     updateProfile,
     refreshToken,
     initializeAuth,
-
-    // Development helpers
-    loginAsAdmin,
-    loginAsUser,
   }
 }) 

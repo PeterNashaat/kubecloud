@@ -21,15 +21,26 @@ export interface ApiOptions {
   loadingMessage?: string
   successMessage?: string
   errorMessage?: string
+  requiresAuth?: boolean
 }
 
 class ApiClient {
   private baseURL: string
   private defaultTimeout: number
 
-  constructor(baseURL: string = '/api', timeout: number = 10000) {
-    this.baseURL = baseURL
+  constructor(baseURL?: string, timeout: number = 10000) {
+    this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
     this.defaultTimeout = timeout
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const token = localStorage.getItem('token')
+    if (token) {
+      return {
+        'Authorization': `Bearer ${token}`
+      }
+    }
+    return {}
   }
 
   private async request<T>(
@@ -44,25 +55,36 @@ class ApiClient {
       showNotifications = true,
       loadingMessage,
       successMessage,
-      errorMessage
+      errorMessage,
+      requiresAuth = false
     } = options
 
     const notificationStore = useNotificationStore()
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
+    // Track loading notification state
+    let loadingNotificationId: string | null = null
+    let loadingTimeoutId: NodeJS.Timeout | null = null
+
     try {
-      // Show loading notification if requested
+      // Show loading notification after a minimum delay (500ms) to avoid flashing for quick requests
       if (showNotifications && loadingMessage) {
-        notificationStore.info('Loading', loadingMessage, { duration: 0 })
+        loadingTimeoutId = setTimeout(() => {
+          loadingNotificationId = notificationStore.info('Loading', loadingMessage, { duration: 0 })
+        }, 500)
+      }
+
+      // Add auth headers if required
+      const requestHeaders = {
+        'Content-Type': 'application/json',
+        ...(requiresAuth ? this.getAuthHeaders() : {}),
+        ...headers
       }
 
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers
-        },
+        headers: requestHeaders,
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal
       })
@@ -71,10 +93,15 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`)
+        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
+
+      // Clear loading notification if it was shown
+      if (loadingNotificationId) {
+        notificationStore.removeNotification(loadingNotificationId)
+      }
 
       // Show success notification if requested
       if (showNotifications && successMessage) {
@@ -88,6 +115,11 @@ class ApiClient {
       }
     } catch (error) {
       clearTimeout(timeoutId)
+      
+      // Clear loading notification if it was shown
+      if (loadingNotificationId) {
+        notificationStore.removeNotification(loadingNotificationId)
+      }
       
       let errorMessage = 'An unexpected error occurred'
       
@@ -113,6 +145,11 @@ class ApiClient {
         status: 500,
         code: 'UNKNOWN_ERROR'
       } as ApiError
+    } finally {
+      // Clean up loading timeout if request completed before it fired
+      if (loadingTimeoutId) {
+        clearTimeout(loadingTimeoutId)
+      }
     }
   }
 

@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest } from '@/utils/adminService'
+import AdminUsersTable from '@/components/AdminUsersTable.vue'
+import AdminStatsCards from '@/components/AdminStatsCards.vue'
+import AdminManualCredit from '@/components/AdminManualCredit.vue'
+import AdminVouchersSection from '@/components/AdminVouchersTable.vue'
+import AdminClustersSection from '@/components/AdminClustersSection.vue'
+import AdminSystemSection from '@/components/AdminSystemCard.vue'
 
 // Use defineAsyncComponent to avoid TypeScript issues
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
@@ -7,26 +14,19 @@ const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSideb
 const selected = ref('overview')
 
 const adminStats = ref([
-  { label: 'Total Users', value: 128, icon: 'mdi-account-group', color: '#3B82F6' },
+  { label: 'Total Users', value: 0, icon: 'mdi-account-group', color: '#3B82F6' },
   { label: 'Active Clusters', value: 42, icon: 'mdi-server', color: '#3B82F6' },
-  { label: 'Pending Approvals', value: 3, icon: 'mdi-alert', color: '#F59E0B' },
 ])
 
 // User management state
-const users = ref([
-  { id: 1, name: 'Alice', email: 'alice@example.com' },
-  { id: 2, name: 'Bob', email: 'bob@example.com' },
-  { id: 3, name: 'Charlie', email: 'charlie@example.com' },
-  // ... more mock users ...
-])
+const users = ref<User[]>([])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const pageSize = 5
-const totalUsers = computed(() => users.value.length)
 const filteredUsers = computed(() => {
   if (!searchQuery.value) return users.value
   return users.value.filter(u =>
-    u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+    u.username.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
   )
 })
@@ -35,11 +35,6 @@ const paginatedUsers = computed(() => {
   return filteredUsers.value.slice(start, start + pageSize)
 })
 const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize))
-
-// Create user form
-const newUserName = ref('')
-const newUserEmail = ref('')
-const createUserResult = ref('')
 
 const snackbar = ref(false)
 const snackbarMsg = ref('')
@@ -51,21 +46,29 @@ function showSnackbar(msg: string, color: string = 'success') {
   snackbar.value = true
 }
 
-function createUser() {
-  // TODO: Replace with real API call
-  if (!newUserName.value || !newUserEmail.value) return
-  const newId = users.value.length ? Math.max(...users.value.map(u => u.id)) + 1 : 1
-  users.value.push({ id: newId, name: newUserName.value, email: newUserEmail.value })
-  createUserResult.value = `User ${newUserName.value} created.`
-  showSnackbar(`User ${newUserName.value} created.`, 'success')
-  newUserName.value = ''
-  newUserEmail.value = ''
+
+async function deleteUser(userId: number) {
+  try {
+    await adminService.deleteUser(userId)
+    // Refresh users list
+    await loadUsers()
+    showSnackbar('User deleted successfully', 'success')
+  } catch (error) {
+    showSnackbar('Failed to delete user', 'error')
+  }
 }
 
-function deleteUser(userId: number) {
-  // TODO: Replace with real API call
-  users.value = users.value.filter(u => u.id !== userId)
-  showSnackbar('User deleted.', 'info')
+async function loadUsers() {
+  try {
+    // Map ID to id for compatibility if backend returns ID
+    const rawUsers = await adminService.listUsers()
+    users.value = rawUsers.map(u => ({ ...u, id: u.id ?? (u as any).ID }))
+    // Update admin stats
+    adminStats.value[0].value = users.value.length
+  } catch (error) {
+    console.error('Failed to load users:', error)
+    showSnackbar('Failed to load users', 'error')
+  }
 }
 
 function goToPage(page: number) {
@@ -75,51 +78,113 @@ function goToPage(page: number) {
 // Voucher generation form state
 const voucherValue = ref(50)
 const voucherCount = ref(10)
-const voucherExpiry = ref('2024-12-31')
+const voucherExpiry = ref(30)
 const voucherResult = ref('')
+const vouchers = ref<Voucher[]>([])
 
 // Manual credit form state
-const creditUserId = ref('')
-const creditUserObj = ref<{ id: number; name: string; email: string } | null>(null)
+const creditUserObj = ref<User | null>(null)
 const creditAmount = ref(0)
 const creditReason = ref('')
 const creditResult = ref('')
 
-// Manual credits state for Credits section
-const manualCredits = ref([
-  // Example mock data
-  { id: 1, user: 'Alice', amount: 50, reason: 'Support bonus', date: '2024-06-01' },
-  { id: 2, user: 'Bob', amount: 25, reason: 'Promo credit', date: '2024-06-02' },
-])
+const creditDialog = ref(false)
+const creditUserDialogObj = ref<User | null>(null)
 
 function handleSidebarSelect(newSelected: string) {
   selected.value = newSelected
 }
 
-// Placeholder for API call to generate vouchers
+// Generate vouchers using real API
 async function generateVouchers() {
-  // TODO: Replace with real API call
-  voucherResult.value = `Requested ${voucherCount.value} vouchers of $${voucherValue.value} expiring on ${voucherExpiry.value}`
-  showSnackbar('Vouchers generated!', 'success')
+  try {
+    const data: GenerateVouchersRequest = {
+      count: voucherCount.value,
+      value: voucherValue.value,
+      expire_after_days: voucherExpiry.value
+    }
+    
+    const response = await adminService.generateVouchers(data)
+    voucherResult.value = response.message
+    showSnackbar('Vouchers generated successfully!', 'success')
+    
+    // Refresh vouchers list
+    await loadVouchers()
+  } catch (error) {
+    showSnackbar('Failed to generate vouchers', 'error')
+  }
 }
 
-// Placeholder for API call to apply manual credit
-async function applyManualCredit() {
-  // TODO: Replace with real API call
-  if (!creditUserObj.value) {
-    showSnackbar('Please select a user.', 'error')
-    return
+// Load vouchers using real API
+async function loadVouchers() {
+  try {
+    vouchers.value = await adminService.listVouchers()
+  } catch (error) {
+    console.error('Failed to load vouchers:', error)
+    showSnackbar('Failed to load vouchers', 'error')
   }
-  creditResult.value = `Credited user ${creditUserObj.value.name} with $${creditAmount.value} for: ${creditReason.value}`
-  showSnackbar('Manual credit applied!', 'success')
-  // Optionally reset form
-  creditUserObj.value = null
+}
+
+// Apply manual credit using real API
+async function applyManualCredit() {
+  try {
+    if (!creditUserObj.value) {
+      showSnackbar('Please select a user.', 'error')
+      return
+    }
+    
+    const data: CreditUserRequest = {
+      amount: creditAmount.value,
+      memo: creditReason.value
+    }
+    
+    const response = await adminService.creditUser(creditUserObj.value.id, data)
+    creditResult.value = response.message
+    showSnackbar('Manual credit applied!', 'success')
+    
+    // Reset form
+    creditUserObj.value = null
+    creditAmount.value = 0
+    creditReason.value = ''
+    
+    // Refresh users list to get updated balances
+    await loadUsers()
+  } catch (error) {
+    showSnackbar('Failed to apply credit', 'error')
+  }
+}
+
+function openCreditDialog(user: User) {
+  creditUserDialogObj.value = user
+  creditDialog.value = true
   creditAmount.value = 0
   creditReason.value = ''
+  creditResult.value = ''
 }
 
-function editUser(user: { id: number; name: string; email: string }) {
-  alert('Edit user: ' + user.name)
+function closeCreditDialog() {
+  creditDialog.value = false
+  creditUserDialogObj.value = null
+}
+
+async function applyManualCreditDialog() {
+  if (!creditUserDialogObj.value) return
+  try {
+    const data = {
+      amount: creditAmount.value,
+      memo: creditReason.value
+    }
+    // Use user.id as path param
+    const response = await adminService.creditUser(creditUserDialogObj.value.id, data)
+    creditResult.value = response.message
+    showSnackbar('Manual credit applied!', 'success')
+    creditAmount.value = 0
+    creditReason.value = ''
+    await loadUsers()
+    closeCreditDialog()
+  } catch (error) {
+    showSnackbar('Failed to apply credit', 'error')
+  }
 }
 
 const tabs = [
@@ -130,8 +195,12 @@ const tabs = [
   { key: 'vouchers', label: 'Vouchers' },
 ]
 
-onMounted(() => {
+onMounted(async () => {
   console.log('AdminDashboard mounted, selected:', selected.value)
+  
+  // Load initial data
+  await loadUsers()
+  await loadVouchers()
 })
 </script>
 
@@ -144,298 +213,51 @@ onMounted(() => {
         </div>
         <div class="dashboard-main">
           <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="2500" location="top right">{{ snackbarMsg }}</v-snackbar>
-          <!-- Overview Section -->
-          <div v-if="selected === 'overview'" class="admin-section">
-            <div class="section-header">
-              <h2 class="dashboard-title">Admin Overview</h2>
-              <p class="section-subtitle">Monitor platform health and key metrics</p>
-            </div>
-            <div class="stats-grid">
-              <div v-for="stat in adminStats" :key="stat.label" class="stat-item">
-                <div class="stat-icon">
-                  <v-icon :icon="stat.icon" size="24" :color="stat.color"></v-icon>
-                </div>
-                <div class="stat-content">
-                  <div class="stat-number">{{ stat.value }}</div>
-                  <div class="stat-label">{{ stat.label }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Users Section -->
-          <div v-else-if="selected === 'users'" class="admin-section">
-            <div class="section-header">
-              <h2 class="dashboard-title">User Management</h2>
-              <p class="section-subtitle">Manage user accounts and permissions</p>
-            </div>
-            
-            <div class="dashboard-card">
-              <div class="dashboard-card-header">
-                <h3 class="dashboard-card-title">Create New User</h3>
-                <p class="dashboard-card-subtitle">Add a new user to the platform</p>
-              </div>
-              <v-form @submit.prevent="createUser" class="create-user-form">
-                <div class="form-row">
-                  <v-text-field 
-                    v-model="newUserName" 
-                    label="Name" 
-                    prepend-inner-icon="mdi-account" 
-                    variant="outlined" 
-                    density="comfortable"
-                    required 
-                    hide-details 
-                    class="form-field"
-                  />
-                  <v-text-field 
-                    v-model="newUserEmail" 
-                    label="Email" 
-                    prepend-inner-icon="mdi-email" 
-                    variant="outlined" 
-                    density="comfortable"
-                    required 
-                    hide-details 
-                    class="form-field"
-                  />
-                  <v-btn type="submit" color="primary" variant="elevated" class="btn-primary">
-                    <v-icon icon="mdi-plus" class="mr-2"></v-icon>
-                    Create User
-                  </v-btn>
-                </div>
-              </v-form>
-            </div>
-
-            <div class="dashboard-card">
-              <div class="dashboard-card-header">
-                <h3 class="dashboard-card-title">User Search</h3>
-                <p class="dashboard-card-subtitle">Find and manage existing users</p>
-              </div>
-              <v-text-field 
-                v-model="searchQuery" 
-                label="Search users by name or email" 
-                prepend-inner-icon="mdi-magnify" 
-                variant="outlined" 
-                density="comfortable"
-                clearable 
-                class="search-field"
+          <AdminStatsCards v-if="selected === 'overview'" :adminStats="adminStats" />
+          <AdminUsersTable
+            v-else-if="selected === 'users'"
+            :users="paginatedUsers"
+            :searchQuery="searchQuery"
+            :currentPage="currentPage"
+            :pageSize="pageSize"
+            :totalPages="totalPages"
+            @update:searchQuery="searchQuery = $event"
+            @update:currentPage="goToPage($event)"
+            @deleteUser="deleteUser"
+            @creditUser="openCreditDialog"
+          />
+          <AdminClustersSection v-else-if="selected === 'clusters'" />
+          <AdminSystemSection v-else-if="selected === 'system'" />
+          <AdminVouchersSection
+            v-else-if="selected === 'vouchers'"
+            :voucherValue="voucherValue"
+            :voucherCount="voucherCount"
+            :voucherExpiry="voucherExpiry"
+            :voucherResult="voucherResult"
+            :vouchers="vouchers"
+            @generateVouchers="generateVouchers"
+            @update:voucherValue="voucherValue = $event"
+            @update:voucherCount="voucherCount = $event"
+            @update:voucherExpiry="voucherExpiry = $event"
+          />
+          <v-dialog v-model="creditDialog" max-width="500" persistent>
+            <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">
+              <v-card-title class="text-h6 font-weight-bold mb-2 text-center">Manual Credit</v-card-title>
+              <v-card-subtitle class="mb-4 text-center">Apply credits to user accounts</v-card-subtitle>
+              <AdminManualCredit
+                v-if="creditDialog && creditUserDialogObj"
+                :creditAmount="creditAmount"
+                :creditReason="creditReason"
+                :creditResult="creditResult"
+                @applyManualCredit="applyManualCreditDialog"
+                @update:creditAmount="creditAmount = $event"
+                @update:creditReason="creditReason = $event"
               />
-              
-              <div class="table-container">
-                <v-data-table
-                  :headers="[
-                    { title: 'ID', key: 'id', width: '80px' },
-                    { title: 'Name', key: 'name' },
-                    { title: 'Email', key: 'email' },
-                    { title: 'Actions', key: 'actions', sortable: false, width: '160px' }
-                  ]"
-                  :items="filteredUsers"
-                  :items-per-page="pageSize"
-                  :page="currentPage"
-                  @update:page="currentPage = $event"
-                  class="admin-table"
-                  hide-default-footer
-                  density="comfortable"
-                >
-                  <template #item.actions="{ item }">
-                    <div style="display: flex; gap: var(--space-4); align-items: center;">
-                      <v-btn size="small" variant="outlined" class="action-btn" @click="editUser(item)">
-                        <v-icon icon="mdi-pencil" size="16" class="mr-1"></v-icon>
-                        Edit
-                      </v-btn>
-                      <v-btn size="small" variant="outlined" class="action-btn" @click="deleteUser(item.id)">
-                        <v-icon icon="mdi-delete" size="16" class="mr-1"></v-icon>
-                        Remove
-                      </v-btn>
-                    </div>
-                  </template>
-                </v-data-table>
-              </div>
-              
-              <div class="pagination-container">
-                <v-pagination
-                  v-model="currentPage"
-                  :length="totalPages"
-                  color="primary"
-                  circle
-                  size="small"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Clusters Section -->
-          <div v-else-if="selected === 'clusters'" class="admin-section">
-            <div class="section-header">
-              <h2 class="dashboard-title">Cluster Management</h2>
-              <p class="section-subtitle">Monitor and manage all platform clusters</p>
-            </div>
-            <div class="dashboard-card">
-              <div class="empty-state-content">
-                <v-icon icon="mdi-server-network" size="64" color="var(--color-text-muted)" class="mb-4"></v-icon>
-                <h3 class="empty-state-title">Cluster Management</h3>
-                <p class="empty-state-message">Advanced cluster management features coming soon. Monitor cluster health, performance metrics, and resource utilization.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Credits Section -->
-          <div v-else-if="selected === 'credits'" class="admin-section">
-            <div class="section-header">
-              <h2 class="dashboard-title">Credits History</h2>
-              <p class="section-subtitle">Track all manual credit applications</p>
-            </div>
-            <div class="dashboard-card">
-              <template v-if="manualCredits.length">
-                <div class="dashboard-card-header">
-                  <h3 class="dashboard-card-title">Recent Credits</h3>
-                  <p class="dashboard-card-subtitle">Manual credits applied to user accounts</p>
-                </div>
-                <div class="table-container">
-                  <v-data-table
-                    :headers="[
-                      { title: 'User', key: 'user' },
-                      { title: 'Amount', key: 'amount' },
-                      { title: 'Reason', key: 'reason' },
-                      { title: 'Date', key: 'date' }
-                    ]"
-                    :items="manualCredits"
-                    class="admin-table"
-                    hide-default-footer
-                    density="comfortable"
-                  />
-                </div>
-              </template>
-              <template v-else>
-                <div class="empty-state-content">
-                  <v-icon icon="mdi-cash-plus" size="64" color="var(--color-text-muted)" class="mb-4"></v-icon>
-                  <h3 class="empty-state-title">No Credits Yet</h3>
-                  <p class="empty-state-message">You haven't added any manual credits yet. Use the Users section to apply credits to a user.</p>
-                </div>
-              </template>
-            </div>
-
-            <div class="dashboard-card">
-              <div class="dashboard-card-header">
-                <h3 class="dashboard-card-title">Manual Credit</h3>
-                <p class="section-subtitle">Apply credits to user accounts</p>
-              </div>
-              <v-form @submit.prevent="applyManualCredit" class="credit-form">
-                <div class="form-row">
-                  <v-select
-                    v-model="creditUserObj"
-                    :items="users"
-                    item-title="name"
-                    item-value="id"
-                    label="User"
-                    return-object
-                    :menu-props="{ maxHeight: '300px' }"
-                    prepend-inner-icon="mdi-account"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    class="form-field"
-                    :item-props="user => ({ title: user.name + ' (' + user.email + ')', value: user })"
-                  />
-                  <v-text-field 
-                    v-model.number="creditAmount" 
-                    label="Amount ($)" 
-                    type="number" 
-                    prepend-inner-icon="mdi-currency-usd" 
-                    variant="outlined" 
-                    min="0.01" 
-                    step="0.01" 
-                    density="comfortable"
-                    required 
-                    class="form-field"
-                  />
-                  <v-text-field 
-                    v-model="creditReason" 
-                    label="Reason/Memo" 
-                    prepend-inner-icon="mdi-note-text" 
-                    variant="outlined" 
-                    density="comfortable"
-                    required 
-                    class="form-field"
-                  />
-                </div>
-                <v-btn type="submit" color="primary" variant="elevated" class="btn-primary">
-                  <v-icon icon="mdi-cash-plus" class="mr-2"></v-icon>
-                  Apply Credit
-                </v-btn>
-              </v-form>
-              <v-alert v-if="creditResult" type="success" variant="tonal" class="mt-4">{{ creditResult }}</v-alert>
-            </div>
-          </div>
-
-          <!-- System Section -->
-          <div v-else-if="selected === 'system'" class="admin-section">
-            <div class="section-header">
-              <h2 class="dashboard-title">System Stats</h2>
-              <p class="section-subtitle">Platform health and performance metrics</p>
-            </div>
-            <div class="dashboard-card">
-              <div class="empty-state-content">
-                <v-icon icon="mdi-cog" size="64" color="var(--color-text-muted)" class="mb-4"></v-icon>
-                <h3 class="empty-state-title">System Monitoring</h3>
-                <p class="empty-state-message">Advanced system monitoring, logs, and platform status features coming soon. Monitor system health, performance metrics, and resource utilization.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Vouchers Section -->
-          <div v-else-if="selected === 'vouchers'" class="admin-section">
-            <div class="section-header">
-              <h2 class="dashboard-title">Voucher Management</h2>
-              <p class="section-subtitle">Generate and manage platform vouchers</p>
-            </div>
-            <div class="dashboard-card">
-              <div class="dashboard-card-header">
-                <h3 class="dashboard-card-title">Generate Vouchers</h3>
-                <p class="dashboard-card-subtitle">Create new vouchers for user promotions</p>
-              </div>
-              <v-form @submit.prevent="generateVouchers" class="voucher-form">
-                <div class="form-row">
-                  <v-text-field 
-                    v-model.number="voucherValue" 
-                    label="Voucher Value ($)" 
-                    type="number" 
-                    prepend-inner-icon="mdi-currency-usd" 
-                    variant="outlined" 
-                    min="1" 
-                    density="comfortable"
-                    required 
-                    class="form-field"
-                  />
-                  <v-text-field 
-                    v-model.number="voucherCount" 
-                    label="Number of Vouchers" 
-                    type="number" 
-                    prepend-inner-icon="mdi-pound" 
-                    variant="outlined" 
-                    min="1" 
-                    density="comfortable"
-                    required 
-                    class="form-field"
-                  />
-                  <v-text-field 
-                    v-model="voucherExpiry" 
-                    label="Expiry Date" 
-                    type="date" 
-                    prepend-inner-icon="mdi-calendar" 
-                    variant="outlined" 
-                    density="comfortable"
-                    required 
-                    class="form-field"
-                  />
-                </div>
-                <v-btn type="submit" color="primary" variant="elevated" class="btn-primary">
-                  <v-icon icon="mdi-ticket-percent" class="mr-2"></v-icon>
-                  Generate Vouchers
-                </v-btn>
-              </v-form>
-              <v-alert v-if="voucherResult" type="success" variant="tonal" class="mt-4">{{ voucherResult }}</v-alert>
-            </div>
-          </div>
+              <v-card-actions class="justify-end mt-2">
+                <v-btn text color="grey-lighten-1" @click="closeCreditDialog">Cancel</v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
         </div>
       </div>
     </div>
@@ -605,24 +427,6 @@ onMounted(() => {
 }
 
 /* Forms */
-.create-user-form,
-.credit-form,
-.voucher-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.create-user-form .form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.create-user-form .form-row > .form-field {
-  width: 100%;
-}
-
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

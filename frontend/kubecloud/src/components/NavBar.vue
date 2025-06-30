@@ -3,19 +3,57 @@
     <div class="navbar-content">
       <router-link to="/" class="navbar-logo">KubeCloud</router-link>
       <div class="navbar-main-links">
-        <router-link v-for="link in links" :key="link.to" :to="link.to" class="navbar-link" active-class="active-link">
+        <router-link v-for="link in publicLinks" :key="link.to" :to="link.to" class="navbar-link" active-class="active-link">
           {{ link.label }}
         </router-link>
+        <!-- Show authenticated-only links when user is logged in -->
+        <template v-if="isLoggedIn">
+          <router-link v-for="link in authenticatedLinks" :key="link.to" :to="link.to" class="navbar-link" active-class="active-link">
+            {{ link.label }}
+          </router-link>
+        </template>
       </div>
-      <div class="navbar-signin">
-        <router-link v-if="signInLink" :to="signInLink.to" custom v-slot="{ navigate, isActive }">
+      <div class="navbar-auth">
+        <!-- Show user menu when logged in -->
+        <div v-if="isLoggedIn" class="user-menu">
+          <v-menu>
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                variant="text"
+                color="white"
+                class="user-menu-btn"
+              >
+                <span class="user-name">{{ userName }}</span>
+                <v-icon icon="mdi-chevron-down" class="ml-1"></v-icon>
+              </v-btn>
+            </template>
+            <v-list>
+              <v-list-item v-if="isAdmin" @click="goToAdmin">
+                <v-list-item-title>
+                  <v-icon icon="mdi-shield-crown" class="mr-2"></v-icon>
+                  Admin Panel
+                </v-list-item-title>
+              </v-list-item>
+              <v-divider></v-divider>
+              <v-list-item @click="handleLogout">
+                <v-list-item-title>
+                  <v-icon icon="mdi-logout" class="mr-2"></v-icon>
+                  Sign Out
+                </v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </div>
+        <!-- Show sign in button when not logged in -->
+        <router-link v-else :to="'/sign-in'" custom v-slot="{ navigate, isActive }">
           <v-btn
             variant="outlined"
             color="white"
             @click="navigate"
             :class="{ 'active-link': isActive }"
           >
-            {{ signInLink.label }}
+            Sign In
           </v-btn>
         </router-link>
       </div>
@@ -24,16 +62,59 @@
 </template>
 
 <script setup lang="ts">
-const links = [
+import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
+import { computed, nextTick, watch } from 'vue'
+
+const userStore = useUserStore()
+const router = useRouter()
+
+// Public links (visible to everyone)
+const publicLinks = [
   { label: 'Home', to: '/' },
   { label: 'Features', to: '/features' },
   { label: 'Pricing', to: '/pricing' },
   { label: 'Docs', to: '/docs' },
   { label: 'Use Cases', to: '/use-cases' },
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Admin', to: '/admin' },
 ]
-const signInLink = { label: 'Sign In', to: '/sign-in' }
+
+// Authenticated-only links (visible when logged in)
+const authenticatedLinks = [
+  { label: 'Dashboard', to: '/dashboard' },
+]
+
+// Computed properties for better reactivity
+const isLoggedIn = computed(() => userStore.isLoggedIn)
+const userName = computed(() => {
+  // If we have user data, use the username
+  if (userStore.user?.username) {
+    return userStore.user.username
+  }
+  
+  // If we're logged in but don't have user data, try to extract from token
+  if (userStore.isLoggedIn && userStore.token) {
+    try {
+      // Try to decode the JWT token to get username
+      const payload = JSON.parse(atob(userStore.token.split('.')[1]))
+      return payload.username || 'Authenticated User'
+    } catch (e) {
+      return 'Authenticated User'
+    }
+  }
+  
+  return 'User'
+})
+const isAdmin = computed(() => userStore.isAdmin)
+
+const goToAdmin = () => {
+  router.push('/admin')
+}
+
+const handleLogout = async () => {
+  userStore.logout()
+  await nextTick()
+  router.push('/')
+}
 </script>
 
 <style scoped>
@@ -101,10 +182,23 @@ const signInLink = { label: 'Sign In', to: '/sign-in' }
 .navbar-link.active-link::after {
   width: 100%;
 }
-.navbar-signin {
+.navbar-auth {
   margin-left: auto;
   display: flex;
   align-items: center;
+}
+.user-menu {
+  display: flex;
+  align-items: center;
+}
+.user-menu-btn {
+  color: #e0e7ef !important;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.user-menu-btn:hover {
+  color: #60a5fa !important;
 }
 .more-btn {
   font-size: 1rem;
@@ -132,5 +226,8 @@ const signInLink = { label: 'Sign In', to: '/sign-in' }
   margin-left: 0.5rem;
   font-size: 1.2rem;
   transition: color 0.2s;
+}
+.user-name {
+  font-weight: 500;
 }
 </style>

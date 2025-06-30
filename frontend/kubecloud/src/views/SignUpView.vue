@@ -15,7 +15,6 @@
             variant="outlined"
             class="auth-field"
             :error-messages="errors.firstName"
-            :disabled="loading"
             required
           />
           <v-text-field
@@ -25,7 +24,6 @@
             variant="outlined"
             class="auth-field"
             :error-messages="errors.lastName"
-            :disabled="loading"
             required
           />
         </div>
@@ -37,57 +35,52 @@
           variant="outlined"
           class="auth-field"
           :error-messages="errors.email"
-          :disabled="loading"
           required
         />
         <v-text-field
           v-model="form.password"
           label="Password"
-          type="password"
+          :type="showPassword ? 'text' : 'password'"
           prepend-inner-icon="mdi-lock"
+          :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          @click:append-inner="showPassword = !showPassword"
           variant="outlined"
           class="auth-field"
           :error-messages="errors.password"
-          :disabled="loading"
           required
         />
+        <div class="password-requirements">
+          <small class="text-muted">
+            Password must contain at least 8 characters, including:
+          </small>
+          <ul class="requirements-list">
+            <li>One uppercase letter (A-Z)</li>
+            <li>One lowercase letter (a-z)</li>
+            <li>One number (0-9)</li>
+            <li>One special character (@$!%*?&)</li>
+          </ul>
+        </div>
         <v-text-field
           v-model="form.confirmPassword"
           label="Confirm Password"
-          type="password"
+          :type="showConfirmPassword ? 'text' : 'password'"
           prepend-inner-icon="mdi-lock-check"
+          :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          @click:append-inner="showConfirmPassword = !showConfirmPassword"
           variant="outlined"
           class="auth-field"
           :error-messages="errors.confirmPassword"
-          :disabled="loading"
           required
         />
-        <div class="auth-options">
-          <v-checkbox
-            v-model="form.agreeToTerms"
-            label="I agree to the Terms of Service and Privacy Policy"
-            color="primary"
-            :disabled="loading"
-            class="terms-checkbox"
-          />
-          <v-checkbox
-            v-model="form.newsletter"
-            label="Subscribe to our newsletter for updates"
-            color="primary"
-            :disabled="loading"
-          />
-        </div>
         <v-btn
           type="submit"
           color="white"
           block
           size="large"
           variant="outlined"
-          :loading="loading"
-          :disabled="loading"
         >
           <v-icon icon="mdi-account-plus" class="mr-2"></v-icon>
-          {{ loading ? 'Creating Account...' : 'Create Account' }}
+          {{ 'Create Account' }}
         </v-btn>
       </v-form>
       <div class="auth-footer">
@@ -96,7 +89,6 @@
           variant="outlined"
           color="white"
           to="/sign-in"
-          :disabled="loading"
         >
           Sign In
         </v-btn>
@@ -106,15 +98,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
-import { useLoading } from '../composables/useLoading'
+import { authService } from '../utils/authService'
 import { validateForm, VALIDATION_RULES } from '../utils/validation'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
-const { isLoading: loading, withLoading } = useLoading()
 
 const form = reactive({
   firstName: '',
@@ -122,8 +113,6 @@ const form = reactive({
   email: '',
   password: '',
   confirmPassword: '',
-  agreeToTerms: false,
-  newsletter: false
 })
 
 const errors = reactive({
@@ -133,6 +122,9 @@ const errors = reactive({
   password: '',
   confirmPassword: ''
 })
+
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 
 const clearErrors = () => {
   errors.firstName = ''
@@ -145,14 +137,25 @@ const clearErrors = () => {
 const validateFormData = () => {
   clearErrors()
 
+  // Check if combined name meets backend requirements (3-64 chars)
+  const fullName = `${form.firstName} ${form.lastName}`.trim()
+  if (fullName.length < 3) {
+    errors.firstName = 'Full name must be at least 3 characters'
+    return false
+  }
+  if (fullName.length > 64) {
+    errors.firstName = 'Full name must be no more than 64 characters'
+    return false
+  }
+
   const validationFields = {
     firstName: {
       value: form.firstName,
-      rules: { required: true, minLength: 2 }
+      rules: { required: true, minLength: 1 }
     },
     lastName: {
       value: form.lastName,
-      rules: { required: true, minLength: 2 }
+      rules: { required: true, minLength: 1 }
     },
     email: {
       value: form.email,
@@ -192,11 +195,15 @@ const validateFormData = () => {
         errors.confirmPassword = error
       }
     })
-    return false
-  }
-
-  if (!form.agreeToTerms) {
-    notificationStore.error('Terms Required', 'You must agree to the Terms of Service')
+    
+    // Scroll to the first error field
+    setTimeout(() => {
+      const firstErrorField = document.querySelector('.auth-field .v-field--error')
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+    
     return false
   }
 
@@ -205,26 +212,24 @@ const validateFormData = () => {
 
 const handleSignUp = async () => {
   if (!validateFormData()) {
-    notificationStore.error('Validation Error', 'Please fix the errors above')
+    // Don't show generic notification - inline errors are already shown
     return
   }
 
   try {
-    await withLoading(
-      async () => {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        // Simulate success
-        notificationStore.success('Account Created!', 'Welcome to KubeCloud! Please check your email to verify your account.')
-        router.push('/sign-in')
-      },
-      'Creating your account...',
-      'Account created successfully!'
-    )
+    // Use the real auth service
+    await authService.register({
+      name: `${form.firstName} ${form.lastName}`,
+      email: form.email,
+      password: form.password,
+      confirm_password: form.confirmPassword
+    })
+    
+    // Redirect to verify page on success
+    router.push({ path: '/register/verify', query: { email: form.email } })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Sign up failed'
-    notificationStore.error('Sign Up Failed', message)
+    // Error handling is done in the auth service
+    console.error('Sign up error:', error)
   }
 }
 
@@ -365,5 +370,33 @@ onMounted(() => {
     opacity: 1;
     transform: none;
   }
+}
+
+/* Password field styling */
+.auth-field :deep(.v-field__append-inner) {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.auth-field :deep(.v-field__append-inner:hover) {
+  color: var(--color-primary, #3B82F6);
+}
+
+.auth-field :deep(.v-field__append-inner .v-icon) {
+  font-size: 1.2rem;
+}
+
+.password-requirements {
+  margin-bottom: var(--space-4);
+}
+
+.text-muted {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.requirements-list {
+  list-style-type: disc;
+  padding-left: var(--space-4);
 }
 </style>

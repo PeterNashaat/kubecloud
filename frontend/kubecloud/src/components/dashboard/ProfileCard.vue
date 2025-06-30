@@ -3,142 +3,79 @@
     <div class="card-header">
       <div class="card-title-section">
         <div class="card-title-content">
-          <h3 class="dashboard-card-title">Profile Settings</h3>
-          <p class="card-subtitle">Manage your account information and preferences</p>
+          <h3 class="dashboard-card-title">Profile</h3>
+          <p class="card-subtitle">Your account information</p>
         </div>
       </div>
     </div>
-    <v-form @submit.prevent="saveProfile" class="profile-form">
+    <div v-if="user" class="profile-form">
       <v-row>
         <v-col cols="12" md="6">
           <v-text-field
-            v-model="profile.firstName"
+            :model-value="profile.firstName"
             label="First Name"
             variant="outlined"
             class="profile-field"
-            :rules="[rules.required]"
             color="accent"
             bg-color="transparent"
             hide-details="auto"
+            readonly
           />
         </v-col>
         <v-col cols="12" md="6">
           <v-text-field
-            v-model="profile.lastName"
+            :model-value="profile.lastName"
             label="Last Name"
             variant="outlined"
             class="profile-field"
-            :rules="[rules.required]"
             color="accent"
             bg-color="transparent"
             hide-details="auto"
-          />
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12" md="6">
-          <v-text-field
-            v-model="profile.email"
-            label="Email Address"
-            variant="outlined"
-            type="email"
-            class="profile-field"
-            :rules="[rules.required, rules.email]"
-            color="accent"
-            bg-color="transparent"
-            hide-details="auto"
-          />
-        </v-col>
-        <v-col cols="12" md="6">
-          <v-text-field
-            v-model="profile.phone"
-            label="Phone Number"
-            variant="outlined"
-            class="profile-field"
-            color="accent"
-            bg-color="transparent"
-            hide-details="auto"
+            readonly
           />
         </v-col>
       </v-row>
       <v-row>
         <v-col cols="12">
-          <v-textarea
-            v-model="profile.bio"
-            label="Bio"
-            variant="outlined"
-            rows="3"
-            class="profile-field"
-            color="accent"
-            bg-color="transparent"
-            hide-details="auto"
-          />
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12" md="6">
           <v-text-field
-            v-model="profile.company"
-            label="Company"
+            :model-value="profile.email"
+            label="Email Address"
             variant="outlined"
+            type="email"
             class="profile-field"
             color="accent"
             bg-color="transparent"
             hide-details="auto"
-          />
-        </v-col>
-        <v-col cols="12" md="6">
-          <v-text-field
-            v-model="profile.website"
-            label="Website"
-            variant="outlined"
-            class="profile-field"
-            color="accent"
-            bg-color="transparent"
-            hide-details="auto"
+            readonly
           />
         </v-col>
       </v-row>
-      <v-row>
-        <v-col cols="12" class="d-flex justify-end">
-          <v-btn type="submit" variant="outlined" color="white" class="action-btn">Save Changes</v-btn>
-        </v-col>
-      </v-row>
-    </v-form>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 
-const loading = ref(false)
+const userStore = useUserStore()
+const user = computed(() => userStore.user)
 
-const profile = reactive({
-  firstName: 'John',
-  lastName: 'Doe',
-  email: 'john.doe@example.com',
-  phone: '+1 (555) 123-4567',
-  bio: 'Full-stack developer passionate about cloud computing and decentralized technologies.',
-  company: 'TechCorp Inc.',
-  website: 'https://johndoe.dev'
+const profile = ref({
+  firstName: null as string | null,
+  lastName: null as string | null,
+  email: null as string | null
 })
 
-const rules = {
-  required: (value: string) => !!value || 'This field is required.',
-  email: (value: string) => {
-    const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return pattern.test(value) || 'Please enter a valid email address.'
+// Watch for user data and populate profile fields
+watch(user, (newUser) => {
+  if (newUser) {
+    const [firstName, ...rest] = newUser.username.split(' ')
+    profile.value.firstName = firstName
+    profile.value.lastName = rest.join(' ')
+    profile.value.email = newUser.email
   }
-}
-
-function saveProfile() {
-  loading.value = true
-  // Simulate API call
-  setTimeout(() => {
-    loading.value = false
-    // Show success message
-  }, 2000)
-}
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -148,23 +85,27 @@ function saveProfile() {
 
 .profile-field {
   color: #CBD5E1;
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.2);
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.12);
   border-radius: 0.75rem;
   margin-bottom: 1rem;
-  transition: all 0.2s ease;
+  transition: none;
+  pointer-events: none; /* Prevents hover/focus */
 }
 
+.profile-field:focus-within,
 .profile-field:hover {
-  border-color: rgba(96, 165, 250, 0.4);
-  background: rgba(96, 165, 250, 0.15);
+  border-color: rgba(96, 165, 250, 0.12);
+  background: rgba(96, 165, 250, 0.08);
 }
 
-.profile-field:focus-within {
-  border-color: rgba(96, 165, 250, 0.6);
+.profile-field[readonly],
+.profile-field :deep(input[readonly]) {
+  background: rgba(96, 165, 250, 0.08) !important;
+  border-color: rgba(96, 165, 250, 0.12) !important;
+  cursor: default !important;
 }
 
-/* Vuetify field overrides */
 .profile-field :deep(.v-field) {
   background: transparent !important;
   border: none !important;
@@ -199,31 +140,5 @@ function saveProfile() {
 
 .profile-field :deep(.v-field--variant-outlined .v-field__outline__notch) {
   border-color: transparent !important;
-}
-
-/* Button styling */
-.action-btn {
-  background: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  color: #fff !important;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-@media (max-width: 960px) {
-  .profile-form {
-    margin-top: 1rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .profile-field {
-    margin-bottom: 0.75rem;
-  }
 }
 </style>

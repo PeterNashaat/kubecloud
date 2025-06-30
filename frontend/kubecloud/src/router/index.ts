@@ -14,16 +14,19 @@ const router = createRouter({
       path: '/sign-in',
       name: 'sign-in',
       component: () => import('../views/SignInView.vue'),
+      meta: { requiresGuest: true }
     },
     {
       path: '/sign-up',
       name: 'sign-up',
       component: () => import('../views/SignUpView.vue'),
+      meta: { requiresGuest: true }
     },
     {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/UserDashboard.vue'),
+      meta: { requiresAuth: true }
     },
     {
       path: '/features',
@@ -34,12 +37,14 @@ const router = createRouter({
       path: '/clusters/:id',
       name: 'manage-cluster',
       component: () => import('../components/dashboard/ManageClusterView.vue'),
-      props: true
+      props: true,
+      meta: { requiresAuth: true }
     },
     {
       path: '/deploy',
       name: 'deploy-cluster',
       component: () => import('../views/DeployClusterView.vue'),
+      meta: { requiresAuth: true }
     },
     {
       path: '/reserve',
@@ -65,6 +70,19 @@ const router = createRouter({
       path: '/admin',
       name: 'admin-dashboard',
       component: () => import('../views/AdminDashboard.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+      path: '/register/verify',
+      name: 'register-verify',
+      component: () => import('../views/RegisterVerifyView.vue'),
+      meta: { requiresGuest: true }
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('../views/ForgotPasswordView.vue'),
+      meta: { requiresGuest: true }
     },
   ],
   scrollBehavior(to, from, savedPosition) {
@@ -73,20 +91,43 @@ const router = createRouter({
   }
 })
 
-// router.beforeEach((to, from, next) => {
-//   if (to.path === '/admin') {
-//     // Use Pinia store to check admin status
-//     const userStore = useUserStore()
-//     if (!userStore.isLoggedIn) {
-//       // Not logged in, redirect to sign-in
-//       return next('/sign-in')
-//     }
-//     if (!userStore.isAdmin) {
-//       // Not an admin, redirect to dashboard
-//       return next('/dashboard')
-//     }
-//   }
-//   next()
-// })
+router.beforeEach((to, from, next) => {
+  const userStore = useUserStore()
+  
+  // Check if user is authenticated
+  const isAuthenticated = userStore.isLoggedIn
+  
+  console.log('Route guard:', {
+    to: to.path,
+    from: from.path,
+    isAuthenticated,
+    user: userStore.user
+  })
+  
+  // If route requires guest (sign-in, sign-up) and user is authenticated
+  if (to.meta.requiresGuest && isAuthenticated) {
+    console.log('Authenticated user trying to access guest route, redirecting to home')
+    // Redirect authenticated users to home
+    return next('/')
+  }
+  
+  // If route requires authentication and user is not authenticated
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    console.log('Unauthenticated user trying to access protected route, redirecting to sign-in')
+    // Redirect to sign-in
+    return next('/sign-in')
+  }
+  
+  // If route requires admin access and user is not admin
+  if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    console.log('Non-admin user trying to access admin route, redirecting to dashboard')
+    // Not an admin, redirect to dashboard
+    return next('/dashboard')
+  }
+  
+  console.log('Route guard allowing navigation to:', to.path)
+  // For public routes (home, features, etc.), allow access to everyone
+  next()
+})
 
 export default router

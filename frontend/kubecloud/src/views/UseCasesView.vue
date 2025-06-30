@@ -129,11 +129,11 @@ onMounted(() => {
 .use-cases-content {
   position: relative;
   z-index: 2;
-  padding: 6rem 0 6rem 0;
+  padding: 0 0 6rem 0;
 }
 
 .use-cases-cards-row {
-  margin: 1rem;
+  margin: 0 10rem 0 10rem;
 }
 
 .use-case-card {

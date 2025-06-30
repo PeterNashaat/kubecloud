@@ -128,7 +128,7 @@ export const VALIDATION_RULES = {
     pattern: PATTERNS.PASSWORD,
     custom: (value: string) => {
       if (!PATTERNS.PASSWORD.test(value)) {
-        return 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character'
+        return 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character (@$!%*?&)'
       }
       return true
     }

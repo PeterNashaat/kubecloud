@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useUserStore } from '@/stores/user'
 import ClustersCard from '../components/dashboard/ClustersCard.vue'
 import BillingCard from '../components/dashboard/BillingCard.vue'
 import PaymentCard from '../components/dashboard/PaymentCard.vue'
@@ -9,7 +10,8 @@ import ProfileCard from '../components/dashboard/ProfileCard.vue'
 import OverviewCard from '../components/dashboard/OverviewCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 
-const userName = ref('John Doe')
+const userStore = useUserStore()
+const userName = computed(() => userStore.user?.username || 'User')
 const selected = ref('overview')
 const clusters = ref([
   { id: 1, name: 'Production Cluster', status: 'running', nodes: 3, region: 'US East' },

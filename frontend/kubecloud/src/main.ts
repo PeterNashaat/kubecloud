@@ -11,6 +11,7 @@ import { aliases, mdi } from 'vuetify/iconsets/mdi'
 
 import App from './App.vue'
 import router from './router'
+import { useUserStore } from './stores/user'
 
 const vuetify = createVuetify({
   theme: {
@@ -46,8 +47,13 @@ const vuetify = createVuetify({
 })
 
 const app = createApp(App)
+const pinia = createPinia()
 
-app.use(createPinia())
+app.use(pinia)
+// Initialize auth state
+const userStore = useUserStore()
+userStore.initializeAuth()
+
 app.use(router)
 app.use(vuetify)
 

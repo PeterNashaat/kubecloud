@@ -21,8 +21,10 @@
         <v-text-field
           v-model="form.password"
           label="Password"
-          type="password"
+          :type="showPassword ? 'text' : 'password'"
           prepend-inner-icon="mdi-lock"
+          :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          @click:append-inner="showPassword = !showPassword"
           variant="outlined"
           class="auth-field"
           :error-messages="errors.password"
@@ -41,6 +43,7 @@
             size="small"
             class="forgot-password-btn kubecloud-hover-blue"
             :disabled="loading"
+            @click="router.push('/forgot-password')"
           >
             Forgot Password?
           </v-btn>
@@ -74,15 +77,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
-import { useLoading } from '../composables/useLoading'
+import { useUserStore } from '../stores/user'
 import { validateForm, VALIDATION_RULES } from '../utils/validation'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
-const { isLoading: loading, withLoading } = useLoading()
+const userStore = useUserStore()
 
 const form = reactive({
   email: '',
@@ -94,6 +97,9 @@ const errors = reactive({
   email: '',
   password: ''
 })
+
+const showPassword = ref(false)
+const loading = ref(false)
 
 const clearErrors = () => {
   errors.email = ''
@@ -131,31 +137,28 @@ const validateFormData = () => {
 }
 
 const handleSignIn = async () => {
-  if (!validateFormData()) {
-    notificationStore.error('Validation Error', 'Please fix the errors above')
-    return
-  }
+  if (!validateFormData()) return
 
+  loading.value = true
   try {
-    await withLoading(
-      async () => {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        // Simulate success
-        if (form.email === 'test@example.com' && form.password === 'password') {
-          notificationStore.success('Welcome Back!', 'Successfully signed in to your account')
-          router.push('/dashboard')
-        } else {
-          throw new Error('Invalid email or password')
-        }
-      },
-      'Signing in...',
-      'Successfully signed in!'
-    )
+    await userStore.login(form.email, form.password)
+    await nextTick()
+    console.log('Login successful, user state:', {
+      isLoggedIn: userStore.isLoggedIn,
+      user: userStore.user,
+      token: userStore.token
+    })
+    try {
+      await router.replace('/')
+      console.log('Router navigation to home sent')
+    } catch (routerError) {
+      console.warn('Router navigation failed, using window.location:', routerError)
+      window.location.href = '/'
+    }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Sign in failed'
-    notificationStore.error('Sign In Failed', message)
+    console.error('Sign in error:', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -286,5 +289,19 @@ onMounted(() => {
     opacity: 1;
     transform: none;
   }
+}
+
+/* Password field styling */
+.auth-field :deep(.v-field__append-inner) {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.auth-field :deep(.v-field__append-inner:hover) {
+  color: var(--color-primary, #3B82F6);
+}
+
+.auth-field :deep(.v-field__append-inner .v-icon) {
+  font-size: 1.2rem;
 }
 </style>
