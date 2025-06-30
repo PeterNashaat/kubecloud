@@ -5,7 +5,6 @@ import (
 	"kubecloud/internal"
 	"kubecloud/models"
 	"net/http"
-	"strconv"
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -448,11 +447,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 }
 
 func (h *Handler) ChargeBalance(c *gin.Context) {
-	userID := c.GetString("user_id")
-	if userID == "" {
-		Error(c, http.StatusBadRequest, "Failed to extract user ID from context", "")
-		return
-	}
+	userID := c.GetInt("user_id")
 
 	var request ChargeBalanceInput
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -466,13 +461,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	ID, err := strconv.Atoi(userID)
-	if err != nil {
-		Error(c, http.StatusBadRequest, "Invalid user ID", "")
-		return
-	}
-
-	user, err := h.db.GetUserByID(ID)
+	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusNotFound, "User not found", "")
@@ -514,6 +503,23 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	Success(c, http.StatusOK, "Balance is charged successfully", gin.H{
 		"payment_intent_id": intent.ID,
 		"new_balance":       user.CreditCardBalance,
+	})
+
+}
+
+// GetUserHandler returns all data of user
+func (h *Handler) GetUserHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "User is not found", "")
+		return
+	}
+
+	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
+		"user": user,
 	})
 
 }
