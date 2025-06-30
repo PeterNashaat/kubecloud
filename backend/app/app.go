@@ -10,6 +10,7 @@ import (
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
 	"github.com/gin-gonic/gin"
@@ -55,7 +56,13 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to connect to substrate client: %w", err)
 	}
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient)
+	graphqlClient, err := graphql.NewGraphQl(config.GraphqlURL)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to connect to graphql client")
+		return nil, fmt.Errorf("failed to connect to graphql client: %w", err)
+	}
+
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient)
 
 	app := &App{
 		router:   router,

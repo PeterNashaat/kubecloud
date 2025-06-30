@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/models"
 	"net/http"
 	"strconv"
 
@@ -104,7 +105,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	}
 	if len(nodes) == 0 {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "No nodes are available for rent.","")
+		Error(c, http.StatusNotFound, "No nodes are available for rent.", "")
 		return
 	}
 	node := nodes[0]
@@ -117,19 +118,31 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 	}
 
 	//TODO: check price in month constant
-	if usdBalance < node.PriceUsd/24/30 {
+	if usdBalance < node.PriceUsd/24/30 || user.Debt > 0 {
 		Error(c, http.StatusBadRequest, "You should at lease have enough balance for one hour", "")
 		return
 	}
 
 	contractID, err := h.substrateClient.CreateRentContract(identity, nodeID, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	err = h.db.CreateUserNode(&models.UserNodes{
+		UserID:     userID,
+		ContractID: contractID,
+		NodeID:     nodeID,
+	})
+
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

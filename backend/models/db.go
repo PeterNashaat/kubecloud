@@ -16,4 +16,11 @@ type DB interface {
 	RedeemVoucher(code string) error
 	CreateTransaction(transaction *Transaction) error
 	CreditUserBalance(userID int, amount uint64) error
+	CreateInvoice(invoice *Invoice) error
+	GetInvoice(id int) (Invoice, error)
+	ListUserInvoices(userID int) ([]Invoice, error)
+	ListInvoices() ([]Invoice, error)
+	UpdateInvoicePDF(id int, data []byte) error
+	CreateUserNode(userNode *UserNodes) error
+	ListUserNodes(userID int) ([]UserNodes, error)
 }

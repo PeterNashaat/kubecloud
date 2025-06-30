@@ -16,4 +16,13 @@ type User struct {
 	CreditCardBalance float64   `json:"credit_card_balance" gorm:"default:0"` // money from credit card
 	CreditedBalance   float64   `json:"credited_balance" gorm:"default:0"`    // manually added by admin or from vouchers
 	Mnemonic          string    `json:"-" gorm:"column:mnemonic"`
+	Debt              float64   `json:"debt"`
+}
+
+// UserNodes model holds info of reserved nodes of user
+type UserNodes struct {
+	ID         int    `gorm:"primaryKey;autoIncrement;column:id"`
+	UserID     int    `gorm:"user_id" binding:"required"`
+	ContractID uint64 `gorm:"contract_id" binding:"required"`
+	NodeID     uint32 `gorm:"node_id" binding:"required"`
 }

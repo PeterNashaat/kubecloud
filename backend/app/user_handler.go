@@ -8,6 +8,7 @@ import (
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
 	"github.com/gin-gonic/gin"
@@ -25,10 +26,11 @@ type Handler struct {
 	mailService     internal.MailService
 	proxyClient     proxy.Client
 	substrateClient *substrate.Substrate
+	graphqlClient   graphql.GraphQl
 }
 
 // NewHandler create new handler
-func NewHandler(tokenManager internal.TokenManager, db models.DB, config internal.Configuration, mailService internal.MailService, gridproxy proxy.Client, substrateClient *substrate.Substrate) *Handler {
+func NewHandler(tokenManager internal.TokenManager, db models.DB, config internal.Configuration, mailService internal.MailService, gridproxy proxy.Client, substrateClient *substrate.Substrate, garphqlClient graphql.GraphQl) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -547,7 +549,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		return
 	}
 
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -555,6 +557,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 
 	Success(c, http.StatusOK, "Balance fetched", gin.H{
 		"balance_usd": usdBalance,
+		"debt_usd":    user.Debt,
 	})
 
 }

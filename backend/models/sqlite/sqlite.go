@@ -22,7 +22,7 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{})
+	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{})
 	if err != nil {
 		return nil, err
 	}
@@ -171,4 +171,42 @@ func (s *Sqlite) CreditUserBalance(userID int, amount uint64) error {
 		Where("id = ?", userID).
 		UpdateColumn("credited_balance", gorm.Expr("credited_balance + ?", amount)).
 		Error
+}
+
+// CreateInvoice creates new invoice
+func (s *Sqlite) CreateInvoice(invoice *models.Invoice) error {
+	return s.db.Create(&invoice).Error
+}
+
+// GetInvoice returns an invoice by ID
+func (s *Sqlite) GetInvoice(id int) (models.Invoice, error) {
+	var invoice models.Invoice
+	return invoice, s.db.First(&invoice, id).Error
+}
+
+// ListUserInvoices returns all invoices of user
+func (s *Sqlite) ListUserInvoices(userID int) ([]models.Invoice, error) {
+	var invoices []models.Invoice
+	return invoices, s.db.Where("user_id = ?", userID).Find(&invoices).Error
+}
+
+// ListInvoices returns all invoices (admin)
+func (s *Sqlite) ListInvoices() ([]models.Invoice, error) {
+	var invoices []models.Invoice
+	return invoices, s.db.Find(&invoices).Error
+}
+
+func (s *Sqlite) UpdateInvoicePDF(id int, data []byte) error {
+	return s.db.Model(&models.Invoice{}).Where("id = ?", id).Updates(map[string]interface{}{"file_data": data}).Error
+}
+
+// CreateUserNode creates new node record for user
+func (s *Sqlite) CreateUserNode(userNode *models.UserNodes) error {
+	return s.db.Create(&userNode).Error
+}
+
+// ListUserNodes returns all nodes records for user by its ID
+func (s *Sqlite) ListUserNodes(userID int) ([]models.UserNodes, error) {
+	var userNodes []models.UserNodes
+	return userNodes, s.db.Where("user_id = ?", userID).Find(&userNodes).Error
 }

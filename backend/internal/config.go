@@ -22,6 +22,7 @@ type Configuration struct {
 	TFChainURL           string             `json:"tfchain_url" validate:"required"`
 	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
 	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
+	GraphqlURL           string             `json:"graphql_url" validate:"required"`
 	SystemAccount        GridAccount        `json:"system_account"`
 }
 
