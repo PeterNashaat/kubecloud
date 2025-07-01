@@ -11,9 +11,9 @@
     <div v-if="user" class="profile-form">
       <v-row>
         <v-col cols="12" md="6">
+          <label class="profile-label">Username</label>
           <v-text-field
-            :model-value="profile.firstName"
-            label="First Name"
+            :model-value="user.username"
             variant="outlined"
             class="profile-field"
             color="accent"
@@ -23,9 +23,36 @@
           />
         </v-col>
         <v-col cols="12" md="6">
+          <label class="profile-label">Email Address</label>
           <v-text-field
-            :model-value="profile.lastName"
-            label="Last Name"
+            :model-value="user.email"
+            variant="outlined"
+            type="email"
+            class="profile-field"
+            color="accent"
+            bg-color="transparent"
+            hide-details="auto"
+            readonly
+          />
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col cols="12" md="6">
+          <label class="profile-label">Verified</label>
+          <v-text-field
+            :model-value="user.verified ? 'Yes' : 'No'"
+            variant="outlined"
+            class="profile-field"
+            color="accent"
+            bg-color="transparent"
+            hide-details="auto"
+            readonly
+          />
+        </v-col>
+        <v-col cols="12" md="6">
+          <label class="profile-label">Admin</label>
+          <v-text-field
+            :model-value="user.admin ? 'Yes' : 'No'"
             variant="outlined"
             class="profile-field"
             color="accent"
@@ -36,12 +63,49 @@
         </v-col>
       </v-row>
       <v-row>
-        <v-col cols="12">
+        <v-col cols="12" md="6">
+          <label class="profile-label">Credit Card Balance</label>
           <v-text-field
-            :model-value="profile.email"
-            label="Email Address"
+            :model-value="user.credit_card_balance"
             variant="outlined"
-            type="email"
+            class="profile-field"
+            color="accent"
+            bg-color="transparent"
+            hide-details="auto"
+            readonly
+          />
+        </v-col>
+        <v-col cols="12" md="6">
+          <label class="profile-label">Credited Balance</label>
+          <v-text-field
+            :model-value="user.credited_balance"
+            variant="outlined"
+            class="profile-field"
+            color="accent"
+            bg-color="transparent"
+            hide-details="auto"
+            readonly
+          />
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col cols="12" md="6">
+          <label class="profile-label">Stripe Customer ID</label>
+          <v-text-field
+            :model-value="user.stripe_customer_id"
+            variant="outlined"
+            class="profile-field"
+            color="accent"
+            bg-color="transparent"
+            hide-details="auto"
+            readonly
+          />
+        </v-col>
+        <v-col cols="12" md="6">
+          <label class="profile-label">Last Updated</label>
+          <v-text-field
+            :model-value="formatDate(user.updated_at)"
+            variant="outlined"
             class="profile-field"
             color="accent"
             bg-color="transparent"
@@ -55,27 +119,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 
-const userStore = useUserStore()
-const user = computed(() => userStore.user)
+const { user } = storeToRefs(useUserStore())
 
-const profile = ref({
-  firstName: null as string | null,
-  lastName: null as string | null,
-  email: null as string | null
-})
-
-// Watch for user data and populate profile fields
-watch(user, (newUser) => {
-  if (newUser) {
-    const [firstName, ...rest] = newUser.username.split(' ')
-    profile.value.firstName = firstName
-    profile.value.lastName = rest.join(' ')
-    profile.value.email = newUser.email
-  }
-}, { immediate: true })
+function formatDate(dateStr: string) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleString()
+}
 </script>
 
 <style scoped>
@@ -140,5 +193,13 @@ watch(user, (newUser) => {
 
 .profile-field :deep(.v-field--variant-outlined .v-field__outline__notch) {
   border-color: transparent !important;
+}
+
+.profile-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: --color-text;
+  font-weight: 500;
+  font-size: 0.95rem;
 }
 </style>

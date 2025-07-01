@@ -47,19 +47,17 @@ const totalSpent = computed(() => {
     .reduce((sum, bill) => sum + bill.amount, 0)
     .toFixed(2)
 })
-const uptimeHours = computed(() => {
-  return clusters.value
-    .filter(cluster => cluster.status === 'running')
-    .reduce((sum, cluster) => sum + cluster.nodes * 24, 0)
-})
 function handleSidebarSelect(val: string) {
   selected.value = val
 }
-function handleLogout() {
-  // Implement logout logic here
-}
 function handleNavigate(section: string) {
   selected.value = section
+}
+
+function redeemVoucher(voucher: any) {
+  // TODO: Implement redeem logic (API call, update UI, etc.)
+  alert(`Redeem voucher: ${voucher.name}`)
+  // Or use a notification/snackbar
 }
 </script>
 
@@ -89,7 +87,7 @@ function handleNavigate(section: string) {
               <BillingCard v-if="selected === 'billing'" :billingHistory="billingHistory" />
               <PaymentCard v-if="selected === 'payment'" :paymentMethods="paymentMethods" />
               <SshKeysCard v-if="selected === 'ssh'" :sshKeys="sshKeys" />
-              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" />
+              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
               <ProfileCard v-if="selected === 'profile'" />
             </div>
           </div>

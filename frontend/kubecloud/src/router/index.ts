@@ -47,7 +47,7 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/reserve',
+      path: '/nodes',
       name: 'reserve',
       component: () => import('../views/ReserveView.vue'),
     },
@@ -97,36 +97,23 @@ router.beforeEach((to, from, next) => {
   // Check if user is authenticated
   const isAuthenticated = userStore.isLoggedIn
   
-  console.log('Route guard:', {
-    to: to.path,
-    from: from.path,
-    isAuthenticated,
-    user: userStore.user
-  })
-  
   // If route requires guest (sign-in, sign-up) and user is authenticated
   if (to.meta.requiresGuest && isAuthenticated) {
-    console.log('Authenticated user trying to access guest route, redirecting to home')
     // Redirect authenticated users to home
     return next('/')
   }
   
   // If route requires authentication and user is not authenticated
   if (to.meta.requiresAuth && !isAuthenticated) {
-    console.log('Unauthenticated user trying to access protected route, redirecting to sign-in')
     // Redirect to sign-in
     return next('/sign-in')
   }
   
   // If route requires admin access and user is not admin
   if (to.meta.requiresAdmin && !userStore.isAdmin) {
-    console.log('Non-admin user trying to access admin route, redirecting to dashboard')
     // Not an admin, redirect to dashboard
     return next('/dashboard')
-  }
-  
-  console.log('Route guard allowing navigation to:', to.path)
-  // For public routes (home, features, etc.), allow access to everyone
+  }  // For public routes (home, features, etc.), allow access to everyone
   next()
 })
 

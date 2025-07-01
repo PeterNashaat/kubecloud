@@ -36,9 +36,6 @@ const adminNavItems = [
   { key: 'system', title: 'System', icon: 'mdi-cog' },
 ]
 
-onMounted(() => {
-  console.log('AdminSidebar mounted, selected:', props.selected)
-})
 </script>
 
 <style scoped>

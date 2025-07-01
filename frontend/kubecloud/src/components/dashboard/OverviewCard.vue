@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="dashboard-card">
     <div class="dashboard-card-header">
       <div class="dashboard-card-title-section">
         <div class="dashboard-card-title-content">
@@ -164,7 +164,7 @@ const quickActions = [
     icon: 'mdi-server-plus',
     color: 'secondary',
     variant: 'outlined' as const,
-    handler: () => router.push('/reserve')
+    handler: () => router.push('/nodes')
   },
   {
     label: 'Add SSH Key',

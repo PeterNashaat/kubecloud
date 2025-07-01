@@ -133,7 +133,7 @@ onMounted(() => {
 }
 
 .use-cases-cards-row {
-  margin: 0 10rem 0 10rem;
+  margin: 0 10rem;
 }
 
 .use-case-card {

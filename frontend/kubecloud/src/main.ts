@@ -8,6 +8,7 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { aliases, mdi } from 'vuetify/iconsets/mdi'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
 import App from './App.vue'
 import router from './router'
@@ -48,7 +49,7 @@ const vuetify = createVuetify({
 
 const app = createApp(App)
 const pinia = createPinia()
-
+pinia.use(piniaPluginPersistedstate)
 app.use(pinia)
 // Initialize auth state
 const userStore = useUserStore()

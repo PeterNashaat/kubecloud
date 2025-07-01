@@ -7,26 +7,15 @@
         <p class="auth-subtitle">Join KubeCloud and start your journey</p>
       </div>
       <v-form @submit.prevent="handleSignUp" class="auth-form">
-        <div class="name-fields">
-          <v-text-field
-            v-model="form.firstName"
-            label="First Name"
-            prepend-inner-icon="mdi-account"
-            variant="outlined"
-            class="auth-field"
-            :error-messages="errors.firstName"
-            required
-          />
-          <v-text-field
-            v-model="form.lastName"
-            label="Last Name"
-            prepend-inner-icon="mdi-account"
-            variant="outlined"
-            class="auth-field"
-            :error-messages="errors.lastName"
-            required
-          />
-        </div>
+        <v-text-field
+          v-model="form.name"
+          label="Name"
+          prepend-inner-icon="mdi-account"
+          variant="outlined"
+          class="auth-field"
+          :error-messages="errors.name"
+          required
+        />
         <v-text-field
           v-model="form.email"
           label="Email Address"
@@ -101,23 +90,22 @@
 import { reactive, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
-import { authService } from '../utils/authService'
+import { useUserStore } from '../stores/user'
 import { validateForm, VALIDATION_RULES } from '../utils/validation'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
+const userStore = useUserStore()
 
 const form = reactive({
-  firstName: '',
-  lastName: '',
+  name: '',
   email: '',
   password: '',
   confirmPassword: '',
 })
 
 const errors = reactive({
-  firstName: '',
-  lastName: '',
+  name: '',
   email: '',
   password: '',
   confirmPassword: ''
@@ -127,8 +115,7 @@ const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
 const clearErrors = () => {
-  errors.firstName = ''
-  errors.lastName = ''
+  errors.name = ''
   errors.email = ''
   errors.password = ''
   errors.confirmPassword = ''
@@ -137,25 +124,19 @@ const clearErrors = () => {
 const validateFormData = () => {
   clearErrors()
 
-  // Check if combined name meets backend requirements (3-64 chars)
-  const fullName = `${form.firstName} ${form.lastName}`.trim()
-  if (fullName.length < 3) {
-    errors.firstName = 'Full name must be at least 3 characters'
+  if (form.name.length < 3) {
+    errors.name = 'Name must be at least 3 characters'
     return false
   }
-  if (fullName.length > 64) {
-    errors.firstName = 'Full name must be no more than 64 characters'
+  if (form.name.length > 64) {
+    errors.name = 'Name must be no more than 64 characters'
     return false
   }
 
   const validationFields = {
-    firstName: {
-      value: form.firstName,
-      rules: { required: true, minLength: 1 }
-    },
-    lastName: {
-      value: form.lastName,
-      rules: { required: true, minLength: 1 }
+    name: {
+      value: form.name,
+      rules: { required: true, minLength: 3 }
     },
     email: {
       value: form.email,
@@ -183,10 +164,8 @@ const validateFormData = () => {
 
   if (!result.isValid) {
     result.errors.forEach(error => {
-      if (error.includes('firstName')) {
-        errors.firstName = error
-      } else if (error.includes('lastName')) {
-        errors.lastName = error
+      if (error.includes('name')) {
+        errors.name = error
       } else if (error.includes('email')) {
         errors.email = error
       } else if (error.includes('password') && !error.includes('confirm')) {
@@ -195,18 +174,8 @@ const validateFormData = () => {
         errors.confirmPassword = error
       }
     })
-    
-    // Scroll to the first error field
-    setTimeout(() => {
-      const firstErrorField = document.querySelector('.auth-field .v-field--error')
-      if (firstErrorField) {
-        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-    }, 100)
-    
     return false
   }
-
   return true
 }
 
@@ -217,12 +186,11 @@ const handleSignUp = async () => {
   }
 
   try {
-    // Use the real auth service
-    await authService.register({
-      name: `${form.firstName} ${form.lastName}`,
+    await userStore.register({
+      name: form.name,
       email: form.email,
       password: form.password,
-      confirm_password: form.confirmPassword
+      confirmPassword: form.confirmPassword
     })
     
     // Redirect to verify page on success
@@ -321,9 +289,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin-bottom: var(--space-4);
-}
-.auth-field {
   margin-bottom: var(--space-4);
 }
 .v-btn[type="submit"] {

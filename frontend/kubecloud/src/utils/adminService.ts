@@ -1,4 +1,5 @@
 import { api } from "./api"
+import type { ApiResponse } from "./authService"
 
 // Types for admin requests and responses
 export interface User {
@@ -64,17 +65,17 @@ export class AdminService {
 
   // List all users (requires admin auth)
   async listUsers(): Promise<User[]> {
-    const response = await api.get<User[]>('/v1/user', {
+    const response = await api.get<ApiResponse<{ users: User[] }>>('/v1/users', {
       requiresAuth: true,
       showNotifications: true,
       errorMessage: 'Failed to load users'
     })
-    return response.data
+    return response.data.data.users
   }
 
   // Delete a user (requires admin auth)
   async deleteUser(userId: number): Promise<DeleteUserResponse> {
-    const response = await api.delete<DeleteUserResponse>(`/v1/user/${userId}`, {
+    const response = await api.delete<DeleteUserResponse>(`/v1/users/${userId}`, {
       requiresAuth: true,
       showNotifications: true,
       loadingMessage: 'Deleting user...',
@@ -86,7 +87,7 @@ export class AdminService {
 
   // Credit a user's balance (requires admin auth)
   async creditUser(userId: number, data: CreditUserRequest): Promise<CreditUserResponse> {
-    const response = await api.post<CreditUserResponse>(`/v1/user/${userId}/credit`, data, {
+    const response = await api.post<CreditUserResponse>(`/v1/users/${userId}/credit`, data, {
       requiresAuth: true,
       showNotifications: true,
       loadingMessage: 'Crediting user...',
@@ -98,7 +99,7 @@ export class AdminService {
 
   // Generate vouchers (requires admin auth)
   async generateVouchers(data: GenerateVouchersRequest): Promise<GenerateVouchersResponse> {
-    const response = await api.post<GenerateVouchersResponse>('/v1/user/vouchers/generate', data, {
+    const response = await api.post<GenerateVouchersResponse>('/v1/vouchers/generate', data, {
       requiresAuth: true,
       showNotifications: true,
       loadingMessage: 'Generating vouchers...',
@@ -110,12 +111,12 @@ export class AdminService {
 
   // List all vouchers (requires admin auth)
   async listVouchers(): Promise<Voucher[]> {
-    const response = await api.get<Voucher[]>('/v1/user/vouchers', {
+    const response = await api.get<ApiResponse<{ vouchers: Voucher[] }>>('/v1/vouchers', {
       requiresAuth: true,
       showNotifications: true,
       errorMessage: 'Failed to load vouchers'
     })
-    return response.data
+    return response.data.data.vouchers
   }
 }
 

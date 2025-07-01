@@ -93,13 +93,7 @@ const userName = computed(() => {
   
   // If we're logged in but don't have user data, try to extract from token
   if (userStore.isLoggedIn && userStore.token) {
-    try {
-      // Try to decode the JWT token to get username
-      const payload = JSON.parse(atob(userStore.token.split('.')[1]))
-      return payload.username || 'Authenticated User'
-    } catch (e) {
-      return 'Authenticated User'
-    }
+    return userStore.user?.username
   }
   
   return 'User'

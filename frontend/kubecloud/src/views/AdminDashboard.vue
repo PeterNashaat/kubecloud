@@ -195,9 +195,7 @@ const tabs = [
   { key: 'vouchers', label: 'Vouchers' },
 ]
 
-onMounted(async () => {
-  console.log('AdminDashboard mounted, selected:', selected.value)
-  
+onMounted(async () => {  
   // Load initial data
   await loadUsers()
   await loadVouchers()

@@ -500,13 +500,6 @@ async function deployCluster() {
       availableSshKeys.value.find(k => k.id === keyId)
     );
     
-    console.log('Deploying cluster with configuration:', {
-      name: clusterName.value,
-      vms: allVMs.value,
-      sshKeys: selectedKeys,
-      qsfsConfig: qsfsConfig.value
-    });
-    
     // Show success message
     alert(`Cluster "${clusterName.value}" deployment initiated successfully!`);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { api } from '../utils/api'
+import { api } from '@/utils/api'
+import type { ApiResponse } from '@/utils/authService'
 
 export interface Node {
   id: number
@@ -25,9 +26,12 @@ export function useNodes() {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get<{ total: number; nodes: Node[] }>('/v1/user/nodes', { requiresAuth: true })
-      nodes.value = response.data.nodes
-      total.value = response.data.total
+      const response = await api.get<ApiResponse<{ total: number; nodes: Node[] }>>(
+        '/v1/nodes',
+        { requiresAuth: true, body: {} }
+      )
+      nodes.value = response.data.data.nodes
+      total.value = response.data.data.total
     } catch (err: any) {
       error.value = err?.message || 'Failed to fetch nodes'
     } finally {

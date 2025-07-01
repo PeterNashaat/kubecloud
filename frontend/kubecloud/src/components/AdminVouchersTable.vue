@@ -72,7 +72,7 @@
           density="comfortable"
         >
           <template #item.value="{ item }">
-            {{ item.value }}
+            {{ item.Value }}
           </template>
           <template #item.used="{ item }">
             {{ item.used === true || item.used === 'true' ? 'Yes' : 'No' }}

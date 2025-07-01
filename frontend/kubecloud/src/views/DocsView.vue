@@ -13,7 +13,7 @@
     <!-- Documentation Content -->
     <section class="docs-content section-padding">
       <div class="container-padding">
-        <v-row class="docs-cards-row">
+        <v-row class="docs-cards d-flex justify-center" :gap="10">
           <v-col cols="12" md="6" lg="3" v-for="doc in docs" :key="doc.title" class="doc-col">
             <div class="doc-card card-enhanced fade-in">
               <div class="doc-icon">
@@ -136,8 +136,8 @@ onMounted(() => {
   margin: 0 2rem 0 2rem;
 }
 
-.docs-cards-row {
-  margin: 0 -1rem;
+.docs-cards {
+  margin: 0 10rem;
 }
 
 .doc-col {

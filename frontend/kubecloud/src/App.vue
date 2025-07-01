@@ -59,13 +59,13 @@ const currentTheme = computed(() => {
   const path = route.path
 
   // Theme mapping for different routes
-  const themeMap: Record<string, 'default' | 'home' | 'features' | 'pricing' | 'use-cases' | 'docs' | 'reserve' | 'dashboard'> = {
+  const themeMap: Record<string, 'default' | 'home' | 'features' | 'pricing' | 'use-cases' | 'docs' | 'nodes' | 'dashboard'> = {
     '/': 'home',
     '/features': 'features',
     '/pricing': 'pricing',
     '/usecases': 'use-cases',
     '/docs': 'docs',
-    '/reserve': 'reserve',
+    '/nodes': 'nodes',
     '/deploy': 'dashboard'
   }
 

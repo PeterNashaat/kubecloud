@@ -11,7 +11,7 @@
     <div class="dashboard-card-content">
       <div class="balance-section list-item-interactive">
         <span class="balance-label">Current Balance:</span>
-        <span class="balance-value">$ {{ balance }}</span>
+        <span class="balance-value">$ {{ user?.credited_balance ?? 0 }}</span>
       </div>
       <div class="amount-section">
         <label class="section-label">Amount</label>
@@ -76,8 +76,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useUserStore } from '@/stores/user'
+import { userService } from '../../utils/userService'
 
-const balance = ref(100) // Placeholder, replace with real balance from backend
+const { user } = storeToRefs(useUserStore())
+
 const presets = [5, 10, 20, 50]
 const amount = ref<number | 'custom'>(5)
 const customAmount = ref<number | null>(null)
@@ -93,21 +97,32 @@ function selectAmount(val: number | 'custom') {
   if (val !== 'custom') customAmount.value = null
 }
 
-function chargeBalance() {
+async function chargeBalance() {
   loading.value = true
   successMessage.value = ''
   errorMessage.value = ''
-  // Simulate API call
-  setTimeout(() => {
+  const selectedAmount = getSelectedAmount()
+  if (!selectedAmount || !cardNumber.value || !expiry.value || !cvc.value) {
+    errorMessage.value = 'Please fill all fields.'
     loading.value = false
-    if (!getSelectedAmount() || !cardNumber.value || !expiry.value || !cvc.value) {
-      errorMessage.value = 'Please fill all fields.'
-      return
+    return
+  }
+  try {
+    // Compose payment_method_id as a string (could be card number + expiry + cvc for demo)
+    const payment_method_id = `${cardNumber.value}|${expiry.value}|${cvc.value}`
+    const payload = {
+      card_type: 'credit', // or detect from card number
+      payment_method_id,
+      amount: Number(selectedAmount)
     }
-    // Simulate success
+    await userService.chargeBalance(payload)
     successMessage.value = 'Balance charged successfully!'
     // Optionally update balance here
-  }, 1200)
+  } catch (err: any) {
+    errorMessage.value = err?.message || 'Failed to charge balance.'
+  } finally {
+    loading.value = false
+  }
 }
 
 function getSelectedAmount() {
@@ -124,8 +139,8 @@ function getSelectedAmount() {
   margin-bottom: var(--space-8);
   border: 1px solid var(--color-border, #334155);
   max-width: 480px;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0;
+  padding: 0 !important;
 }
 .dashboard-card-header {
   margin-bottom: var(--space-6);
@@ -148,6 +163,7 @@ function getSelectedAmount() {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  align-items: flex-start;
 }
 .balance-section {
   display: flex;
@@ -165,7 +181,7 @@ function getSelectedAmount() {
 }
 .balance-label {
   font-weight: 500;
-  color: var(--color-text-secondary, #CBD5E1);
+  color: var(--color-text, #CBD5E1);
 }
 .balance-value {
   font-weight: 700;
@@ -177,7 +193,7 @@ function getSelectedAmount() {
 }
 .section-label {
   font-weight: 500;
-  color: var(--color-text-secondary, #CBD5E1);
+  color: var(--color-text, #CBD5E1);
   margin-bottom: 0.5rem;
   display: block;
 }
@@ -192,35 +208,23 @@ function getSelectedAmount() {
   border-radius: 0.75rem;
   padding: 0.5rem 1.2rem;
   font-size: 1rem;
-  color: var(--color-primary, #38BDF8);
+  color: var(--color-text);
   cursor: pointer;
   font-weight: 500;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   outline: none;
 }
-.amount-btn.selected,
-.amount-btn:focus {
-  background: var(--color-primary, #38BDF8);
-  color: #fff;
-  border-color: var(--color-primary, #38BDF8);
-}
 .amount-input {
-  width: 80px;
+  width: 7rem;
   padding: 0.5rem 0.7rem;
   border: 1.5px solid var(--color-border, #334155);
   border-radius: 0.75rem;
   font-size: 1rem;
-  color: var(--color-primary, #38BDF8);
+  color: var(--color-text);
   background: var(--color-bg-btn, #232f47);
   outline: none;
   font-weight: 500;
   margin-left: 0.2rem;
-}
-.amount-input.selected,
-.amount-input:focus {
-  border-color: var(--color-primary, #38BDF8);
-  background: #fff;
-  color: var(--color-primary, #38BDF8);
 }
 .card-details-section {
   margin-bottom: 0;
@@ -235,19 +239,13 @@ function getSelectedAmount() {
   border: 1.5px solid var(--color-border, #334155);
   border-radius: 0.75rem;
   font-size: 1rem;
-  color: var(--color-primary, #38BDF8);
+  color: var(--color-text);
   background: var(--color-bg-btn, #232f47);
   outline: none;
-  width: 160px;
   font-weight: 500;
 }
 .card-input.short {
-  width: 70px;
-}
-.card-input:focus {
-  border-color: var(--color-primary, #38BDF8);
-  background: #fff;
-  color: var(--color-primary, #38BDF8);
+  width: 5.5rem;
 }
 .charge-section {
   margin-top: 0.5rem;

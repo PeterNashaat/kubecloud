@@ -32,16 +32,10 @@
           required
         />
         <div class="auth-options-vertical">
-          <v-checkbox
-            v-model="form.rememberMe"
-            label="Remember me"
-            color="primary"
-            :disabled="loading"
-          />
           <v-btn
             variant="text"
             size="small"
-            class="forgot-password-btn kubecloud-hover-blue"
+            class="kubecloud-hover-blue pa-0"
             :disabled="loading"
             @click="router.push('/forgot-password')"
           >
@@ -79,18 +73,15 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNotificationStore } from '../stores/notifications'
 import { useUserStore } from '../stores/user'
 import { validateForm, VALIDATION_RULES } from '../utils/validation'
 
 const router = useRouter()
-const notificationStore = useNotificationStore()
 const userStore = useUserStore()
 
 const form = reactive({
   email: '',
   password: '',
-  rememberMe: false
 })
 
 const errors = reactive({
@@ -143,16 +134,9 @@ const handleSignIn = async () => {
   try {
     await userStore.login(form.email, form.password)
     await nextTick()
-    console.log('Login successful, user state:', {
-      isLoggedIn: userStore.isLoggedIn,
-      user: userStore.user,
-      token: userStore.token
-    })
     try {
       await router.replace('/')
-      console.log('Router navigation to home sent')
     } catch (routerError) {
-      console.warn('Router navigation failed, using window.location:', routerError)
       window.location.href = '/'
     }
   } catch (error) {
@@ -240,9 +224,6 @@ onMounted(() => {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
-}
-.auth-field {
   margin-bottom: var(--space-4);
 }
 .v-btn[type="submit"] {

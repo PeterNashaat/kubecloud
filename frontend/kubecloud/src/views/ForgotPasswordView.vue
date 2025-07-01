@@ -69,8 +69,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '@/utils/authService'
+import { useUserStore } from '../stores/user'
+import { api } from '../utils/api'
 
 const router = useRouter()
+const userStore = useUserStore()
 const step = ref(1)
 const email = ref('')
 const code = ref('')
@@ -102,13 +105,19 @@ const handleVerifyCode = async () => {
   successMessage.value = ''
   loading.value = true
   try {
-    await authService.verifyForgotPasswordCode({ email: email.value, code: Number(code.value) })
-    successMessage.value = 'Code verified! You can now reset your password.'
-    // Optionally, redirect to a reset password page or show a password reset form here
-    setTimeout(() => router.replace('/sign-in'), 2000)
+    // Get tokens from verification
+    const tokens = await authService.verifyForgotPasswordCode({ email: email.value, code: Number(code.value) })
+    authService.storeTokens(tokens.access_token, tokens.refresh_token)
+    userStore.token = tokens.access_token
+    // Fetch user profile
+    const userRes = await api.get('/v1/user/', { requiresAuth: true, showNotifications: false }) as any
+    userStore.user = userRes.data.data.user
+    successMessage.value = 'Verification successful! Redirecting to your dashboard...'
+    setTimeout(() => router.replace('/'), 1500)
   } catch (err: any) {
     error.value = err?.message || 'Invalid code'
     errorMessage.value = error.value
+    successMessage.value = ''
   } finally {
     loading.value = false
   }
@@ -168,7 +177,6 @@ onMounted(() => {
 .auth-subtitle {
   color: #fff;
   font-size: 1.1rem;
-  margin-bottom: 1.5rem;
 }
 .auth-form {
   width: 100%;
