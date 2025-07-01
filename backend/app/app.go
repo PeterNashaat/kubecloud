@@ -88,9 +88,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 
 	// Create an app-level context for coordinating shutdown
-	appCtx, appCancel := context.WithCancel(context.Background())
+	_, appCancel := context.WithCancel(context.Background())
 
-	workerManager := internal.NewWorkerManager(appCtx, redisClient, sseManager, config.DeployerWorkersNum, gridClient)
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, redisClient, sseManager)
 
@@ -216,7 +216,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 	}
 
 	if app.workerManager != nil {
-		app.workerManager.StopWithContext(ctx)
+		app.workerManager.Stop()
 	}
 
 	if app.sseManager != nil {
