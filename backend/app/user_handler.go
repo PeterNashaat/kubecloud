@@ -544,6 +544,27 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 
 }
 
+// GetUserBalance returns user's balance in usd
+func (h *Handler) GetUserBalance(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "User not found", "")
+		return
+	}
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+	}
+	Success(c, http.StatusOK, "Balance fetched", gin.H{
+		"balance_usd": usdBalance,
+		"debt_usd":    user.Debt,
+	})
+}
+
 func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	voucherCodeParam := c.Param("voucher_code")
 	if voucherCodeParam == "" {
