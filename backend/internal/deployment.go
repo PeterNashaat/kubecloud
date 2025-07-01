@@ -37,9 +37,9 @@ func buildNetwork(name, projectName string, nodes []uint32, addMycelium bool) (w
 }
 
 // DeployKubernetesCluster deploys a kubernetes cluster
-func DeployKubernetesCluster(ctx context.Context, t deployer.TFPluginClient, master workloads.K8sNode, workers []workloads.K8sNode, sshKey, k8sFlist string) (workloads.K8sCluster, error) {
+func DeployKubernetesCluster(ctx context.Context, t deployer.TFPluginClient, master workloads.K8sNode, workers []workloads.K8sNode, sshKey, k8sFlist, userID string) (workloads.K8sCluster, error) {
 	networkName := fmt.Sprintf("%snetwork", master.Name)
-	projectName := fmt.Sprintf("kubernetes/%s", master.Name)
+	projectName := fmt.Sprintf("kubernetes/%s/%s", userID, master.Name)
 	networkNodes := []uint32{master.NodeID}
 	for _, worker := range workers {
 		if !slices.Contains(networkNodes, worker.NodeID) {
