@@ -133,6 +133,10 @@ func (r *RedisClient) GetPendingTasks(ctx context.Context, consumerName string, 
 		if err == redis.Nil {
 			return []DeploymentTask{}, nil
 		}
+		// Check if context was canceled (during shutdown)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("failed to read from stream: %w", err)
 	}
 

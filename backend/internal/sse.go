@@ -19,6 +19,8 @@ type SSEManager struct {
 	clientsMux sync.RWMutex
 	redis      *RedisClient
 	db         models.DB
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 type SSEMessage struct {
@@ -30,15 +32,35 @@ type SSEMessage struct {
 }
 
 func NewSSEManager(redis *RedisClient, db models.DB) *SSEManager {
+	ctx, cancel := context.WithCancel(context.Background())
 	manager := &SSEManager{
 		clients: make(map[string]map[chan SSEMessage]bool),
 		redis:   redis,
 		db:      db,
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 
 	go manager.listenForResults()
 
 	return manager
+}
+
+// Stop gracefully stops the SSE manager
+func (s *SSEManager) Stop() {
+	log.Debug().Msg("Stopping SSE manager")
+	s.cancel()
+
+	// Close all client channels
+	s.clientsMux.Lock()
+	defer s.clientsMux.Unlock()
+
+	for userID, clients := range s.clients {
+		for clientChan := range clients {
+			close(clientChan)
+		}
+		delete(s.clients, userID)
+	}
 }
 
 // AddClient adds a new SSE client for a user
@@ -60,12 +82,15 @@ func (s *SSEManager) RemoveClient(userID string, clientChan chan SSEMessage) {
 	defer s.clientsMux.Unlock()
 
 	if clients, exists := s.clients[userID]; exists {
-		delete(clients, clientChan)
-		if len(clients) == 0 {
-			delete(s.clients, userID)
+		if _, channelExists := clients[clientChan]; channelExists {
+			delete(clients, clientChan)
+			if len(clients) == 0 {
+				delete(s.clients, userID)
+			}
+			// Only close the channel if it's still being tracked
+			close(clientChan)
 		}
 	}
-	close(clientChan)
 }
 
 // BroadcastToUser sends a message to all connections for a specific user
@@ -93,7 +118,6 @@ func (s *SSEManager) BroadcastToUser(userID string, message SSEMessage) {
 
 // listenForResults listens for deployment results from Redis and broadcasts them
 func (s *SSEManager) listenForResults() {
-	ctx := context.Background()
 	callback := func(result *DeploymentResult) {
 		message := SSEMessage{
 			Type:   "deployment_update",
@@ -105,7 +129,11 @@ func (s *SSEManager) listenForResults() {
 		s.BroadcastToUser(result.UserID, message)
 	}
 
-	if err := s.redis.SubscribeToResults(ctx, callback); err != nil {
+	if err := s.redis.SubscribeToResults(s.ctx, callback); err != nil {
+		if s.ctx.Err() != nil {
+			log.Debug().Msg("SSE manager stopped listening for results due to context cancellation")
+			return
+		}
 		log.Error().Err(err).Msg("Failed to listen for results")
 	}
 }

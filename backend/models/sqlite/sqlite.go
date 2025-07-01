@@ -13,7 +13,7 @@ import (
 // Sqlite struct implements db interface with sqlite
 type Sqlite struct {
 	db    *gorm.DB
-	mutex *sync.Mutex
+	mutex sync.Mutex
 }
 
 // NewSqliteStorage connects to the database file

@@ -13,6 +13,7 @@ import (
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
@@ -33,6 +34,9 @@ type App struct {
 
 // NewApp create new instance of the app with all configs
 func NewApp(config internal.Configuration) (*App, error) {
+	// set zerolog level debug
+	log.Logger = log.Logger.Level(zerolog.DebugLevel)
+
 	router := gin.Default()
 
 	stripe.Key = config.StripeSecret
@@ -74,9 +78,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 		config.Grid.Mnemonic,
 		deployer.WithNetwork(config.Grid.Network),
 		// TODO: remove this after testing
-		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
-		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
+		deployer.WithRelayURL("wss://relay.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
@@ -203,6 +207,10 @@ func (app *App) Shutdown(ctx context.Context) error {
 
 	if app.workerManager != nil {
 		app.workerManager.Stop()
+	}
+
+	if app.sseManager != nil {
+		app.sseManager.Stop()
 	}
 
 	if app.redis != nil {

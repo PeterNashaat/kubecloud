@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"kubecloud/internal"
 	"net/http"
 	"time"
@@ -37,10 +38,11 @@ func (h *Handler) DeployHandler(c *gin.Context) {
 		return
 	}
 
+	id := fmt.Sprintf("%v", userID)
 	taskID := uuid.New().String()
 	task := &internal.DeploymentTask{
 		TaskID:    taskID,
-		UserID:    userID.(string),
+		UserID:    id,
 		Status:    internal.TaskStatusPending,
 		CreatedAt: time.Now(),
 		Payload:   cluster,

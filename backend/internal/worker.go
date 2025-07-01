@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
 // Worker represents a deployment worker
@@ -66,6 +67,11 @@ func (w *Worker) processLoop(ctx context.Context) {
 		case <-ticker.C:
 			task, err := w.redis.GetNextPendingTask(ctx, w.ID)
 			if err != nil {
+				// Don't log context cancellation as error during shutdown
+				if ctx.Err() != nil {
+					log.Debug().Str("worker_id", w.ID).Msg("Worker stopping due to context cancellation")
+					return
+				}
 				log.Error().Err(err).Str("worker_id", w.ID).Msg("Failed to get pending task")
 				continue
 			}
@@ -121,23 +127,23 @@ func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *D
 		UserID: task.UserID,
 	}
 
-	res, err := DeployKubernetesCluster(ctx, w.gridClient, *task.Payload.Master, task.Payload.Workers, "", "")
-	if err != nil {
-		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
-		result.Status = TaskStatusFailed
-		result.Error = "Deployment failed"
-		result.Message = "Failed to deploy cluster"
-		result.CompletedAt = time.Now()
-		return result
-	}
+	// res, err := DeployKubernetesCluster(ctx, w.gridClient, *task.Payload.Master, task.Payload.Workers, "", "")
+	// if err != nil {
+	// 	log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
+	// 	result.Status = TaskStatusFailed
+	// 	result.Error = "Deployment failed"
+	// 	result.Message = "Failed to deploy cluster"
+	// 	result.CompletedAt = time.Now()
+	// 	return result
+	// }
 
-	// log.Info().Str("task_id", task.TaskID).Msg("Starting deployment simulation (30s sleep)")
-	// time.Sleep(time.Second * 30)
+	log.Info().Str("task_id", task.TaskID).Msg("Starting deployment simulation (30s sleep)")
+	time.Sleep(time.Second * 30)
 
 	result.Status = TaskStatusCompleted
 	result.Message = "Deployment completed"
 	result.CompletedAt = time.Now()
-	result.Result = res
+	result.Result = workloads.K8sCluster{}
 
 	log.Info().Str("task_id", task.TaskID).Msg("Deployment simulation completed")
 	return result

@@ -114,13 +114,36 @@ func (c *Client) makeRequest(method, endpoint string, body interface{}, needsAut
 	return c.httpClient.Do(req)
 }
 
+func (c *Client) Register(name, email, password, confirmPassword string) error {
+	req := RegisterRequest{
+		Name:            name,
+		Email:           email,
+		Password:        password,
+		ConfirmPassword: confirmPassword,
+	}
+
+	resp, err := c.makeRequest("POST", "/user/register", req, false)
+	if err != nil {
+		return fmt.Errorf("register request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("registration failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Printf("✅ Registration successful for %s!\n", name)
+	return nil
+}
+
 func (c *Client) Login(email, password string) error {
 	req := LoginRequest{
 		Email:    email,
 		Password: password,
 	}
 
-	resp, err := c.makeRequest("POST", "/login", req, false)
+	resp, err := c.makeRequest("POST", "/user/login", req, false)
 	if err != nil {
 		return fmt.Errorf("login request failed: %w", err)
 	}
@@ -270,18 +293,24 @@ func (c *Client) ListenToSSE(taskID string) error {
 func main() {
 	client := NewClient()
 
-	fmt.Println("\n1. Logging in...")
-	if err := client.Login("omar@example.com", "password"); err != nil {
+	// Test registration first
+	// fmt.Println("\n1. Testing user registration...")
+	// if err := client.Register("Test User", "testuser@example.com", "testpassword123", "testpassword123"); err != nil {
+	// 	fmt.Printf("⚠️  Registration failed (might already exist): %v\n", err)
+	// }
+
+	fmt.Println("\n2. Logging in...")
+	if err := client.Login("testuser@example.com", "testpassword123"); err != nil {
 		log.Fatalf("Login failed: %v", err)
 	}
 
-	fmt.Println("\n2. Deploying k8s cluster...")
-	taskID, err := client.DeployClusterWithSSE("my_k8s_cluster2")
+	fmt.Println("\n3. Deploying k8s cluster...")
+	taskID, err := client.DeployClusterWithSSE("my_k8s_cluster3")
 	if err != nil {
 		log.Fatalf("Deployment failed: %v", err)
 	}
 
-	fmt.Printf("\n3. Listening for deployment updates (Task ID: %s)...\n", taskID)
+	fmt.Printf("\n4. Listening for deployment updates (Task ID: %s)...\n", taskID)
 	if err := client.ListenToSSE(taskID); err != nil {
 		log.Printf("SSE listening ended: %v", err)
 	}

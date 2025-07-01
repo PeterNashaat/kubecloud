@@ -135,27 +135,27 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	isAdmin := internal.Contains(h.config.Admins, request.Email)
 
-	mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to setup user on TFChain")
-		InternalServerError(c)
-		return
-	}
-	customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
+	// mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("failed to setup user on TFChain")
+	// 	InternalServerError(c)
+	// 	return
+	// }
+	// customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
+	// if err != nil {
+	// 	log.Error().Err(err).Send()
+	// 	InternalServerError(c)
+	// 	return
+	// }
 
 	user := models.User{
-		StripeCustomerID: customer.ID,
+		StripeCustomerID: "",
 		Username:         request.Name,
 		Email:            request.Email,
 		Password:         hashedPassword,
 		Admin:            isAdmin,
 		Code:             code,
-		Mnemonic:         mnemonic,
+		Mnemonic:         "",
 	}
 
 	// If user exists but not verified
