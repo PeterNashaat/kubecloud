@@ -27,10 +27,11 @@ type Handler struct {
 	proxyClient     proxy.Client
 	substrateClient *substrate.Substrate
 	graphqlClient   graphql.GraphQl
+	firesquidClient graphql.GraphQl
 }
 
 // NewHandler create new handler
-func NewHandler(tokenManager internal.TokenManager, db models.DB, config internal.Configuration, mailService internal.MailService, gridproxy proxy.Client, substrateClient *substrate.Substrate, garphqlClient graphql.GraphQl) *Handler {
+func NewHandler(tokenManager internal.TokenManager, db models.DB, config internal.Configuration, mailService internal.MailService, gridproxy proxy.Client, substrateClient *substrate.Substrate, graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -38,6 +39,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB, config interna
 		mailService:     mailService,
 		proxyClient:     gridproxy,
 		substrateClient: substrateClient,
+		graphqlClient:   graphqlClient,
+		firesquidClient: firesquidClient,
 	}
 }
 

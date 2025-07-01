@@ -6,6 +6,7 @@ import (
 	"kubecloud/models"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -21,6 +22,7 @@ type ListNodesInput struct {
 
 // ListNodesHandler requests all nodes from gridproxy
 func (h *Handler) ListNodesHandler(c *gin.Context) {
+	//TODO: convert this to param
 	var request ListNodesInput
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -141,6 +143,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		UserID:     userID,
 		ContractID: contractID,
 		NodeID:     nodeID,
+		CreatedAt:  time.Now(),
 	})
 
 	if err != nil {

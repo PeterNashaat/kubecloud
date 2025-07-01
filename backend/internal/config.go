@@ -23,6 +23,7 @@ type Configuration struct {
 	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
 	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
 	GraphqlURL           string             `json:"graphql_url" validate:"required"`
+	FiresquidURL         string             `json:"firesquid_url" validate:"required"`
 	SystemAccount        GridAccount        `json:"system_account"`
 }
 

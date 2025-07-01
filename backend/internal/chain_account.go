@@ -133,7 +133,21 @@ func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string
 		return 0, err
 	}
 
-	rawTFT := float64(tftBalance.Free.Int64())
+	usdBalance, err := FromTFTtoUSD(substrateClient, tftBalance.Free.Uint64())
+	if err != nil {
+		return 0, err
+	}
+
+	if userDebt > usdBalance {
+		return 0, nil
+	}
+
+	return usdBalance - userDebt, nil
+
+}
+
+func FromTFTtoUSD(substrateClient *substrate.Substrate, amount uint64) (float64, error) {
+	rawTFT := float64(amount)
 	tft := rawTFT / 1e7
 
 	// convert balance to USDC to show it to user
@@ -144,10 +158,6 @@ func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string
 	}
 
 	usdBalance := float64(tft) * (float64(price) / 1000)
-	if userDebt > usdBalance {
-		return 0, nil
-	}
-
-	return usdBalance - userDebt, nil
+	return usdBalance, nil
 
 }

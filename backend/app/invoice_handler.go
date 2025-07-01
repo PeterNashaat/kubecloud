@@ -1,12 +1,13 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/models"
 	"net/http"
 	"strconv"
 
-	// "kubecloud/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -49,7 +50,7 @@ func (h *Handler) ListUserInvoicesHandler(c *gin.Context) {
 	})
 }
 
-func (h *Handler) MonthlyInvoicesHandler(c *gin.Context) {
+func (h *Handler) MonthlyInvoicesHandler() {
 	for {
 		now := time.Now()
 		monthLastDay := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location()).AddDate(0, 0, -1)
@@ -63,18 +64,9 @@ func (h *Handler) MonthlyInvoicesHandler(c *gin.Context) {
 			log.Error().Err(err).Send()
 		}
 		for _, user := range users {
-			records, err := h.db.ListUserNodes(user.ID)
-
-			if err != nil {
+			if err = h.createUserInvoice(user, monthLastDay); err != nil {
 				log.Error().Err(err).Send()
 			}
-			fmt.Println(records)
-			// h.db.CreateInvoice(&models.Invoice{
-			// 	UserID: user.ID,
-			// 	//TODO:
-			// 	Total: 0,
-			// })
-
 		}
 	}
 
@@ -82,7 +74,23 @@ func (h *Handler) MonthlyInvoicesHandler(c *gin.Context) {
 
 func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
+	////
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+	now := time.Now()
+	monthLastDay := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location()).AddDate(0, 0, -1)
 
+	err = h.createUserInvoice(user, monthLastDay)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+	/////
 	invoiceID := c.Param("invoice_id")
 	if invoiceID == "" {
 		Error(c, http.StatusBadRequest, "Invoice ID is required", "")
@@ -104,31 +112,31 @@ func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 	}
 
 	// Creating pdf for invoice if it doesn't have it
-	if len(invoice.FileData) == 0 {
-		user, err := h.db.GetUserByID(userID)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-
-		pdfContent, err := internal.CreateInvoicePDF(invoice, user)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-
-		invoice.FileData = pdfContent
-		if err := h.db.UpdateInvoicePDF(id, invoice.FileData); err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
+	// if len(invoice.FileData) == 0 {
+	user, err = h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
 	}
 
+	pdfContent, err := internal.CreateInvoicePDF(invoice, user)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	invoice.FileData = pdfContent
+	if err := h.db.UpdateInvoicePDF(id, invoice.FileData); err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+	// }
+
 	if userID != invoice.UserID {
-		Error(c, http.StatusNotFound, "Invalid invoice ID", "")
+		Error(c, http.StatusNotFound, "User is not authorized to download this invoice", "")
 		return
 	}
 
@@ -136,4 +144,77 @@ func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "application/pdf")
 	c.Data(http.StatusOK, "application/pdf", invoice.FileData)
 
+}
+
+func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) error {
+	records, err := h.db.ListUserNodes(user.ID)
+	now := time.Now()
+
+	if err != nil {
+		return err
+	}
+	var nodeItems []models.NodeItem
+	var totalInvoiceCost float64
+
+	for _, record := range records {
+		billReports, err := internal.ListContractBillReportsPerMonth(h.graphqlClient, record.ContractID, now)
+		if err != nil {
+			return err
+		}
+
+		totalAmountTFT, err := internal.AmountBilledPerMonth(billReports)
+		if err != nil {
+			return err
+		}
+		totalAmountUSD, err := internal.FromTFTtoUSD(h.substrateClient, totalAmountTFT)
+		if err != nil {
+			return err
+		}
+		rentRecordStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		if record.CreatedAt.After(rentRecordStart) {
+			rentRecordStart = record.CreatedAt
+		}
+		cancellationData, err := internal.GetRentContractCancellationDate(h.firesquidClient, record.ContractID)
+		fmt.Printf("cancellationData: %v\n", cancellationData)
+
+		totalHours := cancellationData.Day() * 24
+		if errors.Is(err, internal.ErrorEventsNotFound) {
+			totalHours = monthLastDay.Day() * 24
+		} else if err != nil {
+			return err
+		}
+				fmt.Printf("totalHours: %v\n", totalHours)
+
+		nodeItems = append(nodeItems, models.NodeItem{
+			NodeID:        record.NodeID,
+			ContractID:    record.ContractID,
+			RentCreatedAt: rentRecordStart,
+			PeriodInHours: float64(totalHours),
+			Cost:          totalAmountUSD,
+		})
+		totalInvoiceCost += totalAmountUSD
+
+	}
+	invoice := models.Invoice{
+		UserID:    user.ID,
+		Total:     totalInvoiceCost,
+		Nodes:     nodeItems,
+		Tax:       0, //TODO:
+		CreatedAt: time.Now(),
+	}
+	file, err := internal.CreateInvoicePDF(invoice, user)
+	if err != nil {
+		return err
+	}
+	invoice.FileData = file
+	if err = h.db.CreateInvoice(&invoice); err != nil {
+		return err
+	}
+
+	subject, body := h.mailService.InvoiceMailContent(totalInvoiceCost, h.config.Currency, invoice.ID)
+	err = h.mailService.SendMail(h.config.MailSender.Email, user.Email, subject, body)
+	if err != nil {
+		return err
+	}
+	return nil
 }

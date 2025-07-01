@@ -56,13 +56,21 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to connect to substrate client: %w", err)
 	}
 
-	graphqlClient, err := graphql.NewGraphQl(config.GraphqlURL)
+	graphqlURL := []string{config.GraphqlURL}
+	graphqlClient, err := graphql.NewGraphQl(graphqlURL...)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to connect to graphql client")
 		return nil, fmt.Errorf("failed to connect to graphql client: %w", err)
 	}
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient)
+	firesquidURL := []string{config.FiresquidURL}
+	firesquidClient, err := graphql.NewGraphQl(firesquidURL...)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to connect to firesquid client")
+		return nil, fmt.Errorf("failed to connect to firesquid client: %w", err)
+	}
+
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient)
 
 	app := &App{
 		router:   router,
@@ -96,10 +104,12 @@ func (app *App) registerHandlers() {
 				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
-				authGroup.POST("/nodes/unreserve/:contract-id", app.handlers.UnreserveNodeHandler)
+				authGroup.POST("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
 				authGroup.GET("/balance", app.handlers.GetUserBalance)
 				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
+				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
+				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
 			}
 
 			adminGroup := usersGroup.Group("")
@@ -109,6 +119,7 @@ func (app *App) registerHandlers() {
 				adminGroup.GET("", app.handlers.ListUsersHandler)
 				adminGroup.DELETE("/:user_id", app.handlers.DeleteUsersHandler)
 				adminGroup.POST("/:user_id/credit", app.handlers.CreditUserHandler)
+				adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
 
 				vouchersGroup := adminGroup.Group("/vouchers")
 				{
@@ -123,6 +134,10 @@ func (app *App) registerHandlers() {
 
 	}
 
+}
+
+func (app *App) StartBackgroundWorkers() {
+	go app.handlers.MonthlyInvoicesHandler()
 }
 
 // Run starts the server

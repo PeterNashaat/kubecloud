@@ -16,8 +16,8 @@ const (
 
 	startX float64 = 25
 	startY float64 = 30
-
-	logoPath       = "internal/img/logo.png"
+	// TODO:
+	logoPath       = "internal/logo_tft.png"
 	fontPath       = "internal/fonts/Arial.ttf"
 	boldFontPath   = "internal/fonts/Arial-Bold.ttf"
 	italicFontPath = "internal/fonts/Arial-Italic.ttf"
@@ -324,7 +324,7 @@ func (in *InvoicePDF) tableHeader() error {
 
 	in.pdf.SetTextColor(darkGreyColor, darkGreyColor, darkGreyColor)
 	in.pdf.SetXY(in.startX, in.startY)
-	if err := in.pdf.Cell(nil, "Virtual machines"); err != nil {
+	if err := in.pdf.Cell(nil, "Rented nodes"); err != nil {
 		return err
 	}
 

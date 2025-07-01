@@ -22,7 +22,7 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{})
+	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{})
 	if err != nil {
 		return nil, err
 	}

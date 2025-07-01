@@ -12,14 +12,14 @@ type Invoice struct {
 	// TODO:
 	Tax       float64   `json:"tax"`
 	CreatedAt time.Time `json:"created_at"`
-	FileData  []byte    `json:"file_data" gorm:"type:blob"`
+	FileData  []byte    `json:"-" gorm:"type:blob column:file_data"`
 }
 
 type NodeItem struct {
 	ID            int       `json:"id" gorm:"primaryKey"`
 	InvoiceID     int       `json:"invoice_id" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
-	NodeID        int       `json:"node_id"`
-	ContractID    string    `json:"contract_id"`
+	NodeID        uint32    `json:"node_id"`
+	ContractID    uint64    `json:"contract_id"`
 	RentCreatedAt time.Time `json:"rent_created_at"`
 	PeriodInHours float64   `json:"period"`
 	Cost          float64   `json:"cost"`
