@@ -452,18 +452,8 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 }
 
 func (h *Handler) ChargeBalance(c *gin.Context) {
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		Error(c, http.StatusUnauthorized, "User ID not found in context", "")
-		return
-	}
 
-	userID, ok := userIDVal.(int)
-	if !ok {
-		log.Error().Msg("Invalid user ID or type")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
+	userID := c.GetInt("user_id")
 
 	var request ChargeBalanceInput
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -530,20 +520,9 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 }
 
-// GetUserBalance returns user's balance in usd
-func (h *Handler) GetUserBalance(c *gin.Context) {
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		log.Error().Msg("user ID not found in context")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
-
-	userID, ok := userIDVal.(int)
-	if !ok {
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
+// GetUserHandler returns all data of user
+func (h *Handler) GetUserHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
@@ -637,3 +616,4 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "Voucher is Redeemed Successfully", nil)
 
 }
+

@@ -136,6 +136,7 @@ func (app *App) registerHandlers() {
 
 }
 
+
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
 }
