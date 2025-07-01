@@ -30,6 +30,7 @@ type App struct {
 	sseManager    *internal.SSEManager
 	workerManager *internal.WorkerManager
 	gridClient    deployer.TFPluginClient
+	appCancel     context.CancelFunc
 }
 
 // NewApp create new instance of the app with all configs
@@ -86,7 +87,10 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
+	// Create an app-level context for coordinating shutdown
+	appCtx, appCancel := context.WithCancel(context.Background())
+
+	workerManager := internal.NewWorkerManager(appCtx, redisClient, sseManager, config.DeployerWorkersNum, gridClient)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, redisClient, sseManager)
 
@@ -99,6 +103,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		sseManager:    sseManager,
 		workerManager: workerManager,
 		gridClient:    gridClient,
+		appCancel:     appCancel,
 	}
 
 	app.registerHandlers()
@@ -199,6 +204,11 @@ func (app *App) Run() error {
 
 // Shutdown gracefully shuts down the server and worker manager
 func (app *App) Shutdown(ctx context.Context) error {
+	// First, cancel the app context to signal all components to stop
+	if app.appCancel != nil {
+		app.appCancel()
+	}
+
 	if app.httpServer != nil {
 		if err := app.httpServer.Shutdown(ctx); err != nil {
 			log.Error().Err(err).Msg("Failed to shutdown HTTP server")
@@ -206,7 +216,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 	}
 
 	if app.workerManager != nil {
-		app.workerManager.Stop()
+		app.workerManager.StopWithContext(ctx)
 	}
 
 	if app.sseManager != nil {

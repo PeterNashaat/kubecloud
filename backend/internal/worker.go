@@ -117,25 +117,44 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 	// Perform the deployment
 	result := w.performDeployment(ctx, task)
 
+	// Check if context was cancelled during deployment
+	if ctx.Err() != nil {
+		log.Debug().Str("task_id", task.TaskID).Msg("Skipping post-processing due to context cancellation")
+		return ctx.Err()
+	}
+
 	// Always try to add result to stream, even for failed deployments
 	if err := w.redis.AddResult(ctx, result); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to add result to stream")
-		// Don't return here - we still want to send SSE update and acknowledge the task
-		// The task was processed (even if unsuccessfully), so it should be acknowledged
+		// Don't return error here as we still want to try other operations
 	}
 
-	// Send SSE update if manager is available
+	// Check context again before SSE broadcast
+	if ctx.Err() != nil {
+		log.Debug().Str("task_id", task.TaskID).Msg("Skipping SSE broadcast due to context cancellation")
+		return ctx.Err()
+	}
+
+	// Send SSE notification to user
 	if w.sseManager != nil {
-		w.sseManager.SendTaskUpdate(
-			task.UserID,
-			task.TaskID,
-			result.Status,
-			result.Message,
+		w.sseManager.Notify(
+			result.UserID,
+			"deployment_update",
 			map[string]interface{}{
+				"task_id":      result.TaskID,
+				"status":       result.Status,
+				"message":      result.Message,
+				"started_at":   task.StartedAt,
 				"completed_at": result.CompletedAt,
 				"error":        result.Error,
 			},
 		)
+	}
+
+	// Check context before final acknowledgment
+	if ctx.Err() != nil {
+		log.Debug().Str("task_id", task.TaskID).Msg("Skipping task acknowledgment due to context cancellation")
+		return ctx.Err()
 	}
 
 	// Always acknowledge the task after processing (successful or failed)
@@ -210,16 +229,19 @@ type WorkerManager struct {
 	sseManager *SSEManager
 	ctx        context.Context
 	cancel     context.CancelFunc
+	parentCtx  context.Context
 }
 
-func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, gridClient deployer.TFPluginClient) *WorkerManager {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewWorkerManager(parentCtx context.Context, redis *RedisClient, sseManager *SSEManager, workerCount int, gridClient deployer.TFPluginClient) *WorkerManager {
+	// Create a child context that can be cancelled by either the parent context or our own cancel function
+	ctx, cancel := context.WithCancel(parentCtx)
 
 	manager := &WorkerManager{
 		redis:      redis,
 		sseManager: sseManager,
 		ctx:        ctx,
 		cancel:     cancel,
+		parentCtx:  parentCtx,
 	}
 
 	for i := 0; i < workerCount; i++ {
@@ -240,12 +262,44 @@ func (wm *WorkerManager) Start() {
 }
 
 func (wm *WorkerManager) Stop() {
-	// Cancel the context to immediately signal all workers to stop
+	log.Debug().Msg("Stopping worker manager...")
+
+	// Cancel the context to signal all workers to stop accepting new tasks
 	wm.cancel()
 
-	// Stop all workers immediately
+	// Give workers a grace period to finish current tasks
+	log.Debug().Msg("Waiting for workers to finish current tasks...")
+	time.Sleep(2 * time.Second)
+
+	// Stop all workers
 	for _, worker := range wm.workers {
 		worker.Stop()
 	}
 
+	log.Debug().Msg("Worker manager stopped")
+}
+
+func (wm *WorkerManager) StopWithContext(shutdownCtx context.Context) {
+	log.Debug().Msg("Stopping worker manager with context...")
+
+	// Cancel the worker context to signal all workers to stop accepting new tasks
+	wm.cancel()
+
+	// Wait for workers to finish current tasks, but respect shutdown context
+	log.Debug().Msg("Waiting for workers to finish current tasks...")
+	select {
+	case <-time.After(2 * time.Second):
+		// Normal grace period completed
+		log.Debug().Msg("Grace period completed")
+	case <-shutdownCtx.Done():
+		// Shutdown context cancelled - immediate shutdown
+		log.Debug().Msg("Shutdown context cancelled - forcing immediate stop")
+	}
+
+	// Stop all workers
+	for _, worker := range wm.workers {
+		worker.Stop()
+	}
+
+	log.Debug().Msg("Worker manager stopped")
 }
