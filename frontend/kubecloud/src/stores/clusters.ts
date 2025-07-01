@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { mockApi, mockClusters, MOCK_CONFIG } from '@/utils/mockData'
+import { mockApi, mockClusters, MOCK_CONFIG } from '../utils/mockData'
 
 export interface Cluster {
   id: string
@@ -72,7 +72,7 @@ export const useClusterStore = defineStore('clusters', () => {
 
     try {
       if (MOCK_CONFIG.enabled) {
-        const response = await mockApi.get<{ data: Cluster[] }>('/clusters')
+        const response = await mockApi.get('/clusters')
         clusters.value = response.data
       } else {
         // Real API call would go here
@@ -94,9 +94,10 @@ export const useClusterStore = defineStore('clusters', () => {
 
     try {
       if (MOCK_CONFIG.enabled) {
-        const response = await mockApi.post<{ data: Cluster }>('/clusters', clusterData)
+        const response = await mockApi.post('/clusters', clusterData)
         const newCluster: Cluster = {
-          ...response.data,
+          ...(response.data as Cluster),
+          ...clusterData,
           status: 'starting',
           createdAt: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),

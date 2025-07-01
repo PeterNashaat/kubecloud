@@ -142,7 +142,7 @@ const recentClusters = ref([
 ])
 
 const viewCluster = (id: number) => {
-  router.push(`/manage-cluster/${id}`)
+  router.push(`/clusters/${id}`)
 }
 
 const deleteCluster = (id: number) => {

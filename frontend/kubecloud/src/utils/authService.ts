@@ -90,7 +90,8 @@ export class AuthService {
       showNotifications: true,
       loadingMessage: 'Creating your account...',
       successMessage: 'Verification code sent to your email!',
-      errorMessage: 'Registration failed'
+      errorMessage: 'Registration failed',
+      timeout: 60000
     })
     return response.data.data
   }

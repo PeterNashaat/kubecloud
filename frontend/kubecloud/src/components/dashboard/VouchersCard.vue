@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-card">
+  <div class="dashboard-card vouchers-card">
     <div class="dashboard-card-header">
       <div class="dashboard-card-title-section">
         <div class="dashboard-card-title-content">
@@ -9,26 +9,54 @@
       </div>
     </div>
     <div class="dashboard-card-content">
-      <label class="voucher-label" for="voucher-code">Code</label>
-      <input
-        id="voucher-code"
+      <v-text-field
         v-model="code"
-        class="voucher-input"
-        type="text"
-        placeholder="Enter voucher code"
+        label="Voucher Code"
+        prepend-inner-icon="mdi-ticket-percent"
+        variant="outlined"
+        :disabled="loading"
         @keyup.enter="onRedeem"
+        class="voucher-input-field"
       />
-      <button class="action-btn redeem-btn" @click="onRedeem">Redeem</button>
-      <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <v-btn
+        color="primary"
+        :loading="loading"
+        :disabled="loading"
+        class="redeem-btn"
+        @click="onRedeem"
+        prepend-icon="mdi-gift"
+      >
+        Redeem
+      </v-btn>
+      <v-alert v-if="successMessage" type="success" variant="tonal" class="mt-3" border="start" icon="mdi-check-circle">
+        {{ successMessage }}
+      </v-alert>
+      <v-alert v-if="errorMessage" type="error" variant="tonal" class="mt-3" border="start" icon="mdi-alert-circle">
+        {{ errorMessage }}
+      </v-alert>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { VTextField, VBtn, VAlert } from 'vuetify/components'
+
+interface Voucher {
+  id: number | string
+  name: string
+  description?: string
+  amount: string
+  expiryDate: string
+  used?: boolean
+  icon?: string
+  iconColor?: string
+}
+
+const props = defineProps<{ vouchers: Voucher[] }>()
 
 const code = ref('')
+const loading = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
@@ -39,7 +67,22 @@ function onRedeem() {
     errorMessage.value = 'Please enter a code.'
     return
   }
+  loading.value = true
+  // Simulate async redeem
+  setTimeout(() => {
+    loading.value = false
+    // For demo, treat any code as success
+    successMessage.value = 'Voucher redeemed successfully!'
+    code.value = ''
+  }, 1200)
   emit('redeem', code.value)
+}
+
+function isExpired(expiryDate: string) {
+  if (!expiryDate) return false
+  const now = new Date()
+  const exp = new Date(expiryDate)
+  return exp < now
 }
 
 const emit = defineEmits(['redeem'])
@@ -52,80 +95,18 @@ export default {
 </script>
 
 <style scoped>
-.dashboard-card {
-  background: var(--color-bg-card, #182235);
-  border-radius: var(--radius-xl, 1.25rem);
-  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.08);
-  padding: var(--space-8);
-  margin-bottom: var(--space-8);
-  border: 1px solid var(--color-border, #334155);
-  max-width: 480px;
-  margin: 0;
-  padding: 0 !important;
-}
-.dashboard-card-header {
-  margin-bottom: var(--space-6);
-}
-.dashboard-card-title {
-  font-size: var(--font-size-xl, 1.5rem);
-  font-weight: var(--font-weight-semibold, 600);
-  color: var(--color-text, #fff);
-  margin: 0 0 var(--space-2) 0;
-}
-.dashboard-card-subtitle {
-  font-size: var(--font-size-base, 1rem);
-  color: var(--color-primary, #38BDF8);
-  font-weight: var(--font-weight-medium, 500);
-  opacity: 0.9;
+/* Remove centering and use full width like other dashboard cards */
+.vouchers-card {
+  width: 100%;
+  max-width: unset;
   margin: 0;
 }
-.dashboard-card-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  align-items: flex-start;
+.voucher-input-field {
+  width: 100%;
+  max-width: 340px;
 }
-.voucher-label {
-  font-size: 1rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  color: var(--color-text, #fff);
-}
-.voucher-input {
-  width: 320px;
-  padding: 0.75rem 1rem;
-  font-size: 1.1rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border, #334155);
-  margin-bottom: 1.5rem;
-  outline: none;
-}
-.action-btn.redeem-btn {
-  width: 180px;
-  padding: 0.7rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border, #334155);
-  background: transparent;
-  color: var(--color-text, #fff);
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-  transition: background 0.18s, border-color 0.18s;
-}
-.action-btn.redeem-btn:hover {
-  background: rgba(59, 130, 246, 0.07);
-  border-color: var(--color-primary, #3B82F6);
-  color: var(--color-primary, #3B82F6);
-}
-.success-message {
-  color: var(--color-success, #10B981);
-  font-weight: 500;
-  margin-top: 0.5rem;
-}
-.error-message {
-  color: var(--color-error, #ef4444);
-  font-weight: 500;
+.redeem-btn {
+  min-width: 160px;
   margin-top: 0.5rem;
 }
 </style>

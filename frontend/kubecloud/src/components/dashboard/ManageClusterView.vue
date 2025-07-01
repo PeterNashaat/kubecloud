@@ -2,29 +2,25 @@
   <div class="manage-cluster-container">
     <div class="container">
       <v-container fluid class="pa-0">
-        <div class="manage-header mb-6">
+        <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
+          <v-progress-circular indeterminate color="primary" size="48" />
+        </div>
+        <div v-else-if="notFound" class="d-flex flex-column justify-center align-center" style="min-height: 60vh;">
+          <h2>Cluster Not Found</h2>
+          <v-btn color="primary" @click="goBack">Back to Dashboard</v-btn>
+        </div>
+        <div v-else-if="cluster" class="manage-header mb-6">
           <div class="manage-header-content">
-            <div class="manage-navigation">
-              <v-btn icon variant="text" class="back-btn mr-3" @click="goBack">
-                <v-icon>mdi-chevron-left</v-icon>
-              </v-btn>
-              <div class="breadcrumb">
-                <span class="breadcrumb-item">Clusters</span>
-                <v-icon icon="mdi-chevron-right" class="breadcrumb-separator"></v-icon>
-                <span class="breadcrumb-item active">{{ cluster.name }}</span>
-              </div>
-            </div>
             <h1 class="manage-title">{{ cluster.name }}</h1>
             <p class="manage-subtitle">Manage your Kubernetes cluster configuration and resources</p>
           </div>
         </div>
-        
-        <div class="manage-content-wrapper">
+        <div v-if="!loading && !notFound && cluster" class="manage-content-wrapper">
           <!-- Status Bar -->
           <div class="card status-bar">
             <div class="status-bar-content">
               <div class="status-indicator">
-                <span class="status-dot" :class="cluster.status === 'Running' ? 'running' : 'stopped'"></span>
+                <span class="status-dot" :class="cluster.status === 'running' ? 'running' : 'stopped'"></span>
                 <span class="status-text">{{ cluster.status }}</span>
               </div>
               <div class="status-actions">
@@ -52,19 +48,19 @@
                   <div class="resource-list">
                     <div class="resource-item">
                       <span class="resource-label">Nodes:</span>
-                      <span class="resource-value">3</span>
+                      <span class="resource-value">{{ cluster.nodes }}</span>
                     </div>
                     <div class="resource-item">
                       <span class="resource-label">vCPU:</span>
-                      <span class="resource-value">12</span>
+                      <span class="resource-value">{{ cluster.cpu }}</span>
                     </div>
                     <div class="resource-item">
                       <span class="resource-label">RAM:</span>
-                      <span class="resource-value">24 GB</span>
+                      <span class="resource-value">{{ cluster.memory }}</span>
                     </div>
                     <div class="resource-item">
                       <span class="resource-label">Storage:</span>
-                      <span class="resource-value">1 TB</span>
+                      <span class="resource-value">{{ cluster.storage }}</span>
                     </div>
                   </div>
                 </div>
@@ -109,20 +105,16 @@
                   </h3>
                   <div class="details-grid">
                     <div class="detail-item">
-                      <span class="detail-label">API Endpoint:</span>
-                      <span class="detail-value font-mono">ygg://[mycelium-ip-address]</span>
-                    </div>
-                    <div class="detail-item">
-                      <span class="detail-label">Location:</span>
-                      <span class="detail-value">Ghent, Belgium</span>
+                      <span class="detail-label">Region:</span>
+                      <span class="detail-value">{{ cluster.region }}</span>
                     </div>
                     <div class="detail-item">
                       <span class="detail-label">Created:</span>
-                      <span class="detail-value">2023-07-01</span>
+                      <span class="detail-value">{{ cluster.createdAt }}</span>
                     </div>
                     <div class="detail-item">
                       <span class="detail-label">Est. Cost:</span>
-                      <span class="detail-value">$125/month</span>
+                      <span class="detail-value">${{ cluster.cost }}/month</span>
                     </div>
                   </div>
                 </div>
@@ -136,16 +128,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useClusterStore } from '../../stores/clusters'
 
 const router = useRouter()
+const route = useRoute()
+const clusterStore = useClusterStore()
 
-// Mock cluster data
-const cluster = ref({
-  name: 'Production Cluster',
-  status: 'Running'
-})
+const loading = ref(true)
+const notFound = ref(false)
+
+const clusterId = computed(() => route.params.id?.toString() || '')
+const cluster = computed(() =>
+  clusterStore.clusters.find(c => c.id === clusterId.value)
+)
+
+const loadCluster = async () => {
+  loading.value = true
+  notFound.value = false
+  try {
+    if (!clusterStore.clusters.length) {
+      await clusterStore.fetchClusters()
+    }
+    if (!cluster.value) {
+      notFound.value = true
+    }
+  } catch (e) {
+    notFound.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadCluster)
+watch(() => clusterId.value, loadCluster)
 
 const goBack = () => {
   router.push('/dashboard')
@@ -154,6 +171,7 @@ const goBack = () => {
 
 <style scoped>
 .manage-cluster-container {
+  margin-top: 10rem;
   min-height: 100vh;
   background: var(--color-bg);
   padding: 0;

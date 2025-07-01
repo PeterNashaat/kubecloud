@@ -30,6 +30,12 @@ export class UserService {
   async chargeBalance(data: ChargeBalanceRequest) {
     return api.post('/v1/user/charge_balance', data, { requiresAuth: true, showNotifications: true })
   }
+
+  // Create a PaymentIntent (to be implemented)
+  // Replace this stub with a real API call to your backend that returns { clientSecret: string }
+  async createPaymentIntent({ amount }: { amount: number }): Promise<{ clientSecret: string }> {
+    throw new Error('UserService.createPaymentIntent is not implemented. Please implement this method to call your backend and return { clientSecret: string }.')
+  }
 }
 
 export const userService = new UserService() 

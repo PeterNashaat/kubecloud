@@ -40,6 +40,30 @@
                 <p class="section-subtitle">Configure the compute resources for your cluster</p>
               </div>
               
+              <!-- SSH Key Selection -->
+              <div class="ssh-key-section" style="margin-bottom: 2rem;">
+                <h4 class="section-title" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Select SSH Keys</h4>
+                <v-chip-group
+                  v-model="selectedSshKeys"
+                  multiple
+                  column
+                  style="max-width: 600px;"
+                >
+                  <v-chip
+                    v-for="key in availableSshKeys"
+                    :key="key.id"
+                    :value="key.id"
+                    class="ma-1"
+                    :class="{ 'selected-chip': selectedSshKeys.includes(key.id) }"
+                  >
+                    {{ key.name }}
+                  </v-chip>
+                </v-chip-group>
+                <v-btn variant="text" color="primary" @click="navigateToSshKeys" style="margin-top: 0.5rem;">
+                  Manage SSH Keys
+                </v-btn>
+              </div>
+
               <div class="vm-config-grid">
                 <div class="vm-config-card">
                   <div class="card-header">
@@ -65,9 +89,15 @@
                       </div>
                       <div class="vm-details">
                         <div class="vm-name">{{ master.name }}</div>
-                        <div class="vm-specs">
-                          <span class="spec-chip">{{ master.vcpu }} vCPU</span>
-                          <span class="spec-chip">{{ master.ram }}GB RAM</span>
+                        <div class="vm-specs" style="gap: 1rem;">
+                          <div>
+                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">vCPU</label>
+                            <input type="number" min="1" max="64" v-model.number="master.vcpu" style="width: 60px; margin-left: 0.5rem;" />
+                          </div>
+                          <div>
+                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">RAM (GB)</label>
+                            <input type="number" min="1" max="512" v-model.number="master.ram" style="width: 60px; margin-left: 0.5rem;" />
+                          </div>
                         </div>
                       </div>
                       <v-btn 
@@ -108,9 +138,15 @@
                       </div>
                       <div class="vm-details">
                         <div class="vm-name">{{ worker.name }}</div>
-                        <div class="vm-specs">
-                          <span class="spec-chip">{{ worker.vcpu }} vCPU</span>
-                          <span class="spec-chip">{{ worker.ram }}GB RAM</span>
+                        <div class="vm-specs" style="gap: 1rem;">
+                          <div>
+                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">vCPU</label>
+                            <input type="number" min="1" max="64" v-model.number="worker.vcpu" style="width: 60px; margin-left: 0.5rem;" />
+                          </div>
+                          <div>
+                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">RAM (GB)</label>
+                            <input type="number" min="1" max="512" v-model.number="worker.ram" style="width: 60px; margin-left: 0.5rem;" />
+                          </div>
                         </div>
                       </div>
                       <v-btn 
@@ -1020,5 +1056,12 @@ onMounted(() => {
   .step-actions {
     padding: var(--space-4);
   }
+}
+
+.selected-chip {
+  border: 2px solid var(--color-primary, #38BDF8) !important;
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: var(--color-primary, #38BDF8) !important;
+  font-weight: 600;
 }
 </style>
