@@ -14,131 +14,133 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// SSEManager handles Server-Sent Events for real-time notifications
 type SSEManager struct {
-	clients    map[string]map[chan SSEMessage]bool // userID -> channels
-	clientsMux sync.RWMutex
-	redis      *RedisClient
-	db         models.DB
-	ctx        context.Context
-	cancel     context.CancelFunc
+	clients map[string][]chan SSEMessage // userID -> client channels
+	mu      sync.RWMutex
+	ctx     context.Context
+	cancel  context.CancelFunc
+	db      models.DB
 }
 
+// SSEMessage represents a server-sent event message
 type SSEMessage struct {
 	Type      string    `json:"type"`
 	Data      any       `json:"data"`
 	TaskID    string    `json:"task_id,omitempty"`
-	UserID    string    `json:"user_id,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// NewSSEManager creates a new SSE manager
 func NewSSEManager(redis *RedisClient, db models.DB) *SSEManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	manager := &SSEManager{
-		clients: make(map[string]map[chan SSEMessage]bool),
-		redis:   redis,
-		db:      db,
+		clients: make(map[string][]chan SSEMessage),
 		ctx:     ctx,
 		cancel:  cancel,
+		db:      db,
 	}
 
-	go manager.listenForResults()
+	go manager.listenForResults(redis)
 
 	return manager
 }
 
-// Stop gracefully stops the SSE manager
+// Stop gracefully shuts down the SSE manager
 func (s *SSEManager) Stop() {
-	log.Debug().Msg("Stopping SSE manager")
 	s.cancel()
 
-	// Close all client channels
-	s.clientsMux.Lock()
-	defer s.clientsMux.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	for userID, clients := range s.clients {
-		for clientChan := range clients {
-			close(clientChan)
+	// Close all client channels
+	for userID, channels := range s.clients {
+		for _, ch := range channels {
+			close(ch)
 		}
+		delete(s.clients, userID)
+	}
+
+}
+
+// AddClient adds a new client channel for a user
+func (s *SSEManager) AddClient(userID string) chan SSEMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ch := make(chan SSEMessage, 10)
+	s.clients[userID] = append(s.clients[userID], ch)
+
+	return ch
+}
+
+// RemoveClient removes a client channel for a user
+func (s *SSEManager) RemoveClient(userID string, clientChan chan SSEMessage) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	channels := s.clients[userID]
+	for i, ch := range channels {
+		if ch == clientChan {
+			s.clients[userID] = append(channels[:i], channels[i+1:]...)
+			close(ch)
+			break
+		}
+	}
+
+	if len(s.clients[userID]) == 0 {
 		delete(s.clients, userID)
 	}
 }
 
-// AddClient adds a new SSE client for a user
-func (s *SSEManager) AddClient(userID string, clientChan chan SSEMessage) {
-	s.clientsMux.Lock()
-	defer s.clientsMux.Unlock()
-
-	if s.clients[userID] == nil {
-		s.clients[userID] = make(map[chan SSEMessage]bool)
-	}
-	s.clients[userID][clientChan] = true
-
-	log.Debug().Str("user_id", userID).Msg("SSE client connected")
-}
-
-// RemoveClient removes an SSE client
-func (s *SSEManager) RemoveClient(userID string, clientChan chan SSEMessage) {
-	s.clientsMux.Lock()
-	defer s.clientsMux.Unlock()
-
-	if clients, exists := s.clients[userID]; exists {
-		if _, channelExists := clients[clientChan]; channelExists {
-			delete(clients, clientChan)
-			if len(clients) == 0 {
-				delete(s.clients, userID)
-			}
-			// Only close the channel if it's still being tracked
-			close(clientChan)
-		}
-	}
-}
-
-// BroadcastToUser sends a message to all connections for a specific user
-func (s *SSEManager) BroadcastToUser(userID string, message SSEMessage) {
-	s.persistNotification(userID, message)
-
-	s.clientsMux.RLock()
-	defer s.clientsMux.RUnlock()
-
-	if clients, exists := s.clients[userID]; exists {
-		message.Timestamp = time.Now()
-		for clientChan := range clients {
-			select {
-			case clientChan <- message:
-				log.Debug().Str("user_id", userID).Msg("Message sent to client")
-			case <-time.After(time.Second * 5):
-				log.Warn().Str("user_id", userID).Msg("Client not responding, removing")
-				go s.RemoveClient(userID, clientChan)
-			}
-		}
-	} else {
-		log.Warn().Str("user_id", userID).Msg("No clients found for user")
-	}
-}
-
-// listenForResults listens for deployment results from Redis and broadcasts them
-func (s *SSEManager) listenForResults() {
-	callback := func(result *DeploymentResult) {
-		message := SSEMessage{
-			Type:   "deployment_update",
-			Data:   result,
-			TaskID: result.TaskID,
-			UserID: result.UserID,
-		}
-
-		s.BroadcastToUser(result.UserID, message)
+// Notify sends a message to all clients of a specific user
+func (s *SSEManager) Notify(userID string, msgType string, data any, taskID ...string) {
+	message := SSEMessage{
+		Type:      msgType,
+		Data:      data,
+		Timestamp: time.Now(),
 	}
 
-	if err := s.redis.SubscribeToResults(s.ctx, callback); err != nil {
-		if s.ctx.Err() != nil {
-			log.Debug().Msg("SSE manager stopped listening for results due to context cancellation")
+	if len(taskID) > 0 {
+		message.TaskID = taskID[0]
+	}
+
+	// Persist notification to database (except connection messages)
+	if msgType != "connected" {
+		s.persistNotification(userID, message)
+	}
+
+	s.mu.RLock()
+	channels := make([]chan SSEMessage, len(s.clients[userID]))
+	copy(channels, s.clients[userID])
+	s.mu.RUnlock()
+
+	// Send to all user's clients
+	for _, ch := range channels {
+		select {
+		case ch <- message:
+			// Message sent successfully
+		case <-time.After(100 * time.Millisecond):
+			// Client not responding, remove it
+			go s.RemoveClient(userID, ch)
+		case <-s.ctx.Done():
 			return
 		}
-		log.Error().Err(err).Msg("Failed to listen for results")
 	}
+
 }
 
-// HandleSSE handles SSE connections
+// SendTaskUpdate is a convenience method for sending task updates
+func (s *SSEManager) SendTaskUpdate(userID, taskID string, status TaskStatus, message string, data any) {
+	payload := map[string]interface{}{
+		"status":  status,
+		"message": message,
+		"data":    data,
+	}
+	s.Notify(userID, "task_update", payload, taskID)
+}
+
+// HandleSSE handles SSE HTTP connections
 func (s *SSEManager) HandleSSE(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -147,68 +149,68 @@ func (s *SSEManager) HandleSSE(c *gin.Context) {
 	}
 
 	userIDStr := fmt.Sprintf("%v", userID)
+
+	// Set SSE headers
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Access-Control-Allow-Headers", "Cache-Control")
 
-	// TODO: limit the number of concurrent connections per user
-	clientChan := make(chan SSEMessage, 10)
-	s.AddClient(userIDStr, clientChan)
-
-	initialMessage := SSEMessage{
-		Type: "connected",
-		Data: map[string]string{"status": "connected"},
-	}
-	s.BroadcastToUser(userIDStr, initialMessage)
-
+	// Add client and get channel
+	clientChan := s.AddClient(userIDStr)
 	defer s.RemoveClient(userIDStr, clientChan)
 
-	// Keep connection alive and send messages
+	// Send initial connection message
+	s.Notify(userIDStr, "connected", map[string]string{"status": "connected"})
+
+	// Stream messages to client
 	c.Stream(func(w io.Writer) bool {
 		select {
-		case message := <-clientChan:
+		case message, ok := <-clientChan:
+			if !ok {
+				return false // Channel closed
+			}
+
 			data, err := json.Marshal(message)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to marshal SSE message")
 				return false
 			}
+
 			c.SSEvent("message", string(data))
 			return true
+
 		case <-c.Request.Context().Done():
-			log.Debug().Str("user_id", userIDStr).Msg("SSE client disconnected")
+			log.Debug().Str("user_id", userIDStr).Msg("Client disconnected")
+			return false
+
+		case <-s.ctx.Done():
 			return false
 		}
 	})
 }
 
-// SendTaskUpdate sends a task status update to the user
-func (s *SSEManager) SendTaskUpdate(userID string, taskID string, status TaskStatus, message string, data any) {
-	sseMessage := SSEMessage{
-		Type:   "task_update",
-		TaskID: taskID,
-		Data: map[string]interface{}{
-			"status":  status,
-			"message": message,
-			"data":    data,
-		},
+// listenForResults listens for deployment results from Redis
+func (s *SSEManager) listenForResults(redis *RedisClient) {
+	callback := func(result *DeploymentResult) {
+		s.Notify(result.UserID, "deployment_update", result, result.TaskID)
 	}
-	s.BroadcastToUser(userID, sseMessage)
+
+	if err := redis.SubscribeToResults(s.ctx, callback); err != nil {
+		if s.ctx.Err() == nil {
+			log.Error().Err(err).Msg("Failed to listen for Redis results")
+		}
+	}
 }
 
-// persistNotification saves a notification to the database
+// persistNotification saves notification to database
 func (s *SSEManager) persistNotification(userID string, message SSEMessage) {
 	if s.db == nil {
-		log.Warn().Msg("Database not available, skipping notification persistence")
 		return
 	}
 
-	if message.Type == "connected" {
-		return
-	}
-
-	// Extract title and message from SSE data
+	// Extract meaningful title and message
 	title := "Notification"
 	messageText := "New notification"
 
@@ -225,12 +227,7 @@ func (s *SSEManager) persistNotification(userID string, message SSEMessage) {
 		}
 	}
 
-	// Serialize data to JSON
-	dataJSON, err := json.Marshal(message.Data)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to marshal notification data")
-		dataJSON = []byte("{}")
-	}
+	dataJSON, _ := json.Marshal(message.Data)
 
 	notification := &models.Notification{
 		UserID:  userID,
@@ -244,7 +241,5 @@ func (s *SSEManager) persistNotification(userID string, message SSEMessage) {
 
 	if err := s.db.CreateNotification(notification); err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("Failed to persist notification")
-	} else {
-		log.Debug().Str("user_id", userID).Str("type", string(models.NotificationTypeTaskUpdate)).Msg("Notification persisted successfully")
 	}
 }

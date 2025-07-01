@@ -47,7 +47,7 @@ func (w *Worker) Stop() {
 		return
 	}
 
-	log.Debug().Str("worker_id", w.ID).Msg("Stopping worker")
+	log.Debug().Str("worker_id", w.ID).Msg("Terminating worker")
 	close(w.stopChan)
 	w.isRunning = false
 }
@@ -167,8 +167,33 @@ func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *D
 	// 	return result
 	// }
 
+	// Check if context is already cancelled before starting
+	select {
+	case <-ctx.Done():
+		log.Info().Str("task_id", task.TaskID).Msg("Task dropped - system shutting down")
+		result.Status = TaskStatusFailed
+		result.Error = "System shutdown"
+		result.Message = "Task dropped due to system shutdown"
+		result.CompletedAt = time.Now()
+		return result
+	default:
+	}
+
 	log.Info().Str("task_id", task.TaskID).Msg("Starting deployment simulation (30s sleep)")
-	time.Sleep(time.Second * 30)
+
+	// Use context-aware sleep - immediate cancellation on shutdown
+	select {
+	case <-time.After(time.Second * 30):
+		// Normal completion
+	case <-ctx.Done():
+		// Immediate cancellation on shutdown
+		log.Info().Str("task_id", task.TaskID).Msg("Task dropped during execution - system shutting down")
+		result.Status = TaskStatusFailed
+		result.Error = "System shutdown"
+		result.Message = "Task dropped during execution due to system shutdown"
+		result.CompletedAt = time.Now()
+		return result
+	}
 
 	result.Status = TaskStatusCompleted
 	result.Message = "Deployment completed"
@@ -215,11 +240,12 @@ func (wm *WorkerManager) Start() {
 }
 
 func (wm *WorkerManager) Stop() {
-	log.Debug().Msg("Stopping worker manager")
-
+	// Cancel the context to immediately signal all workers to stop
 	wm.cancel()
 
+	// Stop all workers immediately
 	for _, worker := range wm.workers {
 		worker.Stop()
 	}
+
 }

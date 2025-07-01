@@ -201,7 +201,7 @@ func (app *App) Run() error {
 func (app *App) Shutdown(ctx context.Context) error {
 	if app.httpServer != nil {
 		if err := app.httpServer.Shutdown(ctx); err != nil {
-			log.Error().Err(err).Msg("Failed to shutdown server")
+			log.Error().Err(err).Msg("Failed to shutdown HTTP server")
 		}
 	}
 

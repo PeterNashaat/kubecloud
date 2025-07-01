@@ -68,6 +68,7 @@ func gracefulShutdown(app *app.App) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	log.Info().Msg("Shutting down...")
 	if err := app.Shutdown(shutdownCtx); err != nil {
 		log.Error().Err(err).Msg("Server shutdown failed")
 		return err
