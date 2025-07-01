@@ -202,6 +202,8 @@ github.com/stripe/stripe-go/v82 v82.2.1 h1:kXytHogrwTin+zT8R+3p0LG9cLkfLHoIlSfTu
 github.com/stripe/stripe-go/v82 v82.2.1/go.mod h1:majCQX6AfObAvJiHraPi/5udwHi4ojRvJnnxckvHrX8=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20241127100051-77e684bcb1b2 h1:VW2J36F8g/kJn4IkY0JiRFmb1gFcdjiOyltfJLJ0mYU=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20241127100051-77e684bcb1b2/go.mod h1:cOL5YgHUmDG5SAXrsZxFjUECRQQuAqOoqvXhZG5sEUw=
+github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.8 h1:tlC0soYQiOYCXZI9OwB0ijCxvkGPkmwJsXXiwVLmjDc=
+github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.8/go.mod h1:et4qTZDUqV9kYJKS4wpciMeYqPz7tBbL4UmcI6Dp0OA=
 github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.8 h1:xzEdqjFaMbtYC+VZZZFD+pDvJ05lPxuY2tP5IXFwzrU=
 github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.8/go.mod h1:BUv06qsO3Kbk6XWa7r8EJdUG8SEQtYkFpK05RUaPrEQ=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.1-0.20241229121208-76ac3fea5e67 h1:Ii9TmXPBC1GYxRirReSygRZvEGXfAsQRaIipMEzGik0=

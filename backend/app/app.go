@@ -115,6 +115,8 @@ func (app *App) registerHandlers() {
 	app.router.Use(middlewares.CorsMiddleware())
 	v1 := app.router.Group("/api/v1")
 	{
+		v1.GET("/nodes", app.handlers.ListNodesHandler)
+
 		adminGroup := v1.Group("")
 		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
 		{
@@ -148,10 +150,9 @@ func (app *App) registerHandlers() {
 			{
 				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
 				authGroup.GET("/", app.handlers.GetUserHandler)
-				authGroup.GET("/nodes", app.handlers.ListNodesHandler)
+				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
-				authGroup.GET("/nodes/reserved", app.handlers.ListReservedNodeHandler)
-				authGroup.POST("/nodes/unreserve/:contract-id", app.handlers.UnreserveNodeHandler)
+				authGroup.POST("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
 			}
 
