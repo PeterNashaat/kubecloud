@@ -3,6 +3,7 @@ package sqlite
 import (
 	"fmt"
 	"kubecloud/models"
+	"sync"
 	"time"
 
 	"gorm.io/driver/sqlite"
@@ -11,7 +12,8 @@ import (
 
 // Sqlite struct implements db interface with sqlite
 type Sqlite struct {
-	db *gorm.DB
+	db    *gorm.DB
+	mutex sync.Mutex
 }
 
 // NewSqliteStorage connects to the database file
@@ -22,7 +24,12 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{})
+	err = db.AutoMigrate(
+		&models.User{},
+		&models.Voucher{},
+		&models.Transaction{},
+		&models.Notification{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -147,4 +154,79 @@ func (s *Sqlite) CreditUserBalance(userID int, amount float64) error {
 		Where("id = ?", userID).
 		UpdateColumn("credited_balance", gorm.Expr("credited_balance + ?", amount)).
 		Error
+}
+
+// CreateNotification creates a new notification
+func (s *Sqlite) CreateNotification(notification *models.Notification) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.db.Create(notification).Error
+}
+
+// GetUserNotifications retrieves notifications for a user with pagination
+func (s *Sqlite) GetUserNotifications(userID string, limit, offset int) ([]models.Notification, error) {
+	var notifications []models.Notification
+	err := s.db.Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&notifications).Error
+	return notifications, err
+}
+
+// MarkNotificationAsRead marks a specific notification as read
+func (s *Sqlite) MarkNotificationAsRead(notificationID uint, userID string) error {
+	now := time.Now()
+	result := s.db.Model(&models.Notification{}).
+		Where("id = ? AND user_id = ?", notificationID, userID).
+		Updates(map[string]interface{}{
+			"status":  models.NotificationStatusRead,
+			"read_at": &now,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("notification not found or access denied")
+	}
+
+	return nil
+}
+
+// MarkAllNotificationsAsRead marks all notifications as read for a user
+func (s *Sqlite) MarkAllNotificationsAsRead(userID string) error {
+	now := time.Now()
+	return s.db.Model(&models.Notification{}).
+		Where("user_id = ? AND status = ?", userID, models.NotificationStatusUnread).
+		Updates(map[string]interface{}{
+			"status":  models.NotificationStatusRead,
+			"read_at": &now,
+		}).Error
+}
+
+// GetUnreadNotificationCount returns the count of unread notifications for a user
+func (s *Sqlite) GetUnreadNotificationCount(userID string) (int64, error) {
+	var count int64
+	err := s.db.Model(&models.Notification{}).
+		Where("user_id = ? AND status = ?", userID, models.NotificationStatusUnread).
+		Count(&count).Error
+	return count, err
+}
+
+// DeleteNotification deletes a notification for a user
+func (s *Sqlite) DeleteNotification(notificationID uint, userID string) error {
+	result := s.db.Where("id = ? AND user_id = ?", notificationID, userID).
+		Delete(&models.Notification{})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("notification not found or access denied")
+	}
+
+	return nil
 }
