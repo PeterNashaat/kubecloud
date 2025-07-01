@@ -531,15 +531,8 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 		return
 	}
 
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-	}
-
-	Success(c, http.StatusOK, "Balance fetched", gin.H{
-		"balance_usd": usdBalance,
-		"debt_usd":    user.Debt,
+	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
+		"user": user,
 	})
 
 }
@@ -637,4 +630,3 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "Voucher is Redeemed Successfully", nil)
 
 }
-

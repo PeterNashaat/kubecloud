@@ -17,7 +17,7 @@ type Invoice struct {
 
 type NodeItem struct {
 	ID            int       `json:"id" gorm:"primaryKey"`
-	InvoiceID     int       `json:"invoice_id" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	InvoiceID     int       `json:"invoice_id"`
 	NodeID        uint32    `json:"node_id"`
 	ContractID    uint64    `json:"contract_id"`
 	RentCreatedAt time.Time `json:"rent_created_at"`

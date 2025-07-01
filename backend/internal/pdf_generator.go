@@ -297,7 +297,7 @@ func (in *InvoicePDF) summary() error {
 	}
 
 	in.pdf.SetXY(in.startX+540-totalTextWidth, in.startY+35)
-	return in.pdf.Cell(nil, formatFloat(in.invoice.Total))
+	return in.pdf.Cell(nil, fmt.Sprintf("%v$", formatFloat(in.invoice.Total)))
 }
 
 func (in *InvoicePDF) usageCharges() error {
@@ -350,7 +350,7 @@ func (in *InvoicePDF) tableHeader() error {
 	}
 
 	in.pdf.SetXY(in.startX+540-totalTextWidth, in.startY)
-	if err := in.pdf.Cell(nil, formatFloat(in.invoice.Total)); err != nil {
+	if err := in.pdf.Cell(nil, fmt.Sprintf("%v$", formatFloat(in.invoice.Total))); err != nil {
 		return err
 	}
 
@@ -393,7 +393,7 @@ func (in *InvoicePDF) tableContent() error {
 		}
 
 		in.pdf.SetXY(in.startX+540-costTextWidth, y)
-		if err := in.pdf.Cell(nil, formatFloat(d.Cost)); err != nil {
+		if err := in.pdf.Cell(nil, fmt.Sprintf("%v$", formatFloat(d.Cost))); err != nil {
 			return err
 		}
 

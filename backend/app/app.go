@@ -89,18 +89,41 @@ func (app *App) registerHandlers() {
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
-		usersGroup := v1.Group("/user")
-		{
-			usersGroup.POST("/register", app.handlers.RegisterHandler)
-			usersGroup.POST("/register/verify", app.handlers.VerifyRegisterCode)
-			usersGroup.POST("/login", app.handlers.LoginUserHandler)
-			usersGroup.POST("/refresh", app.handlers.RefreshTokenHandler)
-			usersGroup.POST("/forgot_password", app.handlers.ForgotPasswordHandler)
-			usersGroup.POST("/forgot_password/verify", app.handlers.VerifyForgetPasswordCodeHandler)
 
-			authGroup := usersGroup.Group("")
+		adminGroup := v1.Group("")
+		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
+		{
+			usersGroup := adminGroup.Group("/users")
+			{
+				usersGroup.GET("", app.handlers.ListUsersHandler)
+				usersGroup.DELETE("/:user_id", app.handlers.DeleteUsersHandler)
+				usersGroup.POST("/:user_id/credit", app.handlers.CreditUserHandler)
+			}
+
+			adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
+
+			vouchersGroup := adminGroup.Group("/vouchers")
+			{
+				vouchersGroup.POST("/generate", app.handlers.GenerateVouchersHandler)
+				vouchersGroup.GET("", app.handlers.ListVouchersHandler)
+
+			}
+
+		}
+
+		userGroup := v1.Group("/user")
+		{
+			userGroup.POST("/register", app.handlers.RegisterHandler)
+			userGroup.POST("/register/verify", app.handlers.VerifyRegisterCode)
+			userGroup.POST("/login", app.handlers.LoginUserHandler)
+			userGroup.POST("/refresh", app.handlers.RefreshTokenHandler)
+			userGroup.POST("/forgot_password", app.handlers.ForgotPasswordHandler)
+			userGroup.POST("/forgot_password/verify", app.handlers.VerifyForgetPasswordCodeHandler)
+
+			authGroup := userGroup.Group("")
 			authGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
 			{
+				authGroup.GET("/", app.handlers.GetUserHandler)
 				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
@@ -112,30 +135,11 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
 			}
 
-			adminGroup := usersGroup.Group("")
-			adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
-			{
-
-				adminGroup.GET("", app.handlers.ListUsersHandler)
-				adminGroup.DELETE("/:user_id", app.handlers.DeleteUsersHandler)
-				adminGroup.POST("/:user_id/credit", app.handlers.CreditUserHandler)
-				adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
-
-				vouchersGroup := adminGroup.Group("/vouchers")
-				{
-					vouchersGroup.POST("/generate", app.handlers.GenerateVouchersHandler)
-					vouchersGroup.GET("", app.handlers.ListVouchersHandler)
-
-				}
-
-			}
-
 		}
 
 	}
 
 }
-
 
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()

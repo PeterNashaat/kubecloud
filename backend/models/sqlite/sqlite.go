@@ -181,19 +181,53 @@ func (s *Sqlite) CreateInvoice(invoice *models.Invoice) error {
 // GetInvoice returns an invoice by ID
 func (s *Sqlite) GetInvoice(id int) (models.Invoice, error) {
 	var invoice models.Invoice
-	return invoice, s.db.First(&invoice, id).Error
+	err := s.db.First(&invoice, id).Error
+	if err != nil {
+		return models.Invoice{}, err
+	}
+
+	var nodes []models.NodeItem
+	if err = s.db.Model(&invoice).Association("Nodes").Find(&nodes); err != nil {
+		return models.Invoice{}, err
+	}
+
+	invoice.Nodes = nodes
+	return invoice, nil
 }
 
 // ListUserInvoices returns all invoices of user
 func (s *Sqlite) ListUserInvoices(userID int) ([]models.Invoice, error) {
 	var invoices []models.Invoice
-	return invoices, s.db.Where("user_id = ?", userID).Find(&invoices).Error
+	err := s.db.Where("user_id = ?", userID).Find(&invoices).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for idx := range invoices {
+		invoices[idx], err = s.GetInvoice(invoices[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return invoices, nil
 }
 
 // ListInvoices returns all invoices (admin)
 func (s *Sqlite) ListInvoices() ([]models.Invoice, error) {
 	var invoices []models.Invoice
-	return invoices, s.db.Find(&invoices).Error
+	err := s.db.Find(&invoices).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	for idx := range invoices {
+		invoices[idx], err = s.GetInvoice(invoices[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return invoices, nil
 }
 
 func (s *Sqlite) UpdateInvoicePDF(id int, data []byte) error {

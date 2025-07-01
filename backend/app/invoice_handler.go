@@ -74,23 +74,7 @@ func (h *Handler) MonthlyInvoicesHandler() {
 
 func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
-	////
-	user, err := h.db.GetUserByID(userID)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-	now := time.Now()
-	monthLastDay := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location()).AddDate(0, 0, -1)
 
-	err = h.createUserInvoice(user, monthLastDay)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-	/////
 	invoiceID := c.Param("invoice_id")
 	if invoiceID == "" {
 		Error(c, http.StatusBadRequest, "Invoice ID is required", "")
@@ -112,28 +96,28 @@ func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 	}
 
 	// Creating pdf for invoice if it doesn't have it
-	// if len(invoice.FileData) == 0 {
-	user, err = h.db.GetUserByID(userID)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
+	if len(invoice.FileData) == 0 {
+		user, err := h.db.GetUserByID(userID)
+		if err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
 
-	pdfContent, err := internal.CreateInvoicePDF(invoice, user)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
+		pdfContent, err := internal.CreateInvoicePDF(invoice, user)
+		if err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
 
-	invoice.FileData = pdfContent
-	if err := h.db.UpdateInvoicePDF(id, invoice.FileData); err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
+		invoice.FileData = pdfContent
+		if err := h.db.UpdateInvoicePDF(id, invoice.FileData); err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
 	}
-	// }
 
 	if userID != invoice.UserID {
 		Error(c, http.StatusNotFound, "User is not authorized to download this invoice", "")
@@ -174,16 +158,17 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 		if record.CreatedAt.After(rentRecordStart) {
 			rentRecordStart = record.CreatedAt
 		}
-		cancellationData, err := internal.GetRentContractCancellationDate(h.firesquidClient, record.ContractID)
-		fmt.Printf("cancellationData: %v\n", cancellationData)
 
-		totalHours := cancellationData.Day() * 24
+		var totalHours int
+		cancellationDate, err := internal.GetRentContractCancellationDate(h.firesquidClient, record.ContractID)
+
 		if errors.Is(err, internal.ErrorEventsNotFound) {
-			totalHours = monthLastDay.Day() * 24
+			totalHours = GetHoursSinceFirstDayOfMonth(rentRecordStart, monthLastDay)
 		} else if err != nil {
 			return err
+		} else {
+			totalHours = GetHoursSinceFirstDayOfMonth(rentRecordStart, cancellationDate)
 		}
-				fmt.Printf("totalHours: %v\n", totalHours)
 
 		nodeItems = append(nodeItems, models.NodeItem{
 			NodeID:        record.NodeID,
@@ -217,4 +202,12 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 		return err
 	}
 	return nil
+}
+
+func GetHoursSinceFirstDayOfMonth(startDate, endDate time.Time) int {
+	// Calculate the duration between the first day of the month and the specific date
+	duration := endDate.Sub(startDate)
+	// Convert the duration to hours
+	hours := int(duration.Hours())
+	return hours
 }
