@@ -67,8 +67,8 @@ func (r *TFGWReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		mne,
 		deployer.WithNetwork(net),
 		// TODO: remove this after testing
-		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
+		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
 	)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create TF plugin client: %w", err)

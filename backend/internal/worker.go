@@ -107,7 +107,6 @@ func (w *Worker) performDeployment(task *DeploymentTask) *DeploymentResult {
 		UserID: task.UserID,
 	}
 
-	// TODO: Implement actual deployment
 	res, err := DeployKubernetesCluster(context.Background(), w.gridClient, *task.Payload.Master, task.Payload.Workers, "", "")
 	if err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
