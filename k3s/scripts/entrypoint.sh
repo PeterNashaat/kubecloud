@@ -10,6 +10,11 @@ if [ -z "${K3S_FLANNEL_IFACE}" ]; then
     K3S_FLANNEL_IFACE=eth0
 fi
 
+if [[ "${DUAL_STACK}" = "true" && "${MASTER}" = "true" ]]; then
+    EXTRA_ARGS="$EXTRA_ARGS --cluster-cidr=10.42.0.0/16,2001:cafe:42::/56"
+    EXTRA_ARGS="$EXTRA_ARGS --service-cidr=10.43.0.0/16,2001:cafe:43::/112"
+fi
+
 if [ -z "${K3S_URL}" ]; then
     # Add additional SANs for planetary network IP, public IPv4, and public IPv6  
     # https://github.com/threefoldtech/tf-images/issues/98
@@ -24,7 +29,12 @@ if [ -z "${K3S_URL}" ]; then
             ip route get $addr && EXTRA_ARGS="$EXTRA_ARGS --tls-san $addr"
         done
     done
+    if [ "${HA}" = "true" ]; then
+        EXTRA_ARGS="$EXTRA_ARGS --cluster-init"
+    fi
     exec k3s server --flannel-iface $K3S_FLANNEL_IFACE $EXTRA_ARGS 2>&1
+elif [ "${MASTER}" = "true" ]; then
+    exec k3s server --server $K3S_URL --flannel-iface $K3S_FLANNEL_IFACE $EXTRA_ARGS 2>&1
 else
     exec k3s agent --flannel-iface $K3S_FLANNEL_IFACE $EXTRA_ARGS 2>&1
 fi

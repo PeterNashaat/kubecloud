@@ -25,10 +25,15 @@ type Handler struct {
 	mailService     internal.MailService
 	proxyClient     proxy.Client
 	substrateClient *substrate.Substrate
+	redis           *internal.RedisClient
+	sseManager      *internal.SSEManager
 }
 
 // NewHandler create new handler
-func NewHandler(tokenManager internal.TokenManager, db models.DB, config internal.Configuration, mailService internal.MailService, gridproxy proxy.Client, substrateClient *substrate.Substrate) *Handler {
+func NewHandler(tokenManager internal.TokenManager, db models.DB,
+	config internal.Configuration, mailService internal.MailService,
+	gridproxy proxy.Client, substrateClient *substrate.Substrate,
+	redis *internal.RedisClient, sseManager *internal.SSEManager) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -36,6 +41,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB, config interna
 		mailService:     mailService,
 		proxyClient:     gridproxy,
 		substrateClient: substrateClient,
+		redis:           redis,
+		sseManager:      sseManager,
 	}
 }
 
@@ -102,12 +109,9 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
-	if getErr != gorm.ErrRecordNotFound {
-		if existingUser.Verified {
-			Error(c, http.StatusConflict, "Conflict", "user already registered")
-			return
-		}
-
+	if getErr != nil && getErr != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusConflict, gin.H{"error": "user already registered"})
+		return
 	}
 
 	code := internal.GenerateRandomCode()
@@ -156,7 +160,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	// If user exists but not verified
 	if getErr != gorm.ErrRecordNotFound {
-		if !existingUser.Verified {
+		if existingUser.Verified {
 			user.ID = existingUser.ID
 			user.UpdatedAt = time.Now()
 			err = h.db.UpdateUserByID(&user)
@@ -279,7 +283,7 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		InternalServerError(c)
 		return
 	}
-	Success(c, http.StatusCreated, "token pair generated", tokenPair)
+	c.JSON(http.StatusOK, tokenPair)
 
 }
 
