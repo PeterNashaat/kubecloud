@@ -54,40 +54,51 @@ func (w *Worker) Stop() {
 
 // processLoop is the main processing loop for the worker
 func (w *Worker) processLoop(ctx context.Context) {
-	// TODO: should subscribe to task stream
-	ticker := time.NewTicker(time.Second * 5)
-	defer ticker.Stop()
+	log.Info().Str("worker_id", w.ID).Msg("Worker starting task subscription")
 
-	for {
+	// Create a combined context that respects both the parent context and stop channel
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Monitor stop channel in a separate goroutine
+	go func() {
 		select {
-		case <-ctx.Done():
-			return
 		case <-w.stopChan:
+			log.Debug().Str("worker_id", w.ID).Msg("Worker stop signal received")
+			cancel()
+		case <-workerCtx.Done():
+			// Context already cancelled
+		}
+	}()
+
+	// Create a task processing callback
+	taskCallback := func(task *DeploymentTask) {
+		// Check if worker is still running before processing
+		select {
+		case <-workerCtx.Done():
+			log.Debug().Str("worker_id", w.ID).Str("task_id", task.TaskID).Msg("Skipping task processing due to worker shutdown")
 			return
-		case <-ticker.C:
-			task, err := w.redis.GetNextPendingTask(ctx, w.ID)
-			if err != nil {
-				// Don't log context cancellation as error during shutdown
-				if ctx.Err() != nil {
-					log.Debug().Str("worker_id", w.ID).Msg("Worker stopping due to context cancellation")
-					return
-				}
-				log.Error().Err(err).Str("worker_id", w.ID).Msg("Failed to get pending task")
-				continue
-			}
+		default:
+		}
 
-			if task == nil {
-				log.Debug().Str("worker_id", w.ID).Msg("No pending tasks available")
-				continue
-			}
+		log.Info().Str("worker_id", w.ID).Str("task_id", task.TaskID).Msg("Received task to process")
 
-			log.Info().Str("worker_id", w.ID).Str("task_id", task.TaskID).Msg("Found task to process")
-
-			if err := w.processTask(ctx, task); err != nil {
-				log.Error().Err(err).Str("task_id", task.TaskID).Str("worker_id", w.ID).Msg("Failed to process task")
-			}
+		if err := w.processTask(workerCtx, task); err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Str("worker_id", w.ID).Msg("Failed to process task")
 		}
 	}
+
+	// Subscribe to task stream - this will block and process tasks as they arrive
+	if err := w.redis.SubscribeToTasks(workerCtx, w.ID, taskCallback); err != nil {
+		// Don't log context cancellation as error during shutdown
+		if workerCtx.Err() != nil {
+			log.Debug().Str("worker_id", w.ID).Msg("Worker stopping due to context cancellation")
+			return
+		}
+		log.Error().Err(err).Str("worker_id", w.ID).Msg("Task subscription ended with error")
+	}
+
+	log.Info().Str("worker_id", w.ID).Msg("Worker task subscription ended")
 }
 
 // processTask processes a single deployment task
@@ -98,13 +109,17 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 	now := time.Now()
 	task.StartedAt = &now
 
+	// Perform the deployment
 	result := w.performDeployment(ctx, task)
 
+	// Always try to add result to stream, even for failed deployments
 	if err := w.redis.AddResult(ctx, result); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to add result to stream")
-		return err
+		// Don't return here - we still want to send SSE update and acknowledge the task
+		// The task was processed (even if unsuccessfully), so it should be acknowledged
 	}
 
+	// Send SSE update if manager is available
 	if w.sseManager != nil {
 		w.sseManager.SendTaskUpdate(
 			task.UserID,
@@ -118,7 +133,17 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 		)
 	}
 
-	return w.redis.AckTask(ctx, task)
+	// Always acknowledge the task after processing (successful or failed)
+	// This prevents the task from being reprocessed
+	if err := w.redis.AckTask(ctx, task); err != nil {
+		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to acknowledge task")
+		// Return error here as acknowledgment failure is critical
+		// The task might be reprocessed if not acknowledged
+		return err
+	}
+
+	log.Info().Str("task_id", task.TaskID).Str("status", string(result.Status)).Msg("Task processing completed and acknowledged")
+	return nil
 }
 
 func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *DeploymentResult {
