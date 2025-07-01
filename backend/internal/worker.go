@@ -88,6 +88,11 @@ func (w *Worker) processLoop(ctx context.Context) {
 		}
 	}
 
+	// Handle any unacknowledged tasks first
+	if err := w.redis.HandleUnacknowledgedTasks(workerCtx, w.ID, taskCallback); err != nil {
+		log.Error().Err(err).Str("worker_id", w.ID).Msg("Failed to handle unacknowledged tasks")
+	}
+
 	// Subscribe to task stream - this will block and process tasks as they arrive
 	if err := w.redis.SubscribeToTasks(workerCtx, w.ID, taskCallback); err != nil {
 		// Don't log context cancellation as error during shutdown

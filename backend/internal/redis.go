@@ -28,8 +28,10 @@ type RedisClient struct {
 
 // NewRedisClient creates a new Redis client with task queue functionality
 func NewRedisClient(config Redis) (*RedisClient, error) {
+	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", config.Host, config.Port),
+		Network:  "tcp",
+		Addr:     addr,
 		Password: config.Password,
 		DB:       config.DB,
 	})
@@ -62,7 +64,6 @@ func (r *RedisClient) initializeStreams(ctx context.Context) error {
 		}
 	}
 
-	log.Debug().Msg("Redis streams initialized successfully")
 	return nil
 }
 
@@ -83,8 +84,7 @@ type DeploymentTask struct {
 	StartedAt   *time.Time           `json:"started_at,omitempty"`
 	CompletedAt *time.Time           `json:"completed_at,omitempty"`
 	Payload     workloads.K8sCluster `json:"payload"`
-	// Redis-specific fields for acknowledgment
-	MessageID string `json:"-"` // Redis stream message ID, not serialized
+	MessageID   string               `json:"-"`
 }
 
 type DeploymentResult struct {
@@ -97,242 +97,128 @@ type DeploymentResult struct {
 	Result      workloads.K8sCluster `json:"result,omitempty"`
 }
 
-func (r *RedisClient) AddTask(ctx context.Context, task *DeploymentTask) error {
-	taskData, err := json.Marshal(task)
+// addToStream adds a message to the specified stream
+func (r *RedisClient) addToStream(ctx context.Context, streamKey, id string, data interface{}) error {
+	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("failed to marshal task: %w", err)
+		return fmt.Errorf("failed to marshal data: %w", err)
 	}
 
 	args := &redis.XAddArgs{
-		Stream: TaskStreamKey,
+		Stream: streamKey,
 		Values: map[string]interface{}{
-			"task_id": task.TaskID,
-			"data":    string(taskData),
+			"id":   id,
+			"data": string(jsonData),
 		},
 	}
 
-	if err := r.client.XAdd(ctx, args).Err(); err != nil {
-		return fmt.Errorf("failed to add task to stream: %w", err)
-	}
-
-	log.Debug().Str("task_id", task.TaskID).Msg("Task added to queue")
-	return nil
+	return r.client.XAdd(ctx, args).Err()
 }
 
-func (r *RedisClient) GetPendingTasks(ctx context.Context, consumerName string, count int64) ([]DeploymentTask, error) {
-	args := &redis.XReadGroupArgs{
-		Group:    ConsumerGroup,
-		Consumer: consumerName,
-		Streams:  []string{TaskStreamKey, ">"},
-		Count:    count,
-		Block:    time.Second * 5,
-	}
-
-	streams, err := r.client.XReadGroup(ctx, args).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return []DeploymentTask{}, nil
+// subscribeToStream subscribes to messages from the specified stream
+func (r *RedisClient) subscribeToStream(ctx context.Context, streamKey, consumerGroup, consumerName string, callback func(string, []byte)) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
-		// Check if context was canceled (during shutdown)
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		return nil, fmt.Errorf("failed to read from stream: %w", err)
-	}
 
-	var tasks []DeploymentTask
-	for _, stream := range streams {
-		for _, message := range stream.Messages {
-			var task DeploymentTask
-			if taskData, ok := message.Values["data"].(string); ok {
-				if err := json.Unmarshal([]byte(taskData), &task); err != nil {
-					log.Error().Err(err).Str("message_id", message.ID).Msg("Failed to unmarshal task")
-					continue
+		args := &redis.XReadGroupArgs{
+			Group:    consumerGroup,
+			Consumer: consumerName,
+			Streams:  []string{streamKey, ">"}, // ">" means read both NEW and UNDELIVERED messages
+			Count:    1,                        // read only one message at a time
+			Block:    0,                        // block indefinitely, wait for new messages
+		}
+
+		streams, err := r.client.XReadGroup(ctx, args).Result()
+		if err != nil {
+			if err == redis.Nil {
+				continue
+			}
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			log.Error().Err(err).Str("stream", streamKey).Str("consumer", consumerName).Msg("Failed to read from stream")
+			continue
+		}
+
+		for _, stream := range streams {
+			for _, message := range stream.Messages {
+				if data, ok := message.Values["data"].(string); ok {
+					callback(message.ID, []byte(data))
 				}
-				// Set the Redis message ID for acknowledgment
-				task.MessageID = message.ID
-				tasks = append(tasks, task)
 			}
 		}
 	}
-
-	return tasks, nil
 }
 
-func (r *RedisClient) GetNextPendingTask(ctx context.Context, consumerName string) (*DeploymentTask, error) {
-	tasks, err := r.GetPendingTasks(ctx, consumerName, 1)
-	if err != nil {
-		return nil, err
-	}
+// AddTask adds a deployment task to the task stream
+func (r *RedisClient) AddTask(ctx context.Context, task *DeploymentTask) error {
+	return r.addToStream(ctx, TaskStreamKey, task.TaskID, task)
+}
 
-	if len(tasks) == 0 {
-		return nil, nil
-	}
+// AddResult adds a deployment result to the result stream
+func (r *RedisClient) AddResult(ctx context.Context, result *DeploymentResult) error {
+	return r.addToStream(ctx, ResultStreamKey, result.TaskID, result)
+}
 
-	return &tasks[0], nil
+// SubscribeToTasks subscribes to new tasks
+func (r *RedisClient) SubscribeToTasks(ctx context.Context, consumerName string, callback func(*DeploymentTask)) error {
+	return r.subscribeToStream(ctx, TaskStreamKey, ConsumerGroup, consumerName, func(messageID string, data []byte) {
+		var task DeploymentTask
+		if err := json.Unmarshal(data, &task); err != nil {
+			log.Error().Err(err).Str("message_id", messageID).Msg("Failed to unmarshal task")
+			return
+		}
+		task.MessageID = messageID
+		callback(&task)
+	})
+}
+
+// SubscribeToResults subscribes to deployment results
+func (r *RedisClient) SubscribeToResults(ctx context.Context, callback func(*DeploymentResult)) error {
+	return r.subscribeToStream(ctx, ResultStreamKey, ConsumerGroup+"_results", "result_consumer", func(messageID string, data []byte) {
+		var result DeploymentResult
+		if err := json.Unmarshal(data, &result); err != nil {
+			log.Error().Err(err).Str("message_id", messageID).Msg("Failed to unmarshal result")
+			return
+		}
+		callback(&result)
+	})
 }
 
 // AckTask acknowledges that a task has been processed
 func (r *RedisClient) AckTask(ctx context.Context, task *DeploymentTask) error {
 	if task.MessageID == "" {
-		return fmt.Errorf("task message ID is empty, cannot acknowledge")
+		return fmt.Errorf("task MessageID is required for acknowledgment")
 	}
 
-	result := r.client.XAck(ctx, TaskStreamKey, ConsumerGroup, task.MessageID)
-	if result.Err() != nil {
-		return fmt.Errorf("failed to acknowledge task %s: %w", task.TaskID, result.Err())
-	}
-
-	ackedCount := result.Val()
-	if ackedCount == 0 {
-		log.Warn().Str("task_id", task.TaskID).Str("message_id", task.MessageID).Msg("Task was not acknowledged (may have been already acked)")
-	} else {
-		log.Debug().Str("task_id", task.TaskID).Str("message_id", task.MessageID).Msg("Task acknowledged successfully")
-	}
-
-	return nil
+	return r.client.XAck(ctx, TaskStreamKey, ConsumerGroup, task.MessageID).Err()
 }
 
-// AddResult adds a deployment result to the result stream
-func (r *RedisClient) AddResult(ctx context.Context, result *DeploymentResult) error {
-	resultData, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	args := &redis.XAddArgs{
-		Stream: ResultStreamKey,
-		Values: map[string]interface{}{
-			"task_id": result.TaskID,
-			"data":    string(resultData),
-		},
-	}
-
-	if err := r.client.XAdd(ctx, args).Err(); err != nil {
-		return fmt.Errorf("failed to add result to stream: %w", err)
-	}
-
-	log.Debug().Str("task_id", result.TaskID).Msg("Result added to stream")
-	return nil
-}
-
-// SubscribeToResults subscribes to deployment results
-func (r *RedisClient) SubscribeToResults(ctx context.Context, callback func(*DeploymentResult)) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			args := &redis.XReadArgs{
-				Streams: []string{ResultStreamKey, "$"}, // TODO: readsFromRecent, catch up on missed messages
-				Count:   10,
-				Block:   time.Second * 1,
-			}
-
-			streams, err := r.client.XRead(ctx, args).Result()
-			if err != nil {
-				if err == redis.Nil {
-					continue // No new messages
-				}
-				log.Error().Err(err).Msg("Failed to read from result stream")
-				continue
-			}
-
-			for _, stream := range streams {
-				for _, message := range stream.Messages {
-					var result DeploymentResult
-					if resultData, ok := message.Values["data"].(string); ok {
-						if err := json.Unmarshal([]byte(resultData), &result); err != nil {
-							log.Error().Err(err).Str("message_id", message.ID).Msg("Failed to unmarshal result")
-							continue
-						}
-						callback(&result)
-					}
-				}
-			}
-		}
-	}
-}
-
-// SubscribeToTasks subscribes to new tasks in the stream and handles unacknowledged messages
-func (r *RedisClient) SubscribeToTasks(ctx context.Context, consumerName string, callback func(*DeploymentTask)) error {
-	// First, handle any unacknowledged messages
-	// if err := r.handleUnacknowledgedTasks(ctx, consumerName, callback); err != nil {
-	// 	log.Error().Err(err).Str("consumer", consumerName).Msg("Failed to handle unacknowledged tasks")
-	// }
-
-	// Then subscribe to new tasks
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			args := &redis.XReadGroupArgs{
-				Group:    ConsumerGroup,
-				Consumer: consumerName,
-				Streams:  []string{TaskStreamKey, ">"}, // read any message wasn't consumed
-				Count:    1,                            // Process one task at a time
-				Block:    0,                            // Block indefinitely until a message arrives
-			}
-
-			streams, err := r.client.XReadGroup(ctx, args).Result()
-			if err != nil {
-				if err == redis.Nil {
-					continue // No new messages, continue blocking
-				}
-				// Check if context was canceled (during shutdown)
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				log.Error().Err(err).Str("consumer", consumerName).Msg("Failed to read from task stream")
-				continue
-			}
-
-			// Process received tasks
-			for _, stream := range streams {
-				for _, message := range stream.Messages {
-					var task DeploymentTask
-					if taskData, ok := message.Values["data"].(string); ok {
-						if err := json.Unmarshal([]byte(taskData), &task); err != nil {
-							log.Error().Err(err).Str("message_id", message.ID).Msg("Failed to unmarshal task")
-							continue
-						}
-						// Set the Redis message ID for acknowledgment
-						task.MessageID = message.ID
-						callback(&task)
-					}
-				}
-			}
-		}
-	}
-}
-
-// handleUnacknowledgedTasks processes any unacknowledged messages for the consumer (messages consumed but not acknowledged)
-func (r *RedisClient) handleUnacknowledgedTasks(ctx context.Context, consumerName string, callback func(*DeploymentTask)) error {
-	// Get pending messages for this consumer
+// HandleUnacknowledgedTasks processes messages that are DELIVERED but not ACKNOWLEDGED
+func (r *RedisClient) HandleUnacknowledgedTasks(ctx context.Context, consumerName string, callback func(*DeploymentTask)) error {
 	pendingResult := r.client.XPending(ctx, TaskStreamKey, ConsumerGroup)
 	if pendingResult.Err() != nil {
 		if pendingResult.Err() == redis.Nil {
-			return nil // No pending messages
+			return nil
 		}
 		return fmt.Errorf("failed to get pending messages: %w", pendingResult.Err())
 	}
 
 	pending := pendingResult.Val()
 	if pending.Count == 0 {
-		log.Debug().Str("consumer", consumerName).Msg("No unacknowledged tasks found")
 		return nil
 	}
 
-	log.Info().Str("consumer", consumerName).Int64("count", pending.Count).Msg("Found unacknowledged tasks")
-
-	// Get detailed pending messages for this specific consumer
 	pendingExtResult := r.client.XPendingExt(ctx, &redis.XPendingExtArgs{
 		Stream:   TaskStreamKey,
 		Group:    ConsumerGroup,
 		Start:    "-",
 		End:      "+",
-		Count:    100, // Process up to 100 pending messages at once
+		Count:    100,
 		Consumer: consumerName,
 	})
 
@@ -342,43 +228,23 @@ func (r *RedisClient) handleUnacknowledgedTasks(ctx context.Context, consumerNam
 
 	pendingMessages := pendingExtResult.Val()
 	for _, pendingMsg := range pendingMessages {
-		// Claim messages that have been idle for more than 5 minutes
-		if pendingMsg.Idle > 5*time.Minute {
-			log.Info().Str("message_id", pendingMsg.ID).Dur("idle_time", pendingMsg.Idle).Msg("Claiming idle unacknowledged task")
+		readResult := r.client.XRange(ctx, TaskStreamKey, pendingMsg.ID, pendingMsg.ID)
+		if readResult.Err() != nil {
+			log.Error().Err(readResult.Err()).Str("message_id", pendingMsg.ID).Msg("Failed to read unacknowledged message")
+			continue
+		}
 
-			// Claim the message
-			claimResult := r.client.XClaim(ctx, &redis.XClaimArgs{
-				Stream:   TaskStreamKey,
-				Group:    ConsumerGroup,
-				Consumer: consumerName,
-				MinIdle:  5 * time.Minute,
-				Messages: []string{pendingMsg.ID},
-			})
-
-			if claimResult.Err() != nil {
-				log.Error().Err(claimResult.Err()).Str("message_id", pendingMsg.ID).Msg("Failed to claim message")
-				continue
-			}
-
-			// Process claimed messages
-			claimedMessages := claimResult.Val()
-			for _, message := range claimedMessages {
-				var task DeploymentTask
-				if taskData, ok := message.Values["data"].(string); ok {
-					if err := json.Unmarshal([]byte(taskData), &task); err != nil {
-						log.Error().Err(err).Str("message_id", message.ID).Msg("Failed to unmarshal claimed task")
-						continue
-					}
-					// Set the Redis message ID for acknowledgment
-					task.MessageID = message.ID
-					log.Info().Str("task_id", task.TaskID).Str("message_id", message.ID).Msg("Processing claimed unacknowledged task")
-					callback(&task)
+		messages := readResult.Val()
+		for _, message := range messages {
+			var task DeploymentTask
+			if taskData, ok := message.Values["data"].(string); ok {
+				if err := json.Unmarshal([]byte(taskData), &task); err != nil {
+					log.Error().Err(err).Str("message_id", message.ID).Msg("Failed to unmarshal unacknowledged task")
+					continue
 				}
+				task.MessageID = message.ID
+				callback(&task)
 			}
-		} else {
-			// For messages that are not idle enough, we can still process them if they belong to this consumer
-			// This handles the case where the worker restarted and has unacknowledged messages
-			log.Debug().Str("message_id", pendingMsg.ID).Dur("idle_time", pendingMsg.Idle).Msg("Found recent unacknowledged task, will be processed in normal flow")
 		}
 	}
 
