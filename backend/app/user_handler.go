@@ -756,5 +756,5 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Voucher is Redeemed Successfully", nil)
+	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
 }

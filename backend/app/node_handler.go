@@ -111,7 +111,6 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		NodeID: &nodeID64,
 	}
 
-	// validate user has enough balance for reserving node
 	nodes, _, err := h.proxyClient.Nodes(c.Request.Context(), filter, proxyTypes.Limit{})
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -132,7 +131,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		InternalServerError(c)
 		return
 	}
-
+	// validate user has enough balance for reserving node
 	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -141,7 +140,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	//TODO: check price in month constant
 	if usdBalance < node.PriceUsd/24/30 || user.Debt > 0 {
-		Error(c, http.StatusBadRequest, "You should at lease have enough balance for one hour", "")
+		Error(c, http.StatusBadRequest, "You should at least have enough balance for one hour", "")
 		return
 	}
 

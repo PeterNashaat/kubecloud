@@ -97,7 +97,7 @@ func (service *MailService) InvoiceMailContent(invoiceTotal float64, currency st
 	mailBody += "please don't hesitate to reach out to us.\n\n"
 	mailBody += "We appreciate your prompt attention to this matter and thank you for being a valued customer."
 
-	subject := "Invoice Notification – Action Required"
+	subject := "Invoice Notification"
 	return subject, mailBody
 
 }
