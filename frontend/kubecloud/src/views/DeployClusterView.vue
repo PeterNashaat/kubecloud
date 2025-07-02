@@ -10,19 +10,17 @@
         <div class="deploy-card">
           <!-- Progress Indicator -->
           <div class="progress-section">
-            <div class="progress-header">
-              <div class="progress-step" :class="{ active: step >= 1, completed: step > 1 }">
-                <div class="step-number">1</div>
+            <div class="stepper">
+              <div class="step" :class="{ active: step >= 1, completed: step > 1 }">
+                <div class="step-circle">1</div>
                 <div class="step-label">Define VMs</div>
               </div>
-              <div class="progress-line" :class="{ completed: step > 1 }"></div>
-              <div class="progress-step" :class="{ active: step >= 2, completed: step > 2 }">
-                <div class="step-number">2</div>
+              <div class="step" :class="{ active: step >= 2, completed: step > 2 }">
+                <div class="step-circle">2</div>
                 <div class="step-label">Place VMs</div>
               </div>
-              <div class="progress-line" :class="{ completed: step > 2 }"></div>
-              <div class="progress-step" :class="{ active: step >= 3 }">
-                <div class="step-number">3</div>
+              <div class="step" :class="{ active: step >= 3 }">
+                <div class="step-circle">3</div>
                 <div class="step-label">Review</div>
               </div>
             </div>
@@ -30,304 +28,67 @@
 
           <!-- Step Content -->
           <div class="step-content">
-            <!-- Step 1: Define Your Cluster's Virtual Machines -->
-            <div v-if="step === 1" class="step-section">
-              <div class="section-header">
-                <h3 class="section-title">
-                  <v-icon icon="mdi-server" class="mr-2"></v-icon>
-                  Define Virtual Machines
-                </h3>
-                <p class="section-subtitle">Configure the compute resources for your cluster</p>
-              </div>
-              
-              <!-- SSH Key Selection -->
-              <div class="ssh-key-section" style="margin-bottom: 2rem;">
-                <h4 class="section-title" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Select SSH Keys</h4>
-                <v-chip-group
-                  v-model="selectedSshKeys"
-                  multiple
-                  column
-                  style="max-width: 600px;"
-                >
-                  <v-chip
-                    v-for="key in availableSshKeys"
-                    :key="key.id"
-                    :value="key.id"
-                    class="ma-1"
-                    :class="{ 'selected-chip': selectedSshKeys.includes(key.id) }"
-                  >
-                    {{ key.name }}
-                  </v-chip>
-                </v-chip-group>
-                <v-btn variant="text" color="primary" @click="navigateToSshKeys" style="margin-top: 0.5rem;">
-                  Manage SSH Keys
-                </v-btn>
-              </div>
-
-              <div class="vm-config-grid">
-                <div class="vm-config-card">
-                  <div class="card-header">
-                    <h4 class="card-title">
-                      <v-icon icon="mdi-server" class="mr-2"></v-icon>
-                      Master Nodes
-                    </h4>
-                    <v-btn
-                      color="primary"
-                      :disabled="masters.length >= 3"
-                      prepend-icon="mdi-plus"
-                      size="small"
-                      variant="outlined"
-                      @click="addMaster"
-                    >
-                      Add Master
-                    </v-btn>
-                  </div>
-                  <div class="vm-list">
-                    <div v-for="(master, index) in masters" :key="index" class="vm-item">
-                      <div class="vm-icon" data-type="master">
-                        <v-icon icon="mdi-desktop-classic" color="var(--color-primary)"></v-icon>
-                      </div>
-                      <div class="vm-details">
-                        <div class="vm-name">{{ master.name }}</div>
-                        <div class="vm-specs" style="gap: 1rem;">
-                          <div>
-                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">vCPU</label>
-                            <input type="number" min="1" max="64" v-model.number="master.vcpu" style="width: 60px; margin-left: 0.5rem;" />
-                          </div>
-                          <div>
-                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">RAM (GB)</label>
-                            <input type="number" min="1" max="512" v-model.number="master.ram" style="width: 60px; margin-left: 0.5rem;" />
-                          </div>
-                        </div>
-                      </div>
-                      <v-btn 
-                        icon="mdi-delete" 
-                        variant="text" 
-                        color="error" 
-                        size="small" 
-                        @click="removeMaster(index)"
-                      ></v-btn>
-                    </div>
-                    <div v-if="!masters.length" class="empty-state">
-                      <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
-                      <p>No master nodes configured</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="vm-config-card">
-                  <div class="card-header">
-                    <h4 class="card-title">
-                      <v-icon icon="mdi-desktop-tower-monitor" class="mr-2"></v-icon>
-                      Worker Nodes
-                    </h4>
-                    <v-btn
-                      color="primary"
-                      prepend-icon="mdi-plus"
-                      size="small"
-                      variant="outlined"
-                      @click="addWorker"
-                    >
-                      Add Worker
-                    </v-btn>
-                  </div>
-                  <div class="vm-list">
-                    <div v-for="(worker, index) in workers" :key="index" class="vm-item">
-                      <div class="vm-icon" data-type="worker">
-                        <v-icon icon="mdi-desktop-tower" color="var(--color-success)"></v-icon>
-                      </div>
-                      <div class="vm-details">
-                        <div class="vm-name">{{ worker.name }}</div>
-                        <div class="vm-specs" style="gap: 1rem;">
-                          <div>
-                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">vCPU</label>
-                            <input type="number" min="1" max="64" v-model.number="worker.vcpu" style="width: 60px; margin-left: 0.5rem;" />
-                          </div>
-                          <div>
-                            <label style="font-size: 0.9rem; color: var(--color-text-muted);">RAM (GB)</label>
-                            <input type="number" min="1" max="512" v-model.number="worker.ram" style="width: 60px; margin-left: 0.5rem;" />
-                          </div>
-                        </div>
-                      </div>
-                      <v-btn 
-                        icon="mdi-delete" 
-                        variant="text" 
-                        color="error" 
-                        size="small" 
-                        @click="removeWorker(index)"
-                      ></v-btn>
-                    </div>
-                    <div v-if="!workers.length" class="empty-state">
-                      <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
-                      <p>No worker nodes configured</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="step-actions">
-                <v-btn
-                  color="primary"
-                  :disabled="!masters.length"
-                  @click="nextStep"
-                  class="btn-primary"
-                >
-                  Continue
-                  <v-icon end icon="mdi-arrow-right"></v-icon>
-                </v-btn>
-              </div>
-            </div>
-
-            <!-- Step 2: Place Your VMs on Your Reserved Nodes -->
-            <div v-if="step === 2" class="step-section">
-              <div class="section-header">
-                <h3 class="section-title">
-                  <v-icon icon="mdi-server-network" class="mr-2"></v-icon>
-                  Assign VMs to Reserved Nodes
-                </h3>
-                <p class="section-subtitle">Select which reserved nodes will host your cluster VMs</p>
-              </div>
-              
-              <div class="vm-assignment-grid">
-                <div 
-                  v-for="(vm, index) in allVMs" 
-                  :key="index"
-                  class="vm-assignment-card"
-                >
-                  <div class="vm-assignment-header">
-                    <div class="vm-avatar" :class="vm.name.includes('Master') ? 'master' : 'worker'">
-                      <v-icon 
-                        :icon="vm.name.includes('Master') ? 'mdi-server' : 'mdi-desktop-tower'" 
-                        color="white"
-                      ></v-icon>
-                    </div>
-                    <div class="vm-info">
-                      <h4 class="vm-title">{{ vm.name }}</h4>
-                      <div class="vm-specs">
-                        <span class="spec-chip">{{ vm.vcpu }} vCPU</span>
-                        <span class="spec-chip">{{ vm.ram }}GB RAM</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <v-select
-                    :items="availableNodes"
-                    label="Select Reserved Node"
-                    v-model="vm.node"
-                    item-title="label"
-                    item-value="id"
-                    prepend-inner-icon="mdi-server-network"
-                    variant="outlined"
-                    :hint="vm.node ? getNodeInfo(vm.node) : 'Choose a node for this VM'"
-                    persistent-hint
-                    class="node-select"
-                  ></v-select>
-                </div>
-              </div>
-
-              <div class="step-actions">
-                <v-btn variant="outlined" @click="prevStep" class="btn-outline">
-                  <v-icon start icon="mdi-arrow-left"></v-icon>
-                  Back
-                </v-btn>
-                <v-btn
-                  color="primary"
-                  :disabled="!allVMs.every(vm => vm.node)"
-                  @click="nextStep"
-                  class="btn-primary"
-                >
-                  Continue
-                  <v-icon end icon="mdi-arrow-right"></v-icon>
-                </v-btn>
-              </div>
-            </div>
-
-            <!-- Step 3: Review and Deploy -->
-            <div v-if="step === 3" class="step-section">
-              <div class="section-header">
-                <h3 class="section-title">
-                  <v-icon icon="mdi-check-circle" class="mr-2"></v-icon>
-                  Review Configuration
-                </h3>
-                <p class="section-subtitle">Review your cluster configuration before deployment</p>
-              </div>
-              
-              <div class="review-grid">
-                <div class="review-card">
-                  <h4 class="review-title">Cluster Summary</h4>
-                  <div class="review-stats">
-                    <div class="review-stat">
-                      <span class="stat-label">Master Nodes:</span>
-                      <span class="stat-value">{{ masters.length }}</span>
-                    </div>
-                    <div class="review-stat">
-                      <span class="stat-label">Worker Nodes:</span>
-                      <span class="stat-value">{{ workers.length }}</span>
-                    </div>
-                    <div class="review-stat">
-                      <span class="stat-label">Total vCPU:</span>
-                      <span class="stat-value">{{ totalVcpu }}</span>
-                    </div>
-                    <div class="review-stat">
-                      <span class="stat-label">Total RAM:</span>
-                      <span class="stat-value">{{ totalRam }}GB</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="review-card">
-                  <h4 class="review-title">Node Assignment</h4>
-                  <div class="node-assignments">
-                    <div v-for="(vm, index) in allVMs" :key="index" class="node-assignment">
-                      <div class="assignment-icon">
-                        <v-icon 
-                          :icon="vm.name.includes('Master') ? 'mdi-server' : 'mdi-desktop-tower'" 
-                          :color="vm.name.includes('Master') ? 'var(--color-primary)' : 'var(--color-success)'"
-                        ></v-icon>
-                      </div>
-                      <div class="assignment-details">
-                        <div class="assignment-name">{{ vm.name }}</div>
-                        <div class="assignment-node">{{ getNodeInfo(vm.node) }}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="step-actions">
-                <v-btn variant="outlined" @click="prevStep" class="btn-outline">
-                  <v-icon start icon="mdi-arrow-left"></v-icon>
-                  Back
-                </v-btn>
-                <v-btn
-                  color="success"
-                  @click="deployCluster"
-                  class="btn-primary"
-                  :loading="deploying"
-                >
-                  <v-icon start icon="mdi-rocket-launch"></v-icon>
-                  Deploy Cluster
-                </v-btn>
-              </div>
-            </div>
+            <Step1DefineVMs
+              v-if="step === 1"
+              :masters="masters"
+              :workers="workers"
+              :availableSshKeys="availableSshKeys"
+              :addMaster="addMaster"
+              :addWorker="addWorker"
+              :removeMaster="removeMaster"
+              :removeWorker="removeWorker"
+              :openEditNodeModal="openEditNodeModal"
+              :selectedSshKeys="selectedSshKeys"
+              :setSelectedSshKeys="setSelectedSshKeys"
+              :isStep1Valid="isStep1Valid"
+              @navigateToSshKeys="navigateToSshKeys"
+              @nextStep="nextStep"
+            />
+            <Step2AssignNodes
+              v-else-if="step === 2"
+              :allVMs="allVMs"
+              :availableNodes="availableNodes.map(n => ({ id: String(n.id), label: n.label }))"
+              :getNodeInfo="getNodeInfoString"
+              :onAssignNode="onAssignNode"
+              :isStep2Valid="isStep2Valid"
+              @nextStep="nextStep"
+              @prevStep="prevStep"
+            />
+            <Step3Review
+              v-else-if="step === 3"
+              :allVMs="allVMs"
+              :getNodeInfo="getNodeInfoString"
+              :onDeployCluster="onDeployCluster"
+              :prevStep="prevStep"
+              :deploying="deploying"
+            />
           </div>
         </div>
       </div>
     </v-container>
+    <EditNodeModal v-if="editNodeModal.open && editNodeModal.node" :node="editNodeModal.node" :visible="editNodeModal.open" :availableSshKeys="availableSshKeys" @save="saveEditNode" @cancel="closeEditNodeModal" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useClusterStore } from '../stores/clusters';
+import NodeCard from '../components/NodeCard.vue';
+import EditNodeModal from '../components/EditNodeModal.vue';
+import { useDeployCluster } from '../composables/useDeployCluster';
+import type { VM, SshKey } from '../composables/useDeployCluster';
+import Step1DefineVMs from '../components/deploy/Step1DefineVMs.vue';
+import Step2AssignNodes from '../components/deploy/Step2AssignNodes.vue';
+import Step3Review from '../components/deploy/Step3Review.vue';
+import { api } from '../utils/api';
+import { useNotificationStore } from '../stores/notifications';
+import { UserService } from '../utils/userService';
+import { useNodes } from '../composables/useNodes';
+
+const notificationStore = useNotificationStore();
+const userService = new UserService();
 
 // Type definitions
-interface VM {
-  name: string;
-  vcpu: number;
-  ram: number;
-  node: number | null;
-}
-
 interface Node {
   id: number;
   label: string;
@@ -337,19 +98,61 @@ interface Node {
   location: string;
 }
 
-interface SshKey {
-  id: number;
-  name: string;
-  fingerprint: string;
-  createdAt: string;
+interface ClusterPayload {
+  Master: K8sNode | null;
+  Workers: K8sNode[];
+  Token: string;
+  NetworkName: string;
+  SSHKey: string;
+  Flist: string;
+  SolutionType: string;
+}
+
+interface K8sNode {
+  VM: VMFull;
+  DiskSizeGB: number;
+}
+
+interface VMFull {
+  Name: string;
+  NodeID: number | null;
+  CPU: number;
+  MemoryMB: number;
+  NetworkName: string;
+  Flist: string;
+  Entrypoint: string;
+  EnvVars: Record<string, string>;
+  RootfsSizeMB: number;
+  PublicIP: boolean;
+  Planetary: boolean;
+  QEMUArgs: any[];
 }
 
 const step = ref(1);
-const masters = ref<VM[]>([]);
-const workers = ref<VM[]>([]);
+const { masters, workers, availableSshKeys, addMaster, addWorker, removeMaster, removeWorker } = useDeployCluster();
 const deploying = ref(false);
 
 const allVMs = computed(() => [...masters.value, ...workers.value]);
+
+const { fetchNodes, nodes, loading: nodesLoading, error: nodesError } = useNodes();
+const availableNodes = ref<any[]>([]);
+
+async function fetchAvailableNodes() {
+  try {
+    await fetchNodes();
+    const nodesArr = Array.isArray(nodes.value) ? nodes.value : [];
+    availableNodes.value = nodesArr.map((n: any) => ({
+      id: String(n.id),
+      label: n.label || n.name || `Node #${n.id}`,
+      totalCPU: n.resources?.cpu || n.totalCPU || 0,
+      totalRAM: n.resources?.memory || n.totalRAM || 0,
+      hasGPU: n.gpu || n.hasGPU || false,
+      location: n.location || '',
+    }));
+  } catch (err) {
+    availableNodes.value = [];
+  }
+}
 
 // Computed properties for totals
 const totalVcpu = computed(() => {
@@ -360,59 +163,9 @@ const totalRam = computed(() => {
   return allVMs.value.reduce((total, vm) => total + vm.ram, 0);
 });
 
-// Available nodes with better structure
-const availableNodes = ref<Node[]>([
-  { 
-    id: 1234, 
-    label: 'Node #1234 (GPU)', 
-    totalCPU: 16, 
-    totalRAM: 64, 
-    hasGPU: true,
-    location: 'us-east-1a'
-  },
-  { 
-    id: 5678, 
-    label: 'Node #5678', 
-    totalCPU: 8, 
-    totalRAM: 32, 
-    hasGPU: false,
-    location: 'us-east-1b'
-  },
-  { 
-    id: 9012, 
-    label: 'Node #9012', 
-    totalCPU: 8, 
-    totalRAM: 32, 
-    hasGPU: false,
-    location: 'us-east-1c'
-  },
-]);
-
 const clusterName = ref('');
-const selectedSshKeys = ref<number[]>([]);
+const selectedSshKeys = ref<string[]>([]);
 const qsfsConfig = ref('');
-
-// Available SSH keys (would come from dashboard/API)
-const availableSshKeys = ref<SshKey[]>([
-  {
-    id: 1,
-    name: 'my-laptop-key',
-    fingerprint: 'SHA256:abc123...',
-    createdAt: '2024-01-15'
-  },
-  {
-    id: 2,
-    name: 'production-key',
-    fingerprint: 'SHA256:def456...',
-    createdAt: '2024-01-10'
-  },
-  {
-    id: 3,
-    name: 'team-shared-key',
-    fingerprint: 'SHA256:ghi789...',
-    createdAt: '2024-01-05'
-  }
-]);
 
 // Cluster name generator words
 const adjectives = [
@@ -427,50 +180,38 @@ const nouns = [
   'realm', 'domain', 'sphere', 'matrix', 'grid', 'network', 'system'
 ];
 
-// Computed properties for validation
-const allVMsAssigned = computed(() => {
-  return allVMs.value.every(vm => vm.node);
+// --- Step 1 Validation ---
+const isStep1Valid = computed(() => {
+  if (masters.value.length === 0) return false;
+  // Every node (master/worker) must have at least one SSH key
+  return allVMs.value.every(vm => Array.isArray(vm.sshKeyIds) && vm.sshKeyIds.length > 0);
 });
 
-const isFormValid = computed(() => {
-  return clusterName.value && selectedSshKeys.value.length > 0 && allVMsAssigned.value;
+// --- Step 2 Validation ---
+const assignedNodeIds = computed(() => allVMs.value.map((vm: any) => vm.node));
+const allVMsAssigned = computed(() => allVMs.value.length > 0 && allVMs.value.every((vm: any) => vm.node !== null && vm.node !== undefined));
+const uniqueNodeAssignment = computed(() => {
+  const nodeIds: number[] = assignedNodeIds.value.filter((id: number | null) => id !== null);
+  return new Set(nodeIds).size === nodeIds.length;
 });
+const isStep2Valid = computed(() => allVMsAssigned.value && uniqueNodeAssignment.value);
+
+// --- Step 3 Validation ---
+const isStep3Valid = computed(() => isStep2Valid.value && isStep1Valid.value);
 
 // Helper function to get node info
-function getNodeInfo(nodeId: number | null) {
+function getNodeInfo(nodeId: string | null) {
   if (!nodeId) return '';
   const node = availableNodes.value.find(n => n.id === nodeId);
   if (!node) return '';
   return `${node.totalCPU} vCPU, ${node.totalRAM}GB RAM${node.hasGPU ? ', GPU Available' : ''}`;
 }
 
-function addMaster() {
-  if (masters.value.length < 3) {
-    masters.value.push({
-      name: `Master-${masters.value.length + 1}`,
-      vcpu: 2,
-      ram: 4,
-      node: null
-    });
-  }
-}
-
-function removeMaster(index: number) {
-  masters.value.splice(index, 1);
-}
-
-function addWorker() {
-  workers.value.push({
-    name: `Worker-${workers.value.length + 1}`,
-    vcpu: 2,
-    ram: 4,
-    node: null
-  });
-}
-
-function removeWorker(index: number) {
-  workers.value.splice(index, 1);
-}
+// --- Deploy Logic ---
+const clusterToken = ref('securetoken');
+const clusterNetworkName = ref('');
+const defaultFlist = ref('https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist');
+const defaultEntrypoint = ref('/sbin/zinit init');
 
 // Cluster name generator
 function generateClusterName() {
@@ -512,35 +253,82 @@ function getValidationMessage() {
   return errors.join('. ');
 }
 
+// --- Navigation ---
 function nextStep() {
-  if (step.value < 3) {
+  if ((step.value === 1 && isStep1Valid.value) || (step.value === 2 && isStep2Valid.value)) {
     step.value++;
   }
 }
-
 function prevStep() {
-  if (step.value > 1) {
-    step.value--;
-  }
+  if (step.value > 1) step.value--;
 }
 
-async function deployCluster() {
-  if (!isFormValid.value) return;
+const clusters = useClusterStore();
 
+const clusterPayload = computed<ClusterPayload>(() => {
+  const networkName = clusterNetworkName.value || `${clusterName.value}_network`;
+  const token = clusterToken.value;
+  const flist = 'https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist';
+  const entrypoint = '/sbin/zinit init';
+  const sshKeyObj = availableSshKeys.value.find(k => k.id === selectedSshKeys.value[0]);
+  const sshKey = sshKeyObj ? sshKeyObj.fingerprint : '';
+  function buildVM(vm: VM, nodeType: string): VMFull {
+    return {
+      Name: vm.name,
+      NodeID: vm.node,
+      CPU: vm.vcpu,
+      MemoryMB: vm.ram * 1024,
+      NetworkName: networkName,
+      Flist: flist,
+      Entrypoint: entrypoint,
+      EnvVars: {
+        SSH_KEY: sshKey,
+        K3S_TOKEN: token,
+        K3S_DATA_DIR: '/mnt/data',
+        K3S_FLANNEL_IFACE: 'eth0',
+        K3S_NODE_NAME: vm.name,
+        K3S_URL: '',
+      },
+      RootfsSizeMB: (vm.rootfs || 10) * 1024,
+      PublicIP: vm.publicIp,
+      Planetary: vm.planetary,
+      QEMUArgs: [],
+    };
+  }
+  const masterNode = masters.value[0];
+  const master = masterNode ? {
+    VM: buildVM(masterNode, 'master'),
+    DiskSizeGB: masterNode.rootfs || 10,
+  } : null;
+  const workersArr = workers.value.map(worker => ({
+    VM: buildVM(worker, 'worker'),
+    DiskSizeGB: worker.rootfs || 10,
+  }));
+  return {
+    Master: master,
+    Workers: workersArr,
+    Token: token,
+    NetworkName: networkName,
+    SSHKey: sshKey,
+    Flist: flist,
+    SolutionType: `kubernetes/user/${clusterName.value}`,
+  };
+});
+
+async function onDeployCluster() {
   deploying.value = true;
   try {
-    // Simulating API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const selectedKeys = selectedSshKeys.value.map(keyId => 
-      availableSshKeys.value.find(k => k.id === keyId)
-    );
-    
-    // Show success message
-    alert(`Cluster "${clusterName.value}" deployment initiated successfully!`);
-  } catch (error) {
-    console.error('Failed to deploy cluster:', error);
-    alert('Failed to deploy cluster. Please try again.');
+    await api.post('/v1/deploy', clusterPayload.value, {
+      showNotifications: true,
+      loadingMessage: 'Deploying cluster...',
+      successMessage: 'Cluster deployed successfully!',
+      errorMessage: 'Failed to deploy cluster',
+      requiresAuth: true
+    });
+    notificationStore.success('Success', 'Cluster deployed successfully!');
+    // Optionally, redirect or reset wizard here
+  } catch (err: any) {
+    notificationStore.error('Error', err.message || 'Failed to deploy cluster');
   } finally {
     deploying.value = false;
   }
@@ -550,518 +338,188 @@ async function deployCluster() {
 onMounted(() => {
   // Auto-generate cluster name on component mount
   generateClusterName();
+  fetchAvailableNodes();
 });
+
+const editNodeModal = ref({ open: false, type: '', idx: -1, node: null as null | VM });
+function openEditNodeModal(type: 'master' | 'worker', idx: number) {
+  const node = type === 'master' ? { ...masters.value[idx] } : { ...workers.value[idx] };
+  editNodeModal.value = { open: true, type, idx, node };
+}
+function closeEditNodeModal() {
+  editNodeModal.value = { open: false, type: '', idx: -1, node: null };
+}
+function saveEditNode(updatedNode: VM) {
+  if (!editNodeModal.value.node) return;
+  if (editNodeModal.value.type === 'master') {
+    masters.value[editNodeModal.value.idx] = { ...updatedNode };
+  } else if (editNodeModal.value.type === 'worker') {
+    workers.value[editNodeModal.value.idx] = { ...updatedNode };
+  }
+  closeEditNodeModal();
+}
+
+const editNodeValidation = computed(() => {
+  const node = editNodeModal.value.node;
+  if (!node) return { valid: false };
+  const errors: Record<string, string> = {};
+  if (!node.name || !node.name.trim()) errors.name = 'Name is required.';
+  if (!node.vcpu || node.vcpu <= 0) errors.vcpu = 'vCPU must be a positive number.';
+  if (!node.ram || node.ram <= 0) errors.ram = 'RAM must be a positive number.';
+  if (!node.rootfs || node.rootfs <= 0) errors.rootfs = 'Rootfs size must be positive.';
+  if (!node.disk || node.disk <= 0) errors.disk = 'Disk size must be positive.';
+  if (!node.sshKeyIds || node.sshKeyIds.length === 0) errors.ssh = 'At least one SSH key must be selected.';
+  return { valid: Object.keys(errors).length === 0, errors };
+});
+
+function setSelectedSshKeys(keys: string[]) {
+  selectedSshKeys.value = keys;
+}
+function onAssignNode(vmIdx: number, nodeId: string) {
+  allVMs.value[vmIdx].node = nodeId ? Number(nodeId) : null;
+}
+function getNodeInfoString(id: string) {
+  return getNodeInfo(id);
+}
 </script>
 
+<style>
+.deploy-container {
+  /* Enhanced palette for Deploy Cluster only */
+  --color-bg-elevated: #20243a;
+  --color-bg-hover: #23263b;
+  --color-chip-bg: #23263b;
+  --color-chip-border: #334155;
+  --shadow-card: 0 6px 24px rgba(16, 24, 40, 0.12);
+}
+</style>
+
 <style scoped>
-/* Deploy Container - matches dashboard layout */
 .deploy-container {
   min-height: 100vh;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-family);
+  background: var(--color-bg, #15162b);
+  padding-top: 3.5rem;
+  margin-top: 7rem;
 }
-
 .deploy-header {
   text-align: center;
-  max-width: 900px;
-  margin: 7rem auto 3rem auto;
-  position: relative;
-  z-index: 2;
-  padding: 0 1rem;
+  margin-bottom: 2.5rem;
 }
-
 .hero-title {
-  font-size: var(--font-size-4xl);
-  font-weight: var(--font-weight-bold);
-  margin-bottom: 1.5rem;
-  line-height: 1.1;
-  letter-spacing: -1px;
-  color: var(--color-text);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--color-text, #fff);
+  margin-bottom: 0.5rem;
 }
-
 .section-subtitle {
-  font-size: var(--font-size-lg);
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  opacity: 0.92;
-  margin-bottom: 0;
-  font-weight: var(--font-weight-normal);
+  color: var(--color-text-muted, #7c7fa5);
+  font-size: 1.1rem;
 }
-
 .deploy-content-wrapper {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-  position: relative;
-  z-index: 2;
-  margin-top: 4rem;
+  display: flex;
+  justify-content: center;
 }
-
 .deploy-card {
-  background: rgba(10, 25, 47, 0.65);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8) var(--space-8) 0 var(--space-8);
-  transition: all var(--transition-normal);
-  position: relative;
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-lg);
+  background: var(--color-surface-1, #18192b);
+  border-radius: 22px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  padding: 3.5rem 3rem 2.5rem 3rem;
+  width: 100%;
+  max-width: 900px;
+  margin-top: 2.5rem;
 }
-
-.deploy-card:hover {
-  border-color: var(--color-border-light);
-}
-
-/* Progress Section */
 .progress-section {
-  margin-bottom: var(--space-8);
-  padding: var(--space-6);
-  background: rgba(15, 30, 52, 0.5);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  margin-bottom: 3rem;
 }
-
-.progress-header {
+.stepper {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  margin-bottom: 2.2rem;
+  position: relative;
 }
-
-.progress-step {
+.step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
   flex: 1;
   position: relative;
+  z-index: 1;
 }
-
-.step-number {
-  width: 40px;
-  height: 40px;
+.step-circle {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: transparent;
-  border: 2px solid var(--color-border);
+  background: var(--color-surface-2, #23243a);
+  color: var(--color-primary, #6366f1);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-muted);
-  transition: all var(--transition-normal);
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 0.3rem;
+  border: 2px solid var(--color-surface-2, #23243a);
+  transition: background 0.2s, color 0.2s, border 0.2s;
+  position: relative;
+  z-index: 2;
 }
-
-.progress-step.active .step-number {
-  background: transparent;
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+.step.active .step-circle {
+  background: var(--color-primary, #6366f1);
+  color: #fff;
+  border: 2px solid var(--color-primary, #6366f1);
 }
-
-.progress-step.completed .step-number {
-  background: transparent;
-  border-color: var(--color-success);
-  color: var(--color-success);
+.step.completed .step-circle {
+  background: var(--color-success, #22d3ee);
+  color: #fff;
+  border: 2px solid var(--color-success, #22d3ee);
 }
 
 .step-label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-muted);
+  color: var(--color-text-muted, #7c7fa5);
+  font-size: 1rem;
+  margin-top: 0.2rem;
   text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
-
-.progress-step.active .step-label {
-  color: var(--color-primary);
-}
-
-.progress-step.completed .step-label {
-  color: var(--color-success);
-}
-
-.progress-line {
-  flex: 1;
-  height: 2px;
-  background: var(--color-border);
-  transition: all var(--transition-normal);
-}
-
-.progress-line.completed {
-  background: var(--color-success);
-}
-
-/* Step Content */
-.step-content {
-  padding: var(--space-8);
-}
-
-.step-section {
-  margin-bottom: var(--space-8);
-}
-
-.section-header {
-  margin-bottom: var(--space-6);
-  text-align: center;
-}
-
-.section-title {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin-bottom: var(--space-2);
-}
-
-/* VM Configuration Grid */
-.vm-config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: var(--space-6);
-  margin-bottom: var(--space-8);
-}
-
-.vm-config-card {
-  background: rgba(10, 25, 47, 0.65);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(8px);
-}
-
-.vm-config-card:hover {
-  border-color: var(--color-border-light);
-  background: rgba(15, 30, 52, 0.75);
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.card-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin: 0;
-}
-
-.vm-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.vm-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: rgba(15, 30, 52, 0.5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  transition: all var(--transition-normal);
-}
-
-.vm-item:hover {
-  border-color: var(--color-primary);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.vm-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid var(--color-primary);
-}
-
-.vm-icon[data-type="master"] {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid var(--color-primary);
-}
-
-.vm-icon[data-type="worker"] {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid var(--color-success);
-}
-
-.vm-details {
-  flex: 1;
-}
-
-.vm-name {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin-bottom: var(--space-1);
-}
-
-.vm-specs {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.spec-chip {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--color-primary);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  border: 1px solid var(--color-primary);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-8);
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.empty-state p {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
-/* VM Assignment Grid */
-.vm-assignment-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
-}
-
-.vm-assignment-card {
-  background: rgba(10, 25, 47, 0.65);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(8px);
-}
-
-.vm-assignment-card:hover {
-  border-color: var(--color-border-light);
-  background: rgba(15, 30, 52, 0.75);
-}
-
-.vm-assignment-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.vm-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.vm-avatar.master {
-  background: var(--color-primary);
-}
-
-.vm-avatar.worker {
-  background: var(--color-secondary);
-}
-
-.vm-info {
-  flex: 1;
-}
-
-.vm-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin-bottom: var(--space-2);
-}
-
-.node-select {
-  margin-top: var(--space-4);
-}
-
-/* Review Grid */
-.review-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: var(--space-6);
-  margin-bottom: var(--space-8);
-}
-
-.review-card {
-  background: rgba(10, 25, 47, 0.65);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(8px);
-}
-
-.review-card:hover {
-  border-color: var(--color-border-light);
-  background: rgba(15, 30, 52, 0.75);
-}
-
-.review-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.review-stats {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.review-stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-2) 0;
-}
-
-.stat-label {
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.stat-value {
-  color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
-}
-
-.node-assignments {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.node-assignment {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: rgba(15, 30, 52, 0.5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.assignment-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.assignment-details {
-  flex: 1;
-}
-
-.assignment-name {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin-bottom: var(--space-1);
-}
-
-.assignment-node {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
-/* Step Actions */
-.step-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-3) 0;
-}
-
-/* Responsive Design */
-@media (max-width: 960px) {
-  .deploy-header {
-    margin: 4rem auto 2rem auto;
-  }
-  
-  .deploy-content-wrapper {
-    margin-top: 2rem;
-  }
-  
-  .vm-config-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .review-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .step-actions {
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-}
-
-@media (max-width: 600px) {
-  .deploy-header {
-    margin: 3rem auto 1.5rem auto;
-    padding: 0 var(--space-4);
-  }
-  
-  .hero-title {
-    font-size: var(--font-size-3xl);
-  }
-  
-  .deploy-content-wrapper {
-    padding: 0 var(--space-4);
-    margin-top: 1.5rem;
-  }
-  
-  .deploy-card {
-    padding: var(--space-4);
-  }
-  
-  .progress-section {
-    padding: var(--space-4);
-  }
-  
-  .step-content {
-    padding: var(--space-4);
-  }
-  
-  .vm-config-card,
-  .vm-assignment-card,
-  .review-card {
-    padding: var(--space-4);
-  }
-  
-  .step-actions {
-    padding: var(--space-4);
-  }
-}
-
-.selected-chip {
-  border: 2px solid var(--color-primary, #38BDF8) !important;
-  background: rgba(56, 189, 248, 0.15) !important;
-  color: var(--color-primary, #38BDF8) !important;
+.step.active .step-label {
+  color: var(--color-primary, #6366f1);
   font-weight: 600;
+}
+.step.completed .step-label {
+  color: var(--color-success, #22d3ee);
+  font-weight: 600;
+}
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  right: -50%;
+  width: 100%;
+  height: 4px;
+  background: var(--color-surface-2, #23243a);
+  z-index: 0;
+}
+.step.completed:not(:last-child)::after {
+  background: var(--color-success, #22d3ee);
+}
+@media (max-width: 900px) {
+  .deploy-card {
+    padding: 1.2rem 0.5rem 1.2rem 0.5rem;
+  }
+  .stepper {
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+  .step {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .step-label {
+    margin-top: 0;
+    margin-left: 0.7rem;
+    text-align: left;
+  }
 }
 </style>

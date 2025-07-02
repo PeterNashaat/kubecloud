@@ -1,0 +1,157 @@
+<template>
+  <div>
+    <div class="vm-config-grid">
+      <div class="vm-config-card">
+        <div class="card-header">
+          <h4 class="card-title">
+            <v-icon icon="mdi-server" class="mr-2"></v-icon>
+            Master Nodes
+          </h4>
+          <v-btn color="primary" :disabled="masters.length >= 3" prepend-icon="mdi-plus" size="small" variant="outlined" @click="addMaster" class="add-btn">Add Master</v-btn>
+        </div>
+        <NodeCard v-for="(master, masterIdx) in masters" :key="masterIdx" :node="master" type="master" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('master', masterIdx)" @delete="() => removeMaster(masterIdx)" />
+        <div v-if="!masters.length" class="empty-state">
+          <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
+          <p>No master nodes configured</p>
+        </div>
+      </div>
+      <div class="vm-config-card">
+        <div class="card-header">
+          <h4 class="card-title">
+            <v-icon icon="mdi-desktop-tower-monitor" class="mr-2"></v-icon>
+            Worker Nodes
+          </h4>
+          <v-btn color="primary" prepend-icon="mdi-plus" size="small" variant="outlined" @click="addWorker" class="add-btn">Add Worker</v-btn>
+        </div>
+        <NodeCard v-for="(worker, workerIdx) in workers" :key="workerIdx" :node="worker" type="worker" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('worker', workerIdx)" @delete="() => removeWorker(workerIdx)" />
+        <div v-if="!workers.length" class="empty-state">
+          <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
+          <p>No worker nodes configured</p>
+        </div>
+      </div>
+    </div>
+    <div class="step-actions">
+      <v-btn color="primary" :disabled="!isStep1Valid" @click="$emit('nextStep')">
+        Continue
+        <v-icon end icon="mdi-arrow-right"></v-icon>
+      </v-btn>
+    </div>
+  </div>
+</template>
+<script setup lang="ts">
+import NodeCard from '../NodeCard.vue';
+import type { VM, SshKey } from '../../composables/useDeployCluster';
+import { defineProps, defineEmits, withDefaults } from 'vue';
+const props = withDefaults(defineProps<{
+  masters: VM[];
+  workers: VM[];
+  availableSshKeys: SshKey[];
+  addMaster: () => void;
+  addWorker: () => void;
+  removeMaster: (idx: number) => void;
+  removeWorker: (idx: number) => void;
+  openEditNodeModal: (type: 'master' | 'worker', idx: number) => void;
+  selectedSshKeys?: string[];
+  setSelectedSshKeys: (keys: string[]) => void;
+  isStep1Valid?: boolean;
+}>(), {
+  selectedSshKeys: () => [],
+  isStep1Valid: false
+});
+const emit = defineEmits(['navigateToSshKeys', 'nextStep']);
+</script>
+<script lang="ts">
+export default {
+  name: 'Step1DefineVMs'
+};
+</script>
+<style scoped>
+.ssh-key-section {
+  margin-bottom: 2rem;
+}
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.v-chip {
+  background: var(--color-surface-2, #23243a);
+  color: var(--color-text, #cfd2fa);
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+  border-radius: 16px;
+}
+.v-chip.selected-chip {
+  background: var(--color-primary, #6366f1);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.15);
+}
+.v-chip:hover, .v-chip:focus {
+  background: var(--color-primary, #6366f1);
+  color: #fff;
+  cursor: pointer;
+}
+.vm-config-grid {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+.vm-config-card {
+  background: var(--color-surface-1, #18192b);
+  border-radius: 20px;
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  flex: 1 1 320px;
+  min-width: 320px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  font-size: 1.1rem;
+  font-weight: 500;
+  gap: 0.5rem;
+}
+.add-btn {
+  margin-left: 1rem;
+  background: var(--color-primary, #6366f1) !important;
+  color: #fff !important;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.10);
+  transition: background 0.2s, color 0.2s;
+}
+.add-btn:hover, .add-btn:focus {
+  background: #7b82fa !important;
+  color: #fff !important;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--color-text-muted, #7c7fa5);
+  margin-top: 1.5rem;
+  font-size: 1.08rem;
+}
+.empty-state v-icon {
+  margin-bottom: 0.5rem;
+  font-size: 2.5rem !important;
+  color: #7c7fa5 !important;
+  opacity: 0.7;
+}
+.step-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2rem;
+}
+</style> 

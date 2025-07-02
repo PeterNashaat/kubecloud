@@ -40,6 +40,9 @@ export const useClusterStore = defineStore('clusters', () => {
   const selectedCluster = ref<Cluster | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const deploymentTaskId = ref<string | null>(null)
+  const deploymentStatus = ref<string | null>(null)
+  const deploymentEvents = ref<any[]>([])
 
   // Computed properties
   const runningClusters = computed(() => 
@@ -239,12 +242,48 @@ export const useClusterStore = defineStore('clusters', () => {
     }
   }
 
+  const deployCluster = async (payload: any) => {
+    // Implementation of deployCluster function
+    // This is a placeholder and should be replaced with the actual implementation
+    // For example, you might use a third-party service or a custom implementation
+    // to deploy a cluster and return a task ID and status
+    return { task_id: 'someTaskId', status: 'deploying' }
+  }
+
+  const listenToEvents = async (taskId: string, callback: (data: any) => void) => {
+    // Implementation of listenToEvents function
+    // This is a placeholder and should be replaced with the actual implementation
+    // For example, you might use a third-party service or a custom implementation
+    // to listen to deployment events and call the callback with event data
+  }
+
+  const deploy = async (payload: any) => {
+    const res = await deployCluster(payload)
+    deploymentTaskId.value = res.task_id
+    deploymentStatus.value = res.status
+    deploymentEvents.value = []
+    await listenToEvents(res.task_id, (data) => {
+      deploymentEvents.value.push(data)
+      // Optionally update deploymentStatus based on event data
+    })
+  }
+
+  const listenToDeploymentEvents = async (taskId: string) => {
+    await listenToEvents(taskId, (data) => {
+      deploymentEvents.value.push(data)
+      // Optionally update deploymentStatus based on event data
+    })
+  }
+
   return {
     // State
     clusters: computed(() => clusters.value),
     selectedCluster: computed(() => selectedCluster.value),
     isLoading: computed(() => isLoading.value),
     error: computed(() => error.value),
+    deploymentTaskId: computed(() => deploymentTaskId.value),
+    deploymentStatus: computed(() => deploymentStatus.value),
+    deploymentEvents: computed(() => deploymentEvents.value),
 
     // Computed
     runningClusters,
@@ -262,5 +301,7 @@ export const useClusterStore = defineStore('clusters', () => {
     selectCluster,
     getClusterMetrics,
     initializeClusters,
+    deploy,
+    listenToDeploymentEvents,
   }
 }) 

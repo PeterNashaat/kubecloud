@@ -214,4 +214,31 @@ export const debounce = <T extends (...args: any[]) => any>(
     clearTimeout(timeout)
     timeout = setTimeout(() => func(...args), wait)
   }
+}
+
+export async function deployCluster(payload: any) {
+  const res = await fetch('/api/v1/deploy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    credentials: 'include', // if using cookies/auth
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export function listenToEvents(taskId: string, onMessage: (data: any) => void) {
+  const eventSource = new EventSource(`/api/v1/events?task_id=${taskId}`);
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      onMessage(data);
+    } catch {
+      onMessage(event.data);
+    }
+  };
+  eventSource.onerror = (err) => {
+    eventSource.close();
+  };
+  return eventSource;
 } 
