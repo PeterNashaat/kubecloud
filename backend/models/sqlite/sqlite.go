@@ -24,12 +24,7 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(
-		&models.User{},
-		&models.Voucher{},
-		&models.Transaction{},
-		&models.Notification{},
-	)
+	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{}, &models.Notification{})
 	if err != nil {
 		return nil, err
 	}
@@ -143,17 +138,113 @@ func (s *Sqlite) ListAllVouchers() ([]models.Voucher, error) {
 	return vouchers, nil
 }
 
+// GetVoucherByCode returns voucher by its code
+func (s *Sqlite) GetVoucherByCode(code string) (models.Voucher, error) {
+	var voucher models.Voucher
+	query := s.db.First(&voucher, "code = ?", code)
+	return voucher, query.Error
+}
+
+// RedeemVoucher updates status if voucher
+func (s *Sqlite) RedeemVoucher(code string) error {
+	result := s.db.Model(&models.Voucher{}).
+		Where("code = ?", code).
+		Update("redeemed", true)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no voucher found with Code %d", code)
+	}
+
+	return nil
+}
+
 // CreateTransaction creates a payment transaction
 func (s *Sqlite) CreateTransaction(transaction *models.Transaction) error {
 	return s.db.Create(transaction).Error
 }
 
 // CreditUserBalance add credited balance to user by its ID
-func (s *Sqlite) CreditUserBalance(userID int, amount float64) error {
+func (s *Sqlite) CreditUserBalance(userID int, amount uint64) error {
 	return s.db.Model(&models.User{}).
 		Where("id = ?", userID).
 		UpdateColumn("credited_balance", gorm.Expr("credited_balance + ?", amount)).
 		Error
+}
+
+// CreateInvoice creates new invoice
+func (s *Sqlite) CreateInvoice(invoice *models.Invoice) error {
+	return s.db.Create(&invoice).Error
+}
+
+// GetInvoice returns an invoice by ID
+func (s *Sqlite) GetInvoice(id int) (models.Invoice, error) {
+	var invoice models.Invoice
+	err := s.db.First(&invoice, id).Error
+	if err != nil {
+		return models.Invoice{}, err
+	}
+
+	var nodes []models.NodeItem
+	if err = s.db.Model(&invoice).Association("Nodes").Find(&nodes); err != nil {
+		return models.Invoice{}, err
+	}
+
+	invoice.Nodes = nodes
+	return invoice, nil
+}
+
+// ListUserInvoices returns all invoices of user
+func (s *Sqlite) ListUserInvoices(userID int) ([]models.Invoice, error) {
+	var invoices []models.Invoice
+	err := s.db.Where("user_id = ?", userID).Find(&invoices).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for idx := range invoices {
+		invoices[idx], err = s.GetInvoice(invoices[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return invoices, nil
+}
+
+// ListInvoices returns all invoices (admin)
+func (s *Sqlite) ListInvoices() ([]models.Invoice, error) {
+	var invoices []models.Invoice
+	err := s.db.Find(&invoices).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	for idx := range invoices {
+		invoices[idx], err = s.GetInvoice(invoices[idx].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return invoices, nil
+}
+
+func (s *Sqlite) UpdateInvoicePDF(id int, data []byte) error {
+	return s.db.Model(&models.Invoice{}).Where("id = ?", id).Updates(map[string]interface{}{"file_data": data}).Error
+}
+
+// CreateUserNode creates new node record for user
+func (s *Sqlite) CreateUserNode(userNode *models.UserNodes) error {
+	return s.db.Create(&userNode).Error
+}
+
+// ListUserNodes returns all nodes records for user by its ID
+func (s *Sqlite) ListUserNodes(userID int) ([]models.UserNodes, error) {
+	var userNodes []models.UserNodes
+	return userNodes, s.db.Where("user_id = ?", userID).Find(&userNodes).Error
 }
 
 // CreateNotification creates a new notification

@@ -21,8 +21,8 @@ type GenerateVouchersInput struct {
 
 // CreditRequestInput represents a request to credit a user's balance
 type CreditRequestInput struct {
-	Amount float64 `json:"amount" binding:"required,gt=0" validate:"required,gt=0"`
-	Memo   string  `json:"memo" binding:"required,min=3,max=255" validate:"required"`
+	Amount uint64 `json:"amount" binding:"required,gt=0" validate:"required,gt=0"`
+	Memo   string `json:"memo" binding:"required,min=3,max=255" validate:"required"`
 }
 
 // ListUsersHandler lists all users
@@ -90,7 +90,7 @@ func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 		fullCode := fmt.Sprintf("%s-%s", voucherCode, timestampPart)
 
 		voucher := models.Voucher{
-			Voucher:   fullCode,
+			Code:      fullCode,
 			Value:     request.Value,
 			CreatedAt: time.Now(),
 			ExpiresAt: time.Now().Add(time.Duration(request.ExpireAfter) * 24 * time.Hour),
@@ -173,6 +173,13 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 	if err := h.db.CreditUserBalance(user.ID, request.Amount); err != nil {
 		log.Error().Err(err).Msg("Failed to credit user")
 		InternalServerError(c)
+		return
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
 		return
 	}
 

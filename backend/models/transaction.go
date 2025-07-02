@@ -7,7 +7,7 @@ type Transaction struct {
 	ID        int       `gorm:"primaryKey;autoIncrement"`
 	UserID    int       `json:"user_id"`
 	AdminID   int       `json:"admin_id"`
-	Amount    float64   `json:"amount"`
+	Amount    uint64    `json:"amount"`
 	Memo      string    `json:"memo"`
 	CreatedAt time.Time `json:"created_at"`
 }

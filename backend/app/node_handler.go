@@ -2,11 +2,14 @@ package app
 
 import (
 	"fmt"
+	"kubecloud/internal"
+	"kubecloud/models"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -18,7 +21,6 @@ import (
 func (h *Handler) ListNodesHandler(c *gin.Context) {
 	query := c.Request.URL.Query()
 
-	// Use pointers
 	filter := proxyTypes.NodeFilter{}
 	err := queryParamsToStruct(query, &filter)
 	if err != nil {
@@ -59,6 +61,14 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
+	nodeID64, err := strconv.ParseUint(nodeIDParam, 10, 32)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+	nodeID := uint32(nodeID64)
+
 	userID := c.GetInt("user_id")
 
 	user, err := h.db.GetUserByID(userID)
@@ -68,6 +78,23 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
+	filter := proxyTypes.NodeFilter{
+		NodeID: &nodeID64,
+	}
+
+	nodes, _, err := h.proxyClient.Nodes(c.Request.Context(), filter, proxyTypes.Limit{})
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+	if len(nodes) == 0 {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "No nodes are available for rent.", "")
+		return
+	}
+	node := nodes[0]
+
 	// Create identity from mnemonic
 	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
 	if err != nil {
@@ -75,16 +102,33 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		InternalServerError(c)
 		return
 	}
+	// validate user has enough balance for reserving node
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+	}
 
-	nodeID64, err := strconv.ParseUint(nodeIDParam, 10, 32)
+	//TODO: check price in month constant
+	if usdBalance < node.PriceUsd/24/30 || user.Debt > 0 {
+		Error(c, http.StatusBadRequest, "You should at least have enough balance for one hour", "")
+		return
+	}
+
+	contractID, err := h.substrateClient.CreateRentContract(identity, nodeID, nil)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
-	nodeID := uint32(nodeID64)
 
-	contractID, err := h.substrateClient.CreateRentContract(identity, nodeID, nil)
+	err = h.db.CreateUserNode(&models.UserNodes{
+		UserID:     userID,
+		ContractID: contractID,
+		NodeID:     nodeID,
+		CreatedAt:  time.Now(),
+	})
+
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
