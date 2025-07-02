@@ -130,7 +130,7 @@ func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 			return
 		}
 
-		pdfContent, err := internal.CreateInvoicePDF(invoice, user)
+		pdfContent, err := internal.CreateInvoicePDF(invoice, user, h.config.Invoice)
 		if err != nil {
 			log.Error().Err(err).Send()
 			InternalServerError(c)
@@ -213,7 +213,7 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 		Tax:       0, //TODO:
 		CreatedAt: time.Now(),
 	}
-	file, err := internal.CreateInvoicePDF(invoice, user)
+	file, err := internal.CreateInvoicePDF(invoice, user, h.config.Invoice)
 	if err != nil {
 		return err
 	}

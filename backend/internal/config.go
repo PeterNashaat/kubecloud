@@ -28,6 +28,7 @@ type Configuration struct {
 	Redis                Redis              `json:"redis" validate:"required,dive"`
 	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
+	Invoice              InvoiceCompanyData `json:"invoice"`
 }
 
 type GridConfig struct {
@@ -78,6 +79,13 @@ type Redis struct {
 	Port     int    `json:"port" validate:"required,min=1,max=65535"`
 	Password string `json:"password"`
 	DB       int    `json:"db" validate:"min=0"`
+}
+
+// Invoice struct holds needed data for invoice file
+type InvoiceCompanyData struct {
+	Name        string `json:"name" validate:"required"`
+	Address     string `json:"address" validate:"required"`
+	Governorate string `json:"governorate" validate:"required"`
 }
 
 // ReadConfFile read configurations of json file
