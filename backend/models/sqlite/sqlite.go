@@ -156,7 +156,7 @@ func (s *Sqlite) RedeemVoucher(code string) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("no voucher found with Code %d", code)
+		return fmt.Errorf("no voucher found with Code %s", code)
 	}
 
 	return nil
