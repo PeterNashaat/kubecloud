@@ -32,6 +32,7 @@
           :hint="vm.node !== null && vm.node !== undefined ? getNodeInfo(String(vm.node)) : 'Choose a node for this VM'"
           persistent-hint
           class="node-select"
+          @update:modelValue="val => emit('onAssignNode', index, val)"
         ></v-select>
       </div>
     </div>
@@ -52,9 +53,9 @@ import type { VM } from '../../composables/useDeployCluster';
 import { defineProps, withDefaults, defineEmits } from 'vue';
 const props = withDefaults(defineProps<{
   allVMs: VM[];
-  availableNodes: { id: string; label: string }[];
+  availableNodes: { id: number; label: string }[];
   getNodeInfo: (id: string) => string;
-  onAssignNode: (vmIdx: number, nodeId: string) => void;
+  onAssignNode: (vmIdx: number, nodeId: number) => void;
   isStep2Valid?: boolean;
 }>(), {
   isStep2Valid: false

@@ -1,185 +1,160 @@
 <template>
-  <div v-if="node" class="node-card" tabindex="0">
+  <div class="card node-card">
     <div class="node-header">
-      <div class="node-title">{{ node.name }}</div>
-      <div class="node-actions">
-        <button class="node-action-btn" aria-label="Edit node" @click="$emit('edit')" title="Edit node">
-          <v-icon icon="mdi-pencil" size="18" />
-        </button>
-        <button class="node-action-btn" aria-label="Remove node" @click="$emit('delete')" title="Remove node">
-          <v-icon icon="mdi-delete" size="18" />
-        </button>
+      <h3 class="node-title">
+        Node {{ node.nodeId }}
+      </h3>
+      <div class="node-price">${{ node.price ?? 'N/A' }}/month</div>
+    </div>
+    <div class="node-location d-flex justify-space-between" v-if="node.country">
+      <div>
+        <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
+        {{ node.country }}
+      </div>
+      <div class="spec-item" v-if="node.gpu && node.gpu.toLowerCase() !== 'none'">
+        <v-chip color="white" variant="outlined" size="small" class="mr-1">GPU</v-chip>
       </div>
     </div>
-    <div class="node-specs-grid">
-      <div class="spec-item"><v-icon icon="mdi-cpu-64-bit" size="16" class="spec-icon" /> <span>vCPU</span> <span class="spec-value">{{ node.vcpu }}</span></div>
-      <div class="spec-item"><v-icon icon="mdi-memory" size="16" class="spec-icon" /> <span>RAM</span> <span class="spec-value">{{ node.ram }} GB</span></div>
-      <div class="spec-item"><v-icon icon="mdi-harddisk" size="16" class="spec-icon" /> <span>Disk</span> <span class="spec-value">{{ node.disk }} GB</span></div>
-      <div class="spec-item"><v-icon icon="mdi-database" size="16" class="spec-icon" /> <span>Rootfs</span> <span class="spec-value">{{ node.rootfs }} GB</span></div>
+    <hr class="node-divider" />
+    <div class="node-specs">
+      <div class="spec-item">
+        <v-icon size="18" class="mr-1" color="primary">mdi-cpu-64-bit</v-icon>
+        <span class="spec-label">CPU:</span>
+        <span>{{ Math.round(node.cpu) }} vCPU</span>
+      </div>
+      <div class="spec-item">
+        <v-icon size="18" class="mr-1" color="success">mdi-memory</v-icon>
+        <span class="spec-label">RAM:</span>
+        <span>{{ Math.round(node.ram) }} GB</span>
+      </div>
+      <div class="spec-item">
+        <v-icon size="18" class="mr-1" color="info">mdi-harddisk</v-icon>
+        <span class="spec-label">Storage:</span>
+        <span>{{ formatStorage(node.storage) }}</span>
+      </div>
     </div>
-    <div class="node-divider"></div>
-    <div class="node-ssh-chips">
-      <template v-if="node.sshKeyIds && node.sshKeyIds.length">
-        <span v-for="id in node.sshKeyIds" :key="id" class="ssh-chip">
-          <v-icon icon="mdi-key-variant" size="14" class="ssh-chip-icon" />
-          {{ getSshKeyName(id) }}
-        </span>
-      </template>
-      <span v-else class="ssh-chip ssh-chip-none">No SSH Key</span>
-    </div>
-    <div class="node-badges-row">
-      <span v-if="node.gpu" class="feature-badge" title="GPU enabled"><v-icon icon="mdi-nvidia" size="15" aria-label="GPU enabled" /> GPU</span>
-      <span v-if="node.publicIp" class="feature-badge" title="Public IP enabled"><v-icon icon="mdi-earth" size="15" aria-label="Public IP enabled" /> Public IP</span>
-      <span v-if="node.planetary" class="feature-badge" title="Planetary enabled"><v-icon icon="mdi-planet" size="15" aria-label="Planetary enabled" /> Planetary</span>
-    </div>
+    <v-btn 
+      v-if="isAuthenticated"
+      color="primary" 
+      variant="elevated" 
+      class="reserve-btn"
+      @click="$emit('reserve', node.nodeId)"
+      aria-label="Reserve Node"
+    >
+      Reserve Node
+    </v-btn>
+    <v-btn 
+      v-else
+      color="primary" 
+      variant="outlined" 
+      class="reserve-btn"
+      @click="$emit('signin')"
+      aria-label="Sign In to Reserve"
+    >
+      Sign In to Reserve
+    </v-btn>
   </div>
 </template>
+
 <script setup lang="ts">
-import { defineProps } from 'vue';
-import type { VM } from '../composables/useDeployCluster';
-const props = defineProps<{
-  node: VM;
-  type: string;
-  availableSshKeys: any[];
-}>();
-function getSshKeyName(id: number) {
-  const key = props.availableSshKeys?.find((k: any) => k.id === id);
-  return key ? key.name : 'Unknown';
+import type { NormalizedNode } from '../types/normalizedNode';
+import { defineProps, defineEmits } from 'vue';
+
+const props = defineProps<{ node: NormalizedNode; isAuthenticated: boolean }>();
+const emit = defineEmits(['reserve', 'signin']);
+
+function formatStorage(val: number) {
+  if (val >= 1024) {
+    return (val / 1024).toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' TB';
+  }
+  return Math.round(val).toLocaleString() + ' GB';
 }
 </script>
-<script lang="ts">
-export default {
-  name: 'NodeCard'
-};
-</script>
+
 <style scoped>
-.node-card {
-  background: var(--color-bg-elevated);
-  border-radius: 22px;
-  padding: 2rem 1.5rem 1.5rem 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-md);
-  position: relative;
+.card.node-card {
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+  margin: 0.5rem 0;
+  transition: box-shadow 0.2s, transform 0.2s;
+  min-height: 20rem;
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
-  outline: none;
+}
+.card.node-card:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+  transform: translateY(-2px) scale(1.01);
 }
 .node-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.2rem;
-}
-.node-type-badge {
-  background: var(--color-primary-subtle);
-  color: var(--color-primary);
-  font-size: 0.93rem;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 0.13rem 1.1rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  margin-right: 0.5rem;
+  margin-bottom: 1rem;
 }
 .node-title {
-  font-weight: 800;
-  font-size: 1.22rem;
-  margin-bottom: 0.2rem;
-  letter-spacing: 0.01em;
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
 }
-.node-actions {
-  display: flex;
-  gap: 0.5rem;
+.node-price {
+  font-size: 1.05rem;
+  font-weight: 500;
+  padding: 0.2rem 0.7rem;
 }
-.node-action-btn {
-  background: none;
+.node-location {
+  font-size: 0.98rem;
+  color: #64748b;
+}
+.node-divider {
   border: none;
-  color: var(--color-text-muted);
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 7px;
-  transition: background 0.15s, color 0.15s;
-  outline: none;
+  margin: 0 0 1.1rem 0;
 }
-.node-action-btn:focus, .node-action-btn:hover {
-  background: var(--color-primary-subtle);
-  color: var(--color-text);
-}
-.node-specs-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 1.2rem;
-  font-size: 1.01rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.2rem;
+.node-specs {
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
 }
 .spec-item {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.6rem;
+  font-size: 1.01em;
+  margin-bottom: 0.1rem;
+}
+.spec-label {
+  font-size: 0.97em;
+  color: #475569;
+  min-width: 54px;
   font-weight: 500;
 }
-.spec-icon {
-  opacity: 0.7;
-}
-.spec-value {
-  margin-left: 0.25rem;
+.reserve-btn {
+  width: 100%;
+  margin-top: auto;
   font-weight: 600;
-  color: var(--color-text-muted);
+  font-size: 1.05em;
+  letter-spacing: 0.01em;
+  border-radius: 8px;
+  transition: background 0.18s, color 0.18s;
 }
-.node-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 0.7rem 0 0.2rem 0;
-  border-radius: 1px;
+.reserve-btn[variant="elevated"] {
+  background: #2563eb;
+  color: #fff;
 }
-.node-ssh-chips {
-  margin-top: 0.7rem;
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.reserve-btn[variant="elevated"]:hover {
+  background: #1d4ed8;
 }
-.ssh-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-  border-radius: 999px;
-  padding: 0.22rem 0.95rem;
-  font-size: 1.01rem;
-  font-weight: 600;
+.reserve-btn[variant="outlined"] {
+  border: 1.5px solid #2563eb;
+  color: #2563eb;
+  background: #fff;
 }
-.ssh-chip-icon {
-  opacity: 0.8;
+.reserve-btn[variant="outlined"]:hover {
+  background: #e0e7ff;
+  color: #1d4ed8;
 }
-.ssh-chip-none {
-  background: var(--color-bg-hover);
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-.ssh-more {
-  color: var(--color-text-muted);
-  margin-left: 0.3rem;
-  font-size: 0.93em;
-}
-.node-badges-row {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.feature-badge {
-  background: var(--color-primary-subtle);
-  color: var(--color-primary);
-  font-size: 0.93rem;
-  border-radius: 999px;
-  padding: 0.13rem 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-</style> 
+</style>
+
+// Add explicit default export for linter compatibility
+export default {};

@@ -9,7 +9,7 @@
           </h4>
           <v-btn color="primary" :disabled="masters.length >= 3" prepend-icon="mdi-plus" size="small" variant="outlined" @click="addMaster" class="add-btn">Add Master</v-btn>
         </div>
-        <NodeCard v-for="(master, masterIdx) in masters" :key="masterIdx" :node="master" type="master" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('master', masterIdx)" @delete="() => removeMaster(masterIdx)" />
+        <DeployVMCard v-for="(master, masterIdx) in masters" :key="masterIdx" :vm="master" type="master" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('master', masterIdx)" @delete="() => removeMaster(masterIdx)" />
         <div v-if="!masters.length" class="empty-state">
           <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
           <p>No master nodes configured</p>
@@ -23,7 +23,7 @@
           </h4>
           <v-btn color="primary" prepend-icon="mdi-plus" size="small" variant="outlined" @click="addWorker" class="add-btn">Add Worker</v-btn>
         </div>
-        <NodeCard v-for="(worker, workerIdx) in workers" :key="workerIdx" :node="worker" type="worker" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('worker', workerIdx)" @delete="() => removeWorker(workerIdx)" />
+        <DeployVMCard v-for="(worker, workerIdx) in workers" :key="workerIdx" :vm="worker" type="worker" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('worker', workerIdx)" @delete="() => removeWorker(workerIdx)" />
         <div v-if="!workers.length" class="empty-state">
           <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
           <p>No worker nodes configured</p>
@@ -39,7 +39,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import NodeCard from '../NodeCard.vue';
+import DeployVMCard from '../deploy/DeployVMCard.vue';
 import type { VM, SshKey } from '../../composables/useDeployCluster';
 import { defineProps, defineEmits, withDefaults } from 'vue';
 const props = withDefaults(defineProps<{

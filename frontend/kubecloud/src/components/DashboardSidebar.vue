@@ -39,6 +39,11 @@ const navigationItems = [
     icon: 'mdi-server'
   },
   {
+    key: 'nodes',
+    title: 'My Nodes',
+    icon: 'mdi-server-network'
+  },
+  {
     key: 'profile',
     title: 'Profile',
     icon: 'mdi-account'

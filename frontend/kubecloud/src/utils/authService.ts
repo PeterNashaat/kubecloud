@@ -9,8 +9,8 @@ export interface RegisterRequest {
 }
 
 export interface RegisterResponse {
-  message: string
-  timeout: number
+  email: string
+  timeout: string
 }
 
 export interface VerifyCodeRequest {
@@ -26,6 +26,16 @@ export interface LoginRequest {
 export interface LoginResponse {
   access_token: string
   refresh_token: string
+  user: {
+    id: number
+    username: string
+    email: string
+    admin: boolean
+    verified: boolean
+    updated_at: string
+    credit_card_balance: number
+    credited_balance: number
+  }
 }
 
 // New type to match backend response
@@ -41,7 +51,6 @@ export interface RefreshTokenRequest {
 
 export interface RefreshTokenResponse {
   access_token: string
-  refresh_token: string
 }
 
 export interface ForgotPasswordRequest {
@@ -49,8 +58,8 @@ export interface ForgotPasswordRequest {
 }
 
 export interface ForgotPasswordResponse {
-  message: string
-  timeout: number
+  email: string
+  timeout: string
 }
 
 export interface ChangePasswordRequest {

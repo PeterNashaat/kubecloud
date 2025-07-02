@@ -1,82 +1,88 @@
 <template>
-  <div class="dashboard-card">
+  <div class="dashboard-card payment-card spacious">
     <div class="dashboard-card-header">
-      <div class="dashboard-card-title-section">
-        <div class="dashboard-card-title-content">
-          <h3 class="dashboard-card-title">Add Funds</h3>
-          <p class="dashboard-card-subtitle">Add funds to your account balance</p>
-        </div>
-      </div>
+      <h3 class="dashboard-card-title">Add Funds</h3>
+      <p class="dashboard-card-subtitle">Add funds to your account balance</p>
     </div>
     <div class="dashboard-card-content">
-      <div class="balance-section list-item-interactive">
-        <label class="balance-label" for="current-balance-input">Current Balance:</label>
-        <input
-          id="current-balance-input"
-          class="balance-value balance-input"
-          type="text"
-          :value="`$ ${user?.credited_balance ?? 0}`"
-          readonly
-          tabindex="-1"
-        />
+      <div class="balance-row">
+        <span>Current Balance:</span>
+        <span class="balance-value">${{ user?.credited_balance ?? 0 }}</span>
       </div>
-      <div class="amount-section">
-        <label class="section-label">Amount</label>
+      <div class="amount-row">
+        <span>Amount:</span>
         <div class="amount-options">
           <button
             v-for="preset in presets"
             :key="preset"
-            type="button"
-            :class="['amount-btn', { selected: amount === preset }]"
+            :class="{ selected: amount === preset }"
             @click="selectAmount(preset)"
-          >
-            {{ preset }}
-          </button>
-          <div class="custom-amount-wrapper">
-            <input
-              type="number"
-              min="1"
-              class="amount-input"
-              v-model.number="customAmount"
-              @focus="selectAmount('custom')"
+            type="button"
+          >{{ preset }}</button>
+          <template v-if="amount !== 'custom'">
+            <button
               :class="{ selected: amount === 'custom' }"
-              placeholder="Custom"
-            />
-          </div>
+              @click="selectAmount('custom')"
+              type="button"
+            >Custom</button>
+          </template>
+          <input
+            v-if="amount === 'custom'"
+            type="number"
+            min="1"
+            class="amount-input"
+            v-model.number="customAmount"
+            placeholder="Custom"
+            @focus="selectAmount('custom')"
+          />
         </div>
       </div>
-      <div class="card-details-section">
-        <label class="section-label">Card Details</label>
-        <div class="card-details-fields">
-          <div ref="cardElementRef" class="card-input" style="width:100%"></div>
-        </div>
+      <div class="card-details-row">
+        <input
+          type="text"
+          class="card-input bordered"
+          v-model="cardNumber"
+          placeholder="Card Number"
+          maxlength="19"
+        />
+        <input
+          type="text"
+          class="card-input short bordered"
+          v-model="expiryDate"
+          placeholder="MM/YY"
+          maxlength="5"
+          @input="formatExpiryDate"
+        />
+        <input
+          type="text"
+          class="card-input short bordered"
+          v-model="cvv"
+          placeholder="CVV"
+          maxlength="4"
+        />
       </div>
-      <div class="charge-section">
-        <v-btn
-          variant="outlined"
-          class="action-btn"
-          color="primary"
-          :loading="loading"
-          :disabled="loading"
-          @click="chargeBalance"
-          prepend-icon="mdi-credit-card-plus"
-        >
-          Charge Balance
-        </v-btn>
-      </div>
-      <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <v-btn
+        class="action-btn"
+        color="primary"
+        :loading="loading"
+        :disabled="loading || !isFormValid"
+        @click="chargeBalance"
+        prepend-icon="mdi-credit-card-plus"
+      >
+        Charge Balance
+      </v-btn>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useUserStore } from '@/stores/user'
+import { useUserStore } from '../../stores/user'
 import { userService } from '../../utils/userService'
-import { loadStripe } from '@stripe/stripe-js'
-import type { Stripe, StripeElements } from '@stripe/stripe-js'
+import { api } from '../../utils/api'
+import type { ApiResponse } from '../../utils/authService'
+import type { User } from '../../stores/user'
 
 const { user } = storeToRefs(useUserStore())
 
@@ -84,72 +90,19 @@ const presets = [5, 10, 20, 50]
 const amount = ref<number | 'custom'>(5)
 const customAmount = ref<number | null>(null)
 const loading = ref(false)
-const successMessage = ref('')
-const errorMessage = ref('')
 
-// Stripe integration
-const stripe = ref<Stripe | null>(null)
-const elements = ref<StripeElements | null>(null)
-const cardElement = ref<any>(null)
-const cardElementRef = ref<HTMLDivElement | null>(null)
+// Card details
+const cardNumber = ref('')
+const expiryDate = ref('')
+const cvv = ref('')
 
-// Use only import.meta.env for publishable key
-// Make sure VITE_STRIPE_PUBLISHABLE_KEY is set in your .env file
-const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-
-onMounted(async () => {
-  if (!STRIPE_PUBLISHABLE_KEY) {
-    console.error('VITE_STRIPE_PUBLISHABLE_KEY is not set in environment variables')
-    errorMessage.value = 'Stripe configuration is missing. Please contact support.'
-    return
-  }
-  
-  try {
-    stripe.value = await loadStripe(STRIPE_PUBLISHABLE_KEY)
-    if (stripe.value) {
-      elements.value = stripe.value.elements()
-      if (cardElementRef.value) {
-        cardElement.value = elements.value.create('card', {
-          style: {
-            base: {
-              fontSize: '1rem',
-              color: '#CBD5E1',
-              fontFamily: 'inherit',
-              backgroundColor: '#232f47',
-              border: '1.5px solid #334155',
-              borderRadius: '0.75rem',
-              padding: '0.5rem 1rem',
-              width: '100%',
-              '::placeholder': {
-                color: '#64748b',
-              },
-            },
-            focus: {
-              color: '#38BDF8',
-              backgroundColor: '#232f47',
-              border: '1.5px solid #38BDF8',
-            },
-            invalid: {
-              color: '#ef4444',
-              iconColor: '#ef4444',
-              backgroundColor: '#232f47',
-              border: '1.5px solid #ef4444',
-            },
-            complete: {
-              color: '#fff',
-              backgroundColor: '#232f47',
-              border: '1.5px solid #10B981',
-            },
-          },
-          hidePostalCode: true
-        })
-        cardElement.value.mount(cardElementRef.value)
-      }
-    }
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error)
-    errorMessage.value = 'Failed to initialize payment system. Please refresh the page.'
-  }
+// Form validation
+const isFormValid = computed(() => {
+  const selectedAmount = getSelectedAmount()
+  return selectedAmount && selectedAmount > 0 && 
+         cardNumber.value.replace(/\s/g, '').length >= 13 &&
+         expiryDate.value.length === 5 &&
+         cvv.value.length >= 3
 })
 
 function selectAmount(val: number | 'custom') {
@@ -157,52 +110,58 @@ function selectAmount(val: number | 'custom') {
   if (val !== 'custom') customAmount.value = null
 }
 
+function formatCardNumber() {
+  let value = cardNumber.value.replace(/\s/g, '')
+  value = value.replace(/\D/g, '')
+  value = value.replace(/(\d{4})(?=\d)/g, '$1 ')
+  cardNumber.value = value
+}
+
+function formatExpiryDate() {
+  let value = expiryDate.value.replace(/\D/g, '')
+  if (value.length >= 2) {
+    value = value.substring(0, 2) + '/' + value.substring(2, 4)
+  }
+  expiryDate.value = value
+}
+
 async function chargeBalance() {
   loading.value = true
-  successMessage.value = ''
-  errorMessage.value = ''
+  
   const selectedAmount = getSelectedAmount()
-  if (!selectedAmount) {
-    errorMessage.value = 'Please select an amount.'
-    loading.value = false
+  if (!selectedAmount || !isFormValid.value) {
     return
   }
-  if (!stripe.value || !elements.value) {
-    errorMessage.value = 'Stripe is not loaded.'
-    loading.value = false
-    return
-  }
-  try {
-    // 1. Create PaymentIntent on backend
-    // @ts-ignore
-    const intentRes = await userService.createPaymentIntent({ amount: Number(selectedAmount) })
-    const clientSecret = intentRes.clientSecret
-    if (!clientSecret) throw new Error('Failed to get payment intent.')
 
-    // 2. Confirm card payment
-    const { error, paymentIntent } = await stripe.value.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: cardElement.value,
-      },
+  try {
+    // For demo purposes, we'll use a mock payment method ID
+    // In production, this would be created through Stripe
+    const mockPaymentMethodId = 'pm_' + Math.random().toString(36).substr(2, 9)
+    
+    await userService.chargeBalance({
+      card_type: 'card',
+      payment_method_id: mockPaymentMethodId,
+      amount: Number(selectedAmount)
     })
-    if (error) {
-      errorMessage.value = error.message || 'Payment failed.'
-      loading.value = false
-      return
+    
+    // Clear the form
+    cardNumber.value = ''
+    expiryDate.value = ''
+    cvv.value = ''
+    amount.value = 5
+    customAmount.value = null
+    
+    // Refresh user data to get updated balance
+    const userStore = useUserStore()
+    try {
+      const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
+      userStore.user = userRes.data.data.user
+    } catch (error) {
+      console.error('Failed to refresh user data:', error)
     }
-    if (paymentIntent && paymentIntent.status === 'succeeded') {
-      // 3. Notify backend to credit balance
-      await userService.chargeBalance({
-        card_type: 'stripe',
-        payment_method_id: paymentIntent.payment_method as string,
-        amount: Number(selectedAmount)
-      })
-      successMessage.value = 'Balance charged successfully!'
-    } else {
-      errorMessage.value = 'Payment not successful.'
-    }
+    
   } catch (err: any) {
-    errorMessage.value = err?.message || 'Failed to charge balance.'
+    console.error('Failed to charge balance:', err)
   } finally {
     loading.value = false
   }
@@ -214,193 +173,112 @@ function getSelectedAmount() {
 </script>
 
 <style scoped>
-.dashboard-card {
-  background: var(--color-bg-card, #182235);
-  border-radius: var(--radius-xl, 1.25rem);
-  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.08);
-  padding: var(--space-8);
-  margin-bottom: var(--space-8);
-  border: 1px solid var(--color-border, #334155);
-  max-width: 480px;
+.dashboard-card.payment-card.spacious {
+  background: #181f35;
+  border-radius: 1.25rem;
+  border: 1.5px solid #334155;
+  max-width: 520px;
   margin: 0;
-  padding: 0 !important;
-}
-.dashboard-card-header {
-  margin-bottom: var(--space-6);
-}
-
-.dashboard-card-title {
-  font-size: var(--font-size-xl, 1.5rem);
-  font-weight: var(--font-weight-semibold, 600);
-  color: var(--color-text, #fff);
-  margin: 0 0 var(--space-2) 0;
-}
-.dashboard-card-subtitle {
-  font-size: var(--font-size-base, 1rem);
-  color: var(--color-primary, #38BDF8);
-  font-weight: var(--font-weight-medium, 500);
-  opacity: 0.9;
-  margin: 0;
-}
-.dashboard-card-content {
+  padding: 2.2rem 2.5rem 2.2rem 2.5rem;
+  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.12);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  align-items: flex-start;
+}
+.dashboard-card-header {
+  margin-bottom: 1.5rem;
   width: 100%;
 }
-.balance-section {
+.dashboard-card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+.dashboard-card-subtitle {
+  font-size: 1.05rem;
+  color: #60a5fa;
+  margin-bottom: 0.5rem;
+}
+.dashboard-card-content {
+  width: 100%;
+}
+.balance-row {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid var(--color-border);
-  transition: background 0.18s, border-color 0.18s;
-}
-.balance-section.list-item-interactive:hover {
-  background: rgba(30, 41, 59, 0.85);
-  border-color: var(--color-border-light);
-}
-.balance-label {
-  font-weight: 500;
-  color: var(--color-text, #CBD5E1);
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.3rem;
+  font-size: 1.1rem;
 }
 .balance-value {
-  font-weight: 700;
-  color: var(--color-success, #10B981);
-  font-size: 1.2rem;
-  background: transparent;
-  border: none;
-  outline: none;
-  pointer-events: none;
-  box-shadow: none;
-  padding: 0;
-  margin-left: 0.5rem;
-  width: auto;
-  min-width: 0;
-  max-width: 7ch;
-  height: 1.8rem;
-  line-height: 1.2;
-  display: inline-block;
-  vertical-align: middle;
-}
-/* Style for readonly input */
-.balance-input[readonly] {
-  background: transparent !important;
-  border: none !important;
-  color: var(--color-success, #10B981) !important;
+  color: #10B981;
   font-weight: 700;
   font-size: 1.2rem;
-  outline: none !important;
-  box-shadow: none !important;
-  cursor: default;
-  width: auto;
-  min-width: 0;
-  max-width: 7ch;
-  height: 1.8rem;
-  padding: 0;
-  margin: 0 0.2rem;
-  text-align: left;
-  display: inline-block;
-  vertical-align: middle;
 }
-.amount-section {
-  margin-bottom: 0;
-}
-.section-label {
-  font-weight: 500;
-  color: var(--color-text, #CBD5E1);
-  margin-bottom: 0.5rem;
-  display: block;
+.amount-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.3rem;
+  gap: 0.7rem;
 }
 .amount-options {
   display: flex;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  align-items: center;
 }
-.amount-btn {
-  background: var(--color-bg-btn, #232f47);
-  border: 1.5px solid var(--color-border, #334155);
-  border-radius: 0.75rem;
-  padding: 0.5rem 1.2rem;
-  font-size: 1rem;
-  color: var(--color-text);
+.amount-btn,
+.amount-options button {
+  background: #232f47;
+  border: 1.5px solid #334155;
+  border-radius: 0.7rem;
+  padding: 0.5rem 1.3rem;
+  font-size: 1.1rem;
+  color: #CBD5E1;
   cursor: pointer;
-  font-weight: 500;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.12s, transform 0.12s;
-  outline: none;
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.amount-btn:active {
-  transform: scale(0.96);
-  box-shadow: 0 2px 8px 0 rgba(56, 189, 248, 0.15);
-  border-color: var(--color-primary, #38BDF8);
-}
-.amount-btn.selected {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: var(--color-primary, #38BDF8);
-  color: var(--color-primary, #38BDF8);
-  box-shadow: 0 2px 8px 0 rgba(56, 189, 248, 0.18);
+.amount-options button.selected,
+.amount-options button:focus {
+  background: #60a5fa;
+  color: #fff;
+  border-color: #60a5fa;
 }
 .amount-input {
-  width: 7rem;
+  width: 100px;
   padding: 0.5rem 0.7rem;
-  border: 1.5px solid var(--color-border, #334155);
-  border-radius: 0.75rem;
-  font-size: 1rem;
-  color: var(--color-text);
-  background: var(--color-bg-btn, #232f47);
-  outline: none;
-  font-weight: 500;
-  margin-left: 0.2rem;
-  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+  border: 1.5px solid #334155;
+  border-radius: 0.7rem;
+  font-size: 1.1rem;
+  margin-left: 0.3rem;
 }
-.amount-input.selected,
-.amount-input:focus {
-  border-color: var(--color-primary, #38BDF8);
-  box-shadow: 0 2px 8px 0 rgba(56, 189, 248, 0.18);
-  color: var(--color-primary, #38BDF8);
-}
-.card-details-section {
-  margin-bottom: 0;
-}
-.card-details-fields {
-  margin-top: 0.5rem;
-  width: 100%;
-  display: block;
+.card-details-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.3rem;
 }
 .card-input {
-  padding: 0.5rem 1rem;
-  border: 1.5px solid var(--color-border, #334155);
-  border-radius: 0.75rem;
-  font-size: 1rem;
-  color: var(--color-text);
-  background: var(--color-bg-btn, #232f47);
-  outline: none;
-  font-weight: 500;
-  width: 100%;
-  min-width: 350px;
-  max-width: 480px;
-  display: block;
-  box-sizing: border-box;
-  min-height: 48px;
-  height: 48px;
+  padding: 0.7rem 1.1rem;
+  font-size: 1.1rem;
+  min-width: 0;
+  width: 200px;
+  background: #232f47;
+  color: #CBD5E1;
 }
 .card-input.short {
-  width: 5.5rem;
+  width: 90px;
 }
-.charge-section {
-  margin-top: 0.5rem;
+.card-input.bordered {
+  border: 1.5px solid #334155;
+  border-radius: 0.7rem;
+  outline: none;
+  transition: border-color 0.15s;
 }
-.success-message {
-  color: var(--color-success, #10B981);
+.card-input.bordered:focus {
+  border-color: #60a5fa;
+}
+.action-btn {
   margin-top: 1.2rem;
-  font-weight: 500;
-}
-.error-message {
-  color: var(--color-error, #ef4444);
-  margin-top: 1.2rem;
-  font-weight: 500;
+  font-size: 1.1rem;
+  padding: 0.9rem 0;
+  border-radius: 0.7rem;
 }
 </style>

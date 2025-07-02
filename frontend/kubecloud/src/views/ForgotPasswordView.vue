@@ -56,8 +56,6 @@
           {{ loading ? 'Verifying...' : 'Verify Code' }}
         </v-btn>
       </v-form>
-      <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
       <div class="auth-footer">
         <v-btn variant="text" color="white" to="/sign-in">Back to Sign In</v-btn>
       </div>
@@ -79,21 +77,15 @@ const email = ref('')
 const code = ref('')
 const loading = ref(false)
 const error = ref('')
-const successMessage = ref('')
-const errorMessage = ref('')
 
 const handleRequestCode = async () => {
   error.value = ''
-  errorMessage.value = ''
-  successMessage.value = ''
   loading.value = true
   try {
     await authService.forgotPassword({ email: email.value })
-    successMessage.value = 'Reset code sent to your email!'
     step.value = 2
   } catch (err: any) {
     error.value = err?.message || 'Failed to send reset code'
-    errorMessage.value = error.value
   } finally {
     loading.value = false
   }
@@ -101,8 +93,6 @@ const handleRequestCode = async () => {
 
 const handleVerifyCode = async () => {
   error.value = ''
-  errorMessage.value = ''
-  successMessage.value = ''
   loading.value = true
   try {
     // Get tokens from verification
@@ -112,12 +102,9 @@ const handleVerifyCode = async () => {
     // Fetch user profile
     const userRes = await api.get('/v1/user/', { requiresAuth: true, showNotifications: false }) as any
     userStore.user = userRes.data.data.user
-    successMessage.value = 'Verification successful! Redirecting to your dashboard...'
     setTimeout(() => router.replace('/'), 1500)
   } catch (err: any) {
     error.value = err?.message || 'Invalid code'
-    errorMessage.value = error.value
-    successMessage.value = ''
   } finally {
     loading.value = false
   }
@@ -186,16 +173,6 @@ onMounted(() => {
 }
 .auth-field {
   width: 100%;
-}
-.success-message {
-  color: #22c55e;
-  margin-top: 1rem;
-  text-align: center;
-}
-.error-message {
-  color: #ef4444;
-  margin-top: 1rem;
-  text-align: center;
 }
 .auth-footer {
   margin-top: 2rem;

@@ -14,97 +14,61 @@
       </div>
     </section>
 
+    <!-- Authentication Banner for Non-Authenticated Users -->
+    <section v-if="!isAuthenticated" class="auth-banner section-padding">
+      <div class="container-padding">
+        <v-alert
+          type="info"
+          variant="tonal"
+          class="auth-alert"
+        >
+          <template v-slot:prepend>
+            <v-icon size="24">mdi-information</v-icon>
+          </template>
+          <div class="auth-alert-content">
+            <h3>Ready to reserve your nodes?</h3>
+            <p>Sign in to your account to start reserving nodes and deploying your applications.</p>
+            <div class="auth-alert-actions">
+              <v-btn
+                color="primary"
+                variant="elevated"
+                @click="router.push('/sign-in')"
+                class="mr-3"
+              >
+                Sign In
+              </v-btn>
+              <v-btn
+                color="secondary"
+                variant="outlined"
+                @click="router.push('/sign-up')"
+              >
+                Create Account
+              </v-btn>
+            </div>
+          </div>
+        </v-alert>
+      </div>
+    </section>
+
     <!-- Reservation Content -->
     <section class="reservation-content section-padding">
       <div class="container-padding">
         <v-row>
           <!-- Filter Column -->
           <v-col cols="12" md="3">
-            <div class="filter-card card-enhanced fade-in">
-              <h3 class="filter-title">Filters</h3>
-              
-              <!-- CPU Filter -->
-              <div class="filter-section">
-                <label class="filter-label">CPU Cores</label>
-                <v-select
-                  v-model="filters.cpu"
-                  :items="cpuOptions"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  class="filter-select"
-                  placeholder="All CPU cores"
-                />
-              </div>
-
-              <!-- RAM Filter -->
-              <div class="filter-section">
-                <label class="filter-label">RAM</label>
-                <v-select
-                  v-model="filters.ram"
-                  :items="ramOptions"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  class="filter-select"
-                  placeholder="All RAM sizes"
-                />
-              </div>
-
-              <!-- GPU Filter -->
-              <div class="filter-section">
-                <label class="filter-label">GPU</label>
-                <v-select
-                  v-model="filters.gpu"
-                  :items="gpuOptions"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  class="filter-select"
-                  placeholder="All GPU types"
-                />
-              </div>
-
-              <!-- Price Range Filter -->
-              <div class="filter-section">
-                <label class="filter-label">Price Range</label>
-                <v-range-slider
-                  v-model="filters.priceRange"
-                  :min="0"
-                  :max="1000"
-                  :step="50"
-                  thumb-label="always"
-                  class="filter-slider"
-                  color="primary"
-                />
-                <div class="price-range-display">
-                  ${{ filters.priceRange[0] }} - ${{ filters.priceRange[1] }}
-                </div>
-              </div>
-
-              <!-- Location Filter -->
-              <div class="filter-section">
-                <label class="filter-label">Location</label>
-                <v-select
-                  v-model="filters.location"
-                  :items="locationOptions"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  class="filter-select"
-                  placeholder="All locations"
-                />
-              </div>
-
-              <!-- Clear Filters Button -->
-              <v-btn
-                color="white"
-                variant="outlined"
-                @click="clearFilters"
-              >
-                Clear All Filters
-              </v-btn>
-            </div>
+            <NodeFilterPanel
+              v-model="filters"
+              :cpuMin="cpuMin"
+              :cpuMax="cpuMax"
+              :ramMin="ramMin"
+              :ramMax="ramMax"
+              :priceMin="priceMin"
+              :priceMax="priceMax"
+              :storageMin="storageMin"
+              :storageMax="storageMax"
+              :locationOptions="locationOptions"
+              @clear="clearFilters"
+            />
           </v-col>
 
           <!-- Nodes Column -->
@@ -124,57 +88,49 @@
               
               <v-divider class="my-6" color="primary" />
               
-              <div v-if="filteredNodes.length === 0" class="no-results">
-                <v-icon size="64" color="primary" class="mb-4">mdi-magnify-close</v-icon>
-                <h3>No nodes match your filters</h3>
-                <p>Try adjusting your filter criteria to see more options.</p>
-                <v-btn
-                  color="primary"
-                  variant="outlined"
-                  @click="clearFilters"
-                >
-                  Clear All Filters
-                </v-btn>
+              <div v-if="loading" class="loading-section">
+                <v-skeleton-loader type="card, card, card, card" :loading="loading" class="w-100" />
+                <p class="loading-text">Loading available nodes...</p>
               </div>
-              
-              <div v-else class="nodes-grid">
-                <div v-for="node in filteredNodes" :key="node.id" class="card node-card">
-                  <div class="node-header">
-                    <h3 class="node-title">{{ node.name || `Node #${node.id}` }}</h3>
-                    <div class="node-price">${{ node.price ?? 'N/A' }}/month</div>
-                  </div>
-                  <div class="node-location" v-if="node.location">
-                    <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
-                    {{ node.location }}
-                  </div>
-                  <div class="node-specs">
-                    <div class="spec-item">
-                      <span class="spec-label">CPU:</span>
-                      <span class="spec-value">{{ node.resources?.cpu ?? 'N/A' }} cores</span>
-                    </div>
-                    <div class="spec-item">
-                      <span class="spec-label">RAM:</span>
-                      <span class="spec-value">{{ node.resources?.memory ?? 'N/A' }} GB</span>
-                    </div>
-                    <div class="spec-item">
-                      <span class="spec-label">Storage:</span>
-                      <span class="spec-value">{{ node.resources?.storage ?? 'N/A' }} GB</span>
-                    </div>
-                    <div class="spec-item" v-if="node.gpu">
-                      <span class="spec-label">GPU:</span>
-                      <span class="spec-value">{{ node.gpu }}</span>
-                    </div>
-                  </div>
-                  <v-btn 
-                    color="primary" 
-                    variant="elevated" 
-                    class="reserve-btn"
-                    @click="reserveNode(node.id)"
+              <template v-else>
+                <div v-if="filteredNodes.length === 0" class="no-results">
+                  <v-icon size="64" color="primary" class="mb-4">mdi-magnify-close</v-icon>
+                  <h3>No nodes match your filters</h3>
+                  <p>Try adjusting your filter criteria to see more options.</p>
+                  <v-btn
+                    color="primary"
+                    variant="outlined"
+                    @click="clearFilters"
                   >
-                    Reserve Node
+                    Clear All Filters
                   </v-btn>
                 </div>
-              </div>
+                <div v-else>
+                  <v-row dense align="stretch">
+                    <v-col
+                      v-for="node in paginatedNodes"
+                      :key="node.nodeId"
+                      cols="12" sm="6" md="4" lg="3"
+                    >
+                      <NodeCard
+                        :node="node"
+                        :isAuthenticated="isAuthenticated"
+                        @reserve="reserveNode"
+                        @signin="handleSignIn"
+                        tabindex="0"
+                        aria-label="Node card"
+                      />
+                    </v-col>
+                  </v-row>
+                  <div v-if="filteredNodes.length > pageSize" class="d-flex justify-center mt-6">
+                    <v-pagination
+                      v-model="currentPage"
+                      :length="totalPages"
+                      color="primary"
+                    />
+                  </div>
+                </div>
+              </template>
             </v-card>
           </v-col>
         </v-row>
@@ -184,10 +140,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNodes } from '../composables/useNodes'
+import { userService } from '../utils/userService'
+import { useUserStore } from '../stores/user'
+import { useNormalizedNodes } from '../composables/useNormalizedNodes'
+import { useNodeFilters } from '../composables/useNodeFilters'
+import NodeFilterPanel from '../components/NodeFilterPanel.vue'
+import NodeCard from '../components/NodeCard.vue'
 
-const { nodes, total, loading, error, fetchNodes } = useNodes()
+const router = useRouter()
+const userStore = useUserStore()
+const isAuthenticated = computed(() => userStore.isLoggedIn)
+
+const { nodes, total, loading, fetchNodes } = useNodes()
+const normalizedNodes = useNormalizedNodes(() => nodes.value)
+const {
+  filters,
+  filteredNodes,
+  cpuMin, cpuMax,
+  ramMin, ramMax,
+  priceMin, priceMax,
+  storageMin, storageMax,
+  locationOptions,
+  clearFilters
+} = useNodeFilters(() => normalizedNodes.value)
 
 onMounted(() => {
   fetchNodes()
@@ -208,93 +186,34 @@ onMounted(() => {
   })
 })
 
-// Filter options
-const cpuOptions = [
-  { title: 'All CPU cores', value: null },
-  { title: '4 cores', value: 4 },
-  { title: '8 cores', value: 8 },
-  { title: '16 cores', value: 16 },
-  { title: '32 cores', value: 32 },
-  { title: '64 cores', value: 64 }
-]
-
-const ramOptions = [
-  { title: 'All RAM sizes', value: null },
-  { title: '16 GB', value: 16 },
-  { title: '32 GB', value: 32 },
-  { title: '64 GB', value: 64 },
-  { title: '128 GB', value: 128 },
-  { title: '256 GB', value: 256 }
-]
-
-const gpuOptions = [
-  { title: 'All GPU types', value: null },
-  { title: 'No GPU', value: 'none' },
-  { title: 'NVIDIA A100', value: 'NVIDIA A100' },
-  { title: 'NVIDIA H100', value: 'NVIDIA H100' }
-]
-
-const locationOptions = [
-  { title: 'All locations', value: null },
-  { title: 'US East', value: 'US East' },
-  { title: 'US West', value: 'US West' },
-  { title: 'Europe', value: 'Europe' },
-  { title: 'Asia Pacific', value: 'Asia Pacific' }
-]
-
-const filters = ref({
-  cpu: null,
-  ram: null,
-  gpu: null,
-  priceRange: [0, 1000],
-  location: null
-})
-
-const filteredNodes = computed(() => {
-  return nodes.value.filter(node => {
-    // CPU filter
-    if (filters.value.cpu && node.resources?.cpu !== filters.value.cpu) {
-      return false
-    }
-    // RAM filter
-    if (filters.value.ram && node.resources?.memory !== filters.value.ram) {
-      return false
-    }
-    // GPU filter
-    if (filters.value.gpu) {
-      if (filters.value.gpu === 'none' && node.gpu) {
-        return false
-      }
-      if (filters.value.gpu !== 'none' && node.gpu !== filters.value.gpu) {
-        return false
-      }
-    }
-    // Price range filter
-    if (typeof node.price === 'number' && (node.price < filters.value.priceRange[0] || node.price > filters.value.priceRange[1])) {
-      return false
-    }
-    // Location filter
-    if (filters.value.location && node.location !== filters.value.location) {
-      return false
-    }
-    return true
-  })
-})
-
-const clearFilters = () => {
-  filters.value = {
-    cpu: null,
-    ram: null,
-    gpu: null,
-    priceRange: [0, 1000],
-    location: null
+const reserveNode = async (nodeId: number) => {
+  if (!isAuthenticated.value) {
+    router.push('/sign-in')
+    return
   }
+  await userService.reserveNode(nodeId)
 }
 
-const reserveNode = (nodeId: number) => {
-  // Reservation logic here
-  console.log(`Reserving node ${nodeId}`)
+const handleSignIn = () => {
+  router.push('/sign-in')
 }
+
+// Pagination logic
+const currentPage = ref(1)
+const pageSize = 8
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredNodes.value.length / pageSize)))
+const paginatedNodes = computed(() =>
+  filteredNodes.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
+)
+
+watch(filteredNodes, () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value;
+  }
+  if (currentPage.value < 1) {
+    currentPage.value = 1;
+  }
+})
 </script>
 
 <style scoped>
@@ -313,6 +232,37 @@ const reserveNode = (nodeId: number) => {
   position: relative;
   z-index: 2;
   padding: 2rem 0;
+}
+
+/* Auth Banner */
+.auth-banner {
+  background: rgba(59, 130, 246, 0.05);
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.auth-alert {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 1rem !important;
+}
+
+.auth-alert-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1E40AF;
+  margin-bottom: 0.5rem;
+}
+
+.auth-alert-content p {
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.auth-alert-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .hero-content {
@@ -447,156 +397,30 @@ const reserveNode = (nodeId: number) => {
   opacity: 0.8;
 }
 
-.nodes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
-}
-
-.node-card {
-  text-align: left;
+.loading-section {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 1rem;
-}
-
-.node-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.node-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #fff;
-  margin: 0;
-}
-
-.node-price {
-  font-size: 1rem;
-  font-weight: 400;
-  color: #10B981;
-}
-
-.node-location {
-  font-size: 0.875rem;
+  justify-content: center;
+  min-height: 300px;
+  padding: 3rem 0;
   color: #CBD5E1;
-  opacity: 0.7;
+}
+.loading-section .v-progress-circular {
   margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
 }
-
-.node-specs {
-  margin-bottom: 2rem;
-  flex: 1;
-}
-
-.spec-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.spec-label {
+.loading-text {
+  font-size: 1.15rem;
   color: #CBD5E1;
-  opacity: 0.7;
+  opacity: 0.85;
+  margin-top: 0.5rem;
 }
 
-.spec-value {
-  color: #fff;
+.range-display {
+  text-align: center;
+  font-size: 0.95rem;
+  color: #10B981;
   font-weight: 500;
-}
-
-.reserve-btn {
-  width: 100%;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.01em;
-  margin-top: auto;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .hero-section {
-    min-height: 50vh;
-    padding: 1rem 0;
-  }
-  
-  .hero-description {
-    font-size: 1.125rem;
-  }
-  
-  .reservation-content {
-    padding: 2rem;
-  }
-  
-  .filter-card {
-    position: static;
-    margin-bottom: 2rem;
-  }
-  
-  .reservation-card {
-    padding: 2rem;
-  }
-  
-  .nodes-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .nodes-grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .hero-section {
-    min-height: 40vh;
-  }
-  
-  .reservation-content {
-    padding: 1.5rem;
-  }
-  
-  .filter-card,
-  .reservation-card {
-    padding: 1.5rem;
-  }
-  
-  .node-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-}
-
-.form-label {
-  font-size: 1rem;
-  font-weight: 500;
-  color: #e0e7ef;
-  margin-bottom: 0.5rem;
-}
-
-.submit-btn {
-  font-size: 1.1rem;
-  font-weight: 500;
-  padding: 1rem 2rem;
-  border-radius: 1rem;
-  text-transform: none;
-  letter-spacing: 0.01em;
-}
-
-.reservation-title {
-  font-size: 1.5rem;
-  font-weight: 500;
-  color: #fff;
-  margin-bottom: 1rem;
+  margin-top: 0.25rem;
 }
 </style>

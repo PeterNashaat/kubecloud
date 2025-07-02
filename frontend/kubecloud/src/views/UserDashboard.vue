@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useUserStore } from '@/stores/user'
+import { ref, computed, onMounted } from 'vue'
+import { useUserStore } from '../stores/user'
 import ClustersCard from '../components/dashboard/ClustersCard.vue'
 import BillingCard from '../components/dashboard/BillingCard.vue'
 import PaymentCard from '../components/dashboard/PaymentCard.vue'
@@ -8,11 +8,22 @@ import SshKeysCard from '../components/dashboard/SshKeysCard.vue'
 import VouchersCard from '../components/dashboard/VouchersCard.vue'
 import ProfileCard from '../components/dashboard/ProfileCard.vue'
 import OverviewCard from '../components/dashboard/OverviewCard.vue'
+import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
+
+// Initialize selected section from localStorage or default to 'overview'
 const selected = ref('overview')
+
+onMounted(() => {
+  const savedSection = localStorage.getItem('dashboard-section')
+  if (savedSection) {
+    selected.value = savedSection
+  }
+})
+
 const clusters = ref([
   { id: 1, name: 'Production Cluster', status: 'running', nodes: 3, region: 'US East' },
   { id: 2, name: 'Staging Cluster', status: 'stopped', nodes: 2, region: 'US West' },
@@ -47,17 +58,27 @@ const totalSpent = computed(() => {
     .reduce((sum, bill) => sum + bill.amount, 0)
     .toFixed(2)
 })
+
 function handleSidebarSelect(val: string) {
   selected.value = val
+  // Save to localStorage for persistence
+  localStorage.setItem('dashboard-section', val)
 }
+
 function handleNavigate(section: string) {
   selected.value = section
+  // Save to localStorage for persistence
+  localStorage.setItem('dashboard-section', section)
+}
+
+function handleLogout() {
+  // Handle logout logic here
+  console.log('Logout clicked')
 }
 
 function redeemVoucher(voucher: any) {
   // TODO: Implement redeem logic (API call, update UI, etc.)
   alert(`Redeem voucher: ${voucher.name}`)
-  // Or use a notification/snackbar
 }
 </script>
 
@@ -88,6 +109,7 @@ function redeemVoucher(voucher: any) {
               <PaymentCard v-if="selected === 'payment'" :paymentMethods="paymentMethods" />
               <SshKeysCard v-if="selected === 'ssh'" :sshKeys="sshKeys" />
               <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
+              <NodesCard v-if="selected === 'nodes'" />
               <ProfileCard v-if="selected === 'profile'" />
             </div>
           </div>

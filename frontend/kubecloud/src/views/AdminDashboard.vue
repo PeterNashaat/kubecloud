@@ -36,39 +36,18 @@ const paginatedUsers = computed(() => {
 })
 const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize))
 
-const snackbar = ref(false)
-const snackbarMsg = ref('')
-const snackbarColor = ref('success')
-
-function showSnackbar(msg: string, color: string = 'success') {
-  snackbarMsg.value = msg
-  snackbarColor.value = color
-  snackbar.value = true
-}
-
-
-async function deleteUser(userId: number) {
-  try {
-    await adminService.deleteUser(userId)
+function deleteUser(userId: number) {
+    adminService.deleteUser(userId)
     // Refresh users list
-    await loadUsers()
-    showSnackbar('User deleted successfully', 'success')
-  } catch (error) {
-    showSnackbar('Failed to delete user', 'error')
-  }
+    loadUsers()
 }
 
 async function loadUsers() {
-  try {
     // Map ID to id for compatibility if backend returns ID
     const rawUsers = await adminService.listUsers()
     users.value = rawUsers.map(u => ({ ...u, id: u.id ?? (u as any).ID }))
     // Update admin stats
     adminStats.value[0].value = users.value.length
-  } catch (error) {
-    console.error('Failed to load users:', error)
-    showSnackbar('Failed to load users', 'error')
-  }
 }
 
 function goToPage(page: number) {
@@ -97,7 +76,6 @@ function handleSidebarSelect(newSelected: string) {
 
 // Generate vouchers using real API
 async function generateVouchers() {
-  try {
     const data: GenerateVouchersRequest = {
       count: voucherCount.value,
       value: voucherValue.value,
@@ -106,32 +84,18 @@ async function generateVouchers() {
     
     const response = await adminService.generateVouchers(data)
     voucherResult.value = response.message
-    showSnackbar('Vouchers generated successfully!', 'success')
-    
     // Refresh vouchers list
     await loadVouchers()
-  } catch (error) {
-    showSnackbar('Failed to generate vouchers', 'error')
-  }
 }
 
 // Load vouchers using real API
 async function loadVouchers() {
-  try {
     vouchers.value = await adminService.listVouchers()
-  } catch (error) {
-    console.error('Failed to load vouchers:', error)
-    showSnackbar('Failed to load vouchers', 'error')
-  }
 }
 
 // Apply manual credit using real API
 async function applyManualCredit() {
-  try {
-    if (!creditUserObj.value) {
-      showSnackbar('Please select a user.', 'error')
-      return
-    }
+    if (!creditUserObj.value) return
     
     const data: CreditUserRequest = {
       amount: creditAmount.value,
@@ -140,18 +104,12 @@ async function applyManualCredit() {
     
     const response = await adminService.creditUser(creditUserObj.value.id, data)
     creditResult.value = response.message
-    showSnackbar('Manual credit applied!', 'success')
-    
     // Reset form
     creditUserObj.value = null
     creditAmount.value = 0
     creditReason.value = ''
-    
     // Refresh users list to get updated balances
     await loadUsers()
-  } catch (error) {
-    showSnackbar('Failed to apply credit', 'error')
-  }
 }
 
 function openCreditDialog(user: User) {
@@ -169,7 +127,6 @@ function closeCreditDialog() {
 
 async function applyManualCreditDialog() {
   if (!creditUserDialogObj.value) return
-  try {
     const data = {
       amount: creditAmount.value,
       memo: creditReason.value
@@ -177,14 +134,10 @@ async function applyManualCreditDialog() {
     // Use user.id as path param
     const response = await adminService.creditUser(creditUserDialogObj.value.id, data)
     creditResult.value = response.message
-    showSnackbar('Manual credit applied!', 'success')
     creditAmount.value = 0
     creditReason.value = ''
     await loadUsers()
     closeCreditDialog()
-  } catch (error) {
-    showSnackbar('Failed to apply credit', 'error')
-  }
 }
 
 const tabs = [
@@ -210,7 +163,6 @@ onMounted(async () => {
           <AdminSidebar :selected="selected" @update:selected="handleSidebarSelect" />
         </div>
         <div class="dashboard-main">
-          <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="2500" location="top right">{{ snackbarMsg }}</v-snackbar>
           <AdminStatsCards v-if="selected === 'overview'" :adminStats="adminStats" />
           <AdminUsersTable
             v-else-if="selected === 'users'"

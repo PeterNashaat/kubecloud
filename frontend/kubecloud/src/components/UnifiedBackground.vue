@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 interface Props {
-  theme?: 'default' | 'home' | 'features' | 'pricing' | 'use-cases' | 'docs' | 'reserve' | 'dashboard'
+  theme?: 'default' | 'home' | 'features' | 'pricing' | 'use-cases' | 'docs' | 'reserve' | 'dashboard' | 'nodes'
 }
 
 withDefaults(defineProps<Props>(), {

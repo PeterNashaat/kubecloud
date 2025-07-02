@@ -41,14 +41,13 @@
               :selectedSshKeys="selectedSshKeys"
               :setSelectedSshKeys="setSelectedSshKeys"
               :isStep1Valid="isStep1Valid"
-              @navigateToSshKeys="navigateToSshKeys"
               @nextStep="nextStep"
             />
             <Step2AssignNodes
               v-else-if="step === 2"
               :allVMs="allVMs"
-              :availableNodes="availableNodes.map(n => ({ id: String(n.id), label: n.label }))"
-              :getNodeInfo="getNodeInfoString"
+              :availableNodes="availableNodes.map(n => ({ id: n.id, label: n.label }))"
+              :getNodeInfo="(id: string) => getNodeInfo(Number(id))"
               :onAssignNode="onAssignNode"
               :isStep2Valid="isStep2Valid"
               @nextStep="nextStep"
@@ -57,7 +56,7 @@
             <Step3Review
               v-else-if="step === 3"
               :allVMs="allVMs"
-              :getNodeInfo="getNodeInfoString"
+              :getNodeInfo="(id: string) => getNodeInfo(Number(id))"
               :onDeployCluster="onDeployCluster"
               :prevStep="prevStep"
               :deploying="deploying"
@@ -73,7 +72,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useClusterStore } from '../stores/clusters';
-import NodeCard from '../components/NodeCard.vue';
+import DeployVMCard from '../components/deploy/DeployVMCard.vue';
 import EditNodeModal from '../components/EditNodeModal.vue';
 import { useDeployCluster } from '../composables/useDeployCluster';
 import type { VM, SshKey } from '../composables/useDeployCluster';
@@ -83,7 +82,7 @@ import Step3Review from '../components/deploy/Step3Review.vue';
 import { api } from '../utils/api';
 import { useNotificationStore } from '../stores/notifications';
 import { UserService } from '../utils/userService';
-import { useNodes } from '../composables/useNodes';
+import { useNodeManagement } from '../composables/useNodeManagement';
 
 const notificationStore = useNotificationStore();
 const userService = new UserService();
@@ -134,19 +133,19 @@ const deploying = ref(false);
 
 const allVMs = computed(() => [...masters.value, ...workers.value]);
 
-const { fetchNodes, nodes, loading: nodesLoading, error: nodesError } = useNodes();
+const { rentedNodes, fetchRentedNodes, loading: rentedNodesLoading, error: rentedNodesError } = useNodeManagement();
 const availableNodes = ref<any[]>([]);
 
 async function fetchAvailableNodes() {
   try {
-    await fetchNodes();
-    const nodesArr = Array.isArray(nodes.value) ? nodes.value : [];
+    await fetchRentedNodes();
+    const nodesArr = Array.isArray(rentedNodes.value) ? rentedNodes.value : [];
     availableNodes.value = nodesArr.map((n: any) => ({
-      id: String(n.id),
-      label: n.label || n.name || `Node #${n.id}`,
-      totalCPU: n.resources?.cpu || n.totalCPU || 0,
-      totalRAM: n.resources?.memory || n.totalRAM || 0,
-      hasGPU: n.gpu || n.hasGPU || false,
+      id: n.id,
+      label: n.name || `Node #${n.id}`,
+      totalCPU: n.resources?.cpu || n.total_resources?.cru || 0,
+      totalRAM: n.resources?.memory || n.total_resources?.mru || 0,
+      hasGPU: n.gpu || (n.gpus && n.gpus.length > 0) || false,
       location: n.location || '',
     }));
   } catch (err) {
@@ -200,8 +199,8 @@ const isStep2Valid = computed(() => allVMsAssigned.value && uniqueNodeAssignment
 const isStep3Valid = computed(() => isStep2Valid.value && isStep1Valid.value);
 
 // Helper function to get node info
-function getNodeInfo(nodeId: string | null) {
-  if (!nodeId) return '';
+function getNodeInfo(nodeId: number | null) {
+  if (nodeId == null) return '';
   const node = availableNodes.value.find(n => n.id === nodeId);
   if (!node) return '';
   return `${node.totalCPU} vCPU, ${node.totalRAM}GB RAM${node.hasGPU ? ', GPU Available' : ''}`;
@@ -325,10 +324,8 @@ async function onDeployCluster() {
       errorMessage: 'Failed to deploy cluster',
       requiresAuth: true
     });
-    notificationStore.success('Success', 'Cluster deployed successfully!');
     // Optionally, redirect or reset wizard here
   } catch (err: any) {
-    notificationStore.error('Error', err.message || 'Failed to deploy cluster');
   } finally {
     deploying.value = false;
   }
@@ -375,11 +372,11 @@ const editNodeValidation = computed(() => {
 function setSelectedSshKeys(keys: string[]) {
   selectedSshKeys.value = keys;
 }
-function onAssignNode(vmIdx: number, nodeId: string) {
-  allVMs.value[vmIdx].node = nodeId ? Number(nodeId) : null;
+function onAssignNode(vmIdx: number, nodeId: number) {
+  allVMs.value[vmIdx].node = nodeId != null ? nodeId : null;
 }
 function getNodeInfoString(id: string) {
-  return getNodeInfo(id);
+  return getNodeInfo(Number(id));
 }
 </script>
 

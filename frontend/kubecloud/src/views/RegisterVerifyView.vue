@@ -83,13 +83,8 @@ const handleVerify = async () => {
     errors.code = 'Verification code is required'
     return
   }
-  try {
     await userStore.verifyCode(form.email, Number(form.code))
-    notificationStore.success('Verified', 'Your account has been verified and you are now signed in!')
     router.push('/')
-  } catch (error: any) {
-    notificationStore.error('Verification Failed', error?.message || 'Invalid code or email')
-  }
 }
 
 const resendCode = async () => {
@@ -97,17 +92,12 @@ const resendCode = async () => {
     errors.email = 'Email is required to resend code'
     return
   }
-  try {
     await authService.register({
       name: 'User',
       email: form.email,
       password: 'temporary',
       confirm_password: 'temporary'
     })
-    notificationStore.success('Code Sent', 'A new verification code has been sent to your email.')
-  } catch (error: any) {
-    notificationStore.error('Resend Failed', error?.message || 'Could not resend code')
-  }
 }
 
 onMounted(() => {

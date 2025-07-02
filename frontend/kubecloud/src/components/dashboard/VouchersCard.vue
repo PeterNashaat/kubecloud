@@ -1,46 +1,34 @@
 <template>
-  <div class="dashboard-card vouchers-card">
+  <div class="dashboard-card vouchers-card spacious">
     <div class="dashboard-card-header">
-      <div class="dashboard-card-title-section">
-        <div class="dashboard-card-title-content">
-          <h3 class="dashboard-card-title">Redeem Voucher</h3>
-          <p class="dashboard-card-subtitle">Add credits to your balance using a voucher code</p>
-        </div>
-      </div>
+      <h3 class="dashboard-card-title">Redeem Voucher</h3>
+      <p class="dashboard-card-subtitle">Add credits to your balance using a voucher code</p>
     </div>
     <div class="dashboard-card-content">
-      <v-text-field
+      <input
         v-model="code"
-        label="Voucher Code"
-        prepend-inner-icon="mdi-ticket-percent"
-        variant="outlined"
+        class="voucher-input bordered"
+        type="text"
+        placeholder="Voucher Code"
         :disabled="loading"
         @keyup.enter="onRedeem"
-        class="voucher-input-field"
       />
       <v-btn
         color="primary"
         :loading="loading"
         :disabled="loading"
-        class="redeem-btn"
+        class="redeem-btn action-btn"
         @click="onRedeem"
         prepend-icon="mdi-gift"
       >
         Redeem
       </v-btn>
-      <v-alert v-if="successMessage" type="success" variant="tonal" class="mt-3" border="start" icon="mdi-check-circle">
-        {{ successMessage }}
-      </v-alert>
-      <v-alert v-if="errorMessage" type="error" variant="tonal" class="mt-3" border="start" icon="mdi-alert-circle">
-        {{ errorMessage }}
-      </v-alert>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { VTextField, VBtn, VAlert } from 'vuetify/components'
 
 interface Voucher {
   id: number | string
@@ -57,22 +45,17 @@ const props = defineProps<{ vouchers: Voucher[] }>()
 
 const code = ref('')
 const loading = ref(false)
-const successMessage = ref('')
-const errorMessage = ref('')
 
 function onRedeem() {
-  successMessage.value = ''
-  errorMessage.value = ''
   if (!code.value.trim()) {
-    errorMessage.value = 'Please enter a code.'
-    return
+    // For demo, treat any code as success
+    code.value = ''
   }
   loading.value = true
   // Simulate async redeem
   setTimeout(() => {
     loading.value = false
     // For demo, treat any code as success
-    successMessage.value = 'Voucher redeemed successfully!'
     code.value = ''
   }, 1200)
   emit('redeem', code.value)
@@ -95,18 +78,55 @@ export default {
 </script>
 
 <style scoped>
-/* Remove centering and use full width like other dashboard cards */
-.vouchers-card {
-  width: 100%;
-  max-width: unset;
+.dashboard-card.vouchers-card.spacious {
+  background: #181f35;
+  border-radius: 1.25rem;
+  border: 1.5px solid #334155;
+  max-width: 520px;
   margin: 0;
+  padding: 2.2rem 2.5rem 2.2rem 2.5rem;
+  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
 }
-.voucher-input-field {
+.dashboard-card-header {
+  margin-bottom: 1.5rem;
   width: 100%;
-  max-width: 340px;
 }
-.redeem-btn {
-  min-width: 160px;
-  margin-top: 0.5rem;
+.dashboard-card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+.dashboard-card-subtitle {
+  font-size: 1.05rem;
+  color: #60a5fa;
+  margin-bottom: 0.5rem;
+}
+.dashboard-card-content {
+  width: 100%;
+}
+.voucher-input {
+  width: 100%;
+  padding: 0.7rem 1.1rem;
+  font-size: 1.1rem;
+  background: #232f47;
+  color: #CBD5E1;
+  margin-bottom: 1.3rem;
+}
+.voucher-input.bordered {
+  border: 1.5px solid #334155;
+  border-radius: 0.7rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.voucher-input.bordered:focus {
+  border-color: #60a5fa;
+}
+.redeem-btn.action-btn {
+  margin-top: 1.2rem;
+  font-size: 1.1rem;
+  padding: 0.9rem 0;
+  border-radius: 0.7rem;
 }
 </style>

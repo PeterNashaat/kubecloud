@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { mockApi, mockClusters, MOCK_CONFIG } from '../utils/mockData'
+import { api } from '../utils/api'
 
 export interface Cluster {
   id: string
@@ -74,15 +74,9 @@ export const useClusterStore = defineStore('clusters', () => {
     error.value = null
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        const response = await mockApi.get('/clusters')
-        clusters.value = response.data
-      } else {
-        // Real API call would go here
-        // const response = await api.get('/clusters')
-        // clusters.value = response.data
-        throw new Error('API not ready - use mock mode')
-      }
+      // Real API call
+      const response = await api.get('/clusters')
+      clusters.value = response.data as Cluster[]
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch clusters'
       throw err
@@ -96,22 +90,18 @@ export const useClusterStore = defineStore('clusters', () => {
     error.value = null
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        const response = await mockApi.post('/clusters', clusterData)
-        const newCluster: Cluster = {
-          ...(response.data as Cluster),
-          ...clusterData,
-          status: 'starting',
-          createdAt: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          cost: 0, // Will be calculated once running
-        }
-        clusters.value.push(newCluster)
-        return newCluster
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
+      // Real API call
+      const response = await api.post('/clusters', clusterData)
+      const newCluster: Cluster = {
+        ...(response.data as Cluster),
+        ...clusterData,
+        status: 'starting',
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        cost: 0, // Will be calculated once running
       }
+      clusters.value.push(newCluster)
+      return newCluster
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to create cluster'
       throw err
@@ -125,16 +115,12 @@ export const useClusterStore = defineStore('clusters', () => {
     error.value = null
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        await mockApi.delete(`/clusters/${clusterId}`)
-        clusters.value = clusters.value.filter(cluster => cluster.id !== clusterId)
-        
-        if (selectedCluster.value?.id === clusterId) {
-          selectedCluster.value = null
-        }
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
+      // Real API call
+      await api.delete(`/clusters/${clusterId}`)
+      clusters.value = clusters.value.filter(cluster => cluster.id !== clusterId)
+      
+      if (selectedCluster.value?.id === clusterId) {
+        selectedCluster.value = null
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete cluster'
@@ -151,17 +137,11 @@ export const useClusterStore = defineStore('clusters', () => {
     cluster.status = 'starting'
     
     try {
-      if (MOCK_CONFIG.enabled) {
-        await mockApi.post(`/clusters/${clusterId}/start`, { action: 'start' })
-        // Simulate startup delay
-        setTimeout(() => {
-          cluster.status = 'running'
-          cluster.lastUpdated = new Date().toISOString()
-        }, 3000)
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
-      }
+      // Real API call
+      await api.post(`/clusters/${clusterId}/start`, { action: 'start' })
+      // Optionally update status after API call
+      cluster.status = 'running'
+      cluster.lastUpdated = new Date().toISOString()
     } catch (err) {
       cluster.status = 'error'
       throw err
@@ -175,17 +155,11 @@ export const useClusterStore = defineStore('clusters', () => {
     cluster.status = 'stopping'
     
     try {
-      if (MOCK_CONFIG.enabled) {
-        await mockApi.post(`/clusters/${clusterId}/stop`, { action: 'stop' })
-        // Simulate shutdown delay
-        setTimeout(() => {
-          cluster.status = 'stopped'
-          cluster.lastUpdated = new Date().toISOString()
-        }, 2000)
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
-      }
+      // Real API call
+      await api.post(`/clusters/${clusterId}/stop`, { action: 'stop' })
+      // Optionally update status after API call
+      cluster.status = 'stopped'
+      cluster.lastUpdated = new Date().toISOString()
     } catch (err) {
       cluster.status = 'error'
       throw err
@@ -197,13 +171,9 @@ export const useClusterStore = defineStore('clusters', () => {
     if (!cluster) throw new Error('Cluster not found')
 
     try {
-      if (MOCK_CONFIG.enabled) {
-        await mockApi.put(`/clusters/${clusterId}`, updates)
-        Object.assign(cluster, updates, { lastUpdated: new Date().toISOString() })
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
-      }
+      // Real API call
+      await api.put(`/clusters/${clusterId}`, updates)
+      Object.assign(cluster, updates, { lastUpdated: new Date().toISOString() })
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to update cluster'
       throw err
@@ -216,30 +186,16 @@ export const useClusterStore = defineStore('clusters', () => {
 
   const getClusterMetrics = async (clusterId: string): Promise<ClusterMetrics> => {
     try {
-      if (MOCK_CONFIG.enabled) {
-        // Mock metrics
-        return {
-          cpuUsage: Math.random() * 100,
-          memoryUsage: Math.random() * 100,
-          storageUsage: Math.random() * 100,
-          networkIn: Math.random() * 1000,
-          networkOut: Math.random() * 1000,
-          activeConnections: Math.floor(Math.random() * 100),
-        }
-      } else {
-        // Real API call would go here
-        throw new Error('API not ready - use mock mode')
-      }
+      // Real API call (replace with actual endpoint if available)
+      const response = await api.get(`/clusters/${clusterId}/metrics`)
+      return response.data as ClusterMetrics
     } catch (err) {
       throw new Error('Failed to fetch cluster metrics')
     }
   }
 
   const initializeClusters = () => {
-    // Load initial mock data
-    if (MOCK_CONFIG.enabled && clusters.value.length === 0) {
-      clusters.value = [...mockClusters] as Cluster[]
-    }
+    // No mock data initialization
   }
 
   const deployCluster = async (payload: any) => {
