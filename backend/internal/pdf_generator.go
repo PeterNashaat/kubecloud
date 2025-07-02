@@ -34,7 +34,7 @@ type InvoicePDF struct {
 }
 
 func CreateInvoicePDF(
-	invoice models.Invoice, user models.User,
+	invoice models.Invoice, user models.User, companyData InvoiceCompanyData,
 ) ([]byte, error) {
 	pdf := gopdf.GoPdf{}
 	config := gopdf.Config{PageSize: *gopdf.PageSizeA4}
@@ -53,7 +53,7 @@ func CreateInvoicePDF(
 		return nil, errors.Wrap(err, "failed to set fonts")
 	}
 
-	if err := invoicePDF.draw(); err != nil {
+	if err := invoicePDF.draw(companyData); err != nil {
 		return nil, errors.Wrap(err, "failed to draw pdf")
 	}
 
@@ -72,7 +72,7 @@ func (in *InvoicePDF) setFonts() error {
 	return in.pdf.AddTTFFont("Arial-Italic", italicFontPath)
 }
 
-func (in *InvoicePDF) draw() error {
+func (in *InvoicePDF) draw(companyData InvoiceCompanyData) error {
 	in.pdf.AddPage()
 
 	if err := in.setLogo(); err != nil {
@@ -89,7 +89,7 @@ func (in *InvoicePDF) draw() error {
 	// space
 	in.startY += 45
 
-	if err := in.companySection(); err != nil {
+	if err := in.companySection(companyData); err != nil {
 		return errors.Wrap(err, "failed to display company section")
 	}
 
@@ -155,7 +155,7 @@ func (in *InvoicePDF) title() error {
 	)
 }
 
-func (in *InvoicePDF) companySection() error {
+func (in *InvoicePDF) companySection(companyData InvoiceCompanyData) error {
 	if err := in.pdf.SetFont("Arial-Bold", "", 10); err != nil {
 		return err
 	}
@@ -172,17 +172,17 @@ func (in *InvoicePDF) companySection() error {
 	in.pdf.SetTextColor(greyColor, greyColor, greyColor)
 
 	in.pdf.SetXY(in.startX, in.startY+15)
-	if err := in.pdf.Cell(nil, "Codescalers Egypt"); err != nil {
+	if err := in.pdf.Cell(nil, companyData.Name); err != nil {
 		return err
 	}
 
 	in.pdf.SetXY(in.startX, in.startY+27)
-	if err := in.pdf.Cell(nil, "9 Al Wardi street, El Hegaz St"); err != nil {
+	if err := in.pdf.Cell(nil, companyData.Address); err != nil {
 		return err
 	}
 
 	in.pdf.SetXY(in.startX, in.startY+39)
-	return in.pdf.Cell(nil, "Cairo Governorate 11341")
+	return in.pdf.Cell(nil, companyData.Governorate)
 }
 
 func (in *InvoicePDF) invoiceSection() error {
