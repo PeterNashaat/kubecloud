@@ -25,6 +25,7 @@ type ListNodesResponse struct {
 
 // @Summary List nodes
 // @Description Retrieves a list of nodes from the grid proxy based on the provided filters.
+// @Tags nodes
 // @ID list-nodes
 // @Accept json
 // @Produce json
@@ -35,6 +36,7 @@ type ListNodesResponse struct {
 // @Success 200 {object} APIResponse "Nodes are retrieved successfully"
 // @Failure 400 {object} APIResponse "Invalid filter parameters"
 // @Failure 500 {object} APIResponse "Internal server error"
+// @Router /nodes [get]
 // ListNodesHandler requests all nodes from gridproxy
 func (h *Handler) ListNodesHandler(c *gin.Context) {
 	query := c.Request.URL.Query()

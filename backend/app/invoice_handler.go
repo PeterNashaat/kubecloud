@@ -16,12 +16,13 @@ import (
 
 // @Summary Get all invoices
 // @Description Returns a list of all invoices
-// @Tags invoices
+// @Tags admin
 // @ID get-all-invoices
 // @Accept json
 // @Produce json
 // @Success 200 {array} models.Invoice
 // @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
 // @Router /invoices [get]
 // ListAllInvoicesHandler lists all invoices in system
 func (h *Handler) ListAllInvoicesHandler(c *gin.Context) {

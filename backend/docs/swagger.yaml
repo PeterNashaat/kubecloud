@@ -273,9 +273,53 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
       summary: Get all invoices
       tags:
-      - invoices
+      - admin
+  /nodes:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of nodes from the grid proxy based on the provided
+        filters.
+      operationId: list-nodes
+      parameters:
+      - description: 'Filter by healthy nodes (default: true)'
+        in: query
+        name: healthy
+        type: boolean
+      - description: 'Filter by rentable nodes (default: true)'
+        in: query
+        name: rentable
+        type: boolean
+      - description: 'Limit the number of nodes returned (default: 50)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset for pagination (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Nodes are retrieved successfully
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "400":
+          description: Invalid filter parameters
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: List nodes
+      tags:
+      - nodes
   /user:
     get:
       description: Retrieves all data of the user

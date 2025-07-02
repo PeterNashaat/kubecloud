@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/invoices": {
             "get": {
+                "security": [
+                    {
+                        "AdminMiddleware": []
+                    }
+                ],
                 "description": "Returns a list of all invoices",
                 "consumes": [
                     "application/json"
@@ -25,7 +30,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "invoices"
+                    "admin"
                 ],
                 "summary": "Get all invoices",
                 "operationId": "get-all-invoices",
@@ -41,6 +46,68 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes": {
+            "get": {
+                "description": "Retrieves a list of nodes from the grid proxy based on the provided filters.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "List nodes",
+                "operationId": "list-nodes",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Filter by healthy nodes (default: true)",
+                        "name": "healthy",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by rentable nodes (default: true)",
+                        "name": "rentable",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit the number of nodes returned (default: 50)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset for pagination (default: 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Nodes are retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid filter parameters",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
