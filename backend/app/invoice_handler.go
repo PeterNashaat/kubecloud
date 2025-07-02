@@ -224,7 +224,7 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 
 	subject, body := h.mailService.InvoiceMailContent(totalInvoiceCost, h.config.Currency, invoice.ID)
 	err = h.mailService.SendMail(h.config.MailSender.Email, user.Email, subject, body, internal.Attachment{
-		FileName: fmt.Sprintf("invoice-%s-%d.pdf", invoice.UserID, invoice.ID),
+		FileName: fmt.Sprintf("invoice-%d-%d.pdf", invoice.UserID, invoice.ID),
 		Data:     invoice.FileData,
 	})
 	if err != nil {
