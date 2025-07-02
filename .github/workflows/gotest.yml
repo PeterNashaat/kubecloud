@@ -1,0 +1,29 @@
+name: Go testing
+
+on:
+  push:
+    paths:
+      - backend/**
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+        with:
+          submodules: "true"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+        id: go
+
+      - name: Get dependencies
+        run: |
+          cd backend && go mod download
+
+      - name: Test
+        run: cd backend && go test -v ./...
