@@ -8,6 +8,7 @@ import (
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,8 @@ type Handler struct {
 	mailService     internal.MailService
 	proxyClient     proxy.Client
 	substrateClient *substrate.Substrate
+	graphqlClient   graphql.GraphQl
+	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
 }
@@ -33,6 +36,7 @@ type Handler struct {
 func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
+	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
@@ -41,6 +45,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		mailService:     mailService,
 		proxyClient:     gridproxy,
 		substrateClient: substrateClient,
+		graphqlClient:   graphqlClient,
+		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
 	}
@@ -85,9 +91,9 @@ type ChangePasswordInput struct {
 
 // ChargeBalanceInput struct holds required data to charge users' balance
 type ChargeBalanceInput struct {
-	CardType     string  `json:"card_type" binding:"required"`
-	PaymentToken string  `json:"payment_method_id" binding:"required"`
-	Amount       float64 `json:"amount" binding:"required"`
+	CardType     string `json:"card_type" binding:"required"`
+	PaymentToken string `json:"payment_method_id" binding:"required"`
+	Amount       uint64 `json:"amount" binding:"required"`
 }
 
 // RegisterHandler registers user to the system
@@ -453,12 +459,13 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 }
 
 func (h *Handler) ChargeBalance(c *gin.Context) {
+
 	userID := c.GetInt("user_id")
 
 	var request ChargeBalanceInput
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusBadRequest, "Invalid request format", "")
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
 
@@ -506,6 +513,13 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
 	Success(c, http.StatusOK, "Balance is charged successfully", gin.H{
 		"payment_intent_id": intent.ID,
 		"new_balance":       user.CreditCardBalance,
@@ -527,5 +541,88 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
 		"user": user,
 	})
+
+}
+
+// GetUserBalance returns user's balance in usd
+func (h *Handler) GetUserBalance(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "User is not found", "")
+		return
+	}
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+	}
+	Success(c, http.StatusOK, "Balance fetched", gin.H{
+		"balance_usd": usdBalance,
+		"debt_usd":    user.Debt,
+	})
+}
+
+func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
+	voucherCodeParam := c.Param("voucher_code")
+	if voucherCodeParam == "" {
+		Error(c, http.StatusBadRequest, "Voucher Code is required", "")
+		return
+	}
+	userID := c.GetInt("user_id")
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "User is not found", "")
+		return
+	}
+
+	// check voucher exists
+	voucher, err := h.db.GetVoucherByCode(voucherCodeParam)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusNotFound, "Voucher is not found", "")
+		return
+	}
+
+	// check voucher not redeemed
+	if voucher.Redeemed {
+		Error(c, http.StatusBadRequest, "voucher is already redeemed", "")
+		return
+	}
+
+	// check on expiration time of voucher
+	if voucher.ExpiresAt.Before(time.Now()) {
+		Error(c, http.StatusBadRequest, "voucher is already expired", "")
+		return
+
+	}
+
+	err = h.db.RedeemVoucher(voucher.Code)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	user.CreditedBalance += voucher.Value
+	err = h.db.UpdateUserByID(&user)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	if err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusInternalServerError, "internal server error", "")
+		return
+	}
+
+	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
 
 }

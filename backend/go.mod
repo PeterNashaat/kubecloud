@@ -7,9 +7,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
+	github.com/signintech/gopdf v0.32.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stripe/stripe-go/v82 v82.2.1
-	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20241127100051-77e684bcb1b2
+	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20250625091136-bcdbec5bf71e
 	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.8
 	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.8
 	github.com/tyler-smith/go-bip39 v1.1.0
@@ -45,6 +46,7 @@ require (
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
+	github.com/phpdave11/gofpdi v1.0.14-0.20211212211723-1f10f9844311 // indirect
 	github.com/pierrec/xxHash v0.1.5 // indirect
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
@@ -98,4 +100,3 @@ require (
 )
 
 exclude github.com/threefoldtech/zos v0.5.6-0.20240902110349-172a0a29a6ee
-

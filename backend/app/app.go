@@ -10,6 +10,7 @@ import (
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
 	"github.com/gin-gonic/gin"
@@ -62,6 +63,20 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to connect to substrate client: %w", err)
 	}
 
+	graphqlURL := []string{config.GraphqlURL}
+	graphqlClient, err := graphql.NewGraphQl(graphqlURL...)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to connect to graphql client")
+		return nil, fmt.Errorf("failed to connect to graphql client: %w", err)
+	}
+
+	firesquidURL := []string{config.FiresquidURL}
+	firesquidClient, err := graphql.NewGraphQl(firesquidURL...)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to connect to firesquid client")
+		return nil, fmt.Errorf("failed to connect to firesquid client: %w", err)
+	}
+
 	redisClient, err := internal.NewRedisClient(config.Redis)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create Redis client")
@@ -88,7 +103,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, redisClient, sseManager)
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager)
 
 	app := &App{
 		router:        router,
@@ -112,7 +127,6 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 // registerHandlers registers all routes
 func (app *App) registerHandlers() {
-	app.router.Use(middlewares.CorsMiddleware())
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
@@ -126,6 +140,8 @@ func (app *App) registerHandlers() {
 				usersGroup.DELETE("/:user_id", app.handlers.DeleteUsersHandler)
 				usersGroup.POST("/:user_id/credit", app.handlers.CreditUserHandler)
 			}
+
+			adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
 
 			vouchersGroup := adminGroup.Group("/vouchers")
 			{
@@ -148,12 +164,16 @@ func (app *App) registerHandlers() {
 			authGroup := userGroup.Group("")
 			authGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
 			{
-				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
 				authGroup.GET("/", app.handlers.GetUserHandler)
+				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
 				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.POST("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
+				authGroup.GET("/balance", app.handlers.GetUserBalance)
+				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
+				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
+				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
 			}
 
 		}
@@ -181,9 +201,16 @@ func (app *App) registerHandlers() {
 
 }
 
+func (app *App) StartBackgroundWorkers() {
+	go app.handlers.MonthlyInvoicesHandler()
+	go internal.TrackUserDebt()
+}
+
 // Run starts the server
 func (app *App) Run() error {
 	addr := fmt.Sprintf("%s:%s", app.config.Server.Host, app.config.Server.Port)
+
+	app.StartBackgroundWorkers()
 	app.httpServer = &http.Server{
 		Addr:    addr,
 		Handler: app.router,

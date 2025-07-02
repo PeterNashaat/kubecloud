@@ -22,6 +22,9 @@ type Configuration struct {
 	TFChainURL           string             `json:"tfchain_url" validate:"required"`
 	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
 	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
+	GraphqlURL           string             `json:"graphql_url" validate:"required"`
+	FiresquidURL         string             `json:"firesquid_url" validate:"required"`
+	SystemAccount        GridAccount        `json:"system_account"`
 	Redis                Redis              `json:"redis" validate:"required,dive"`
 	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
@@ -63,6 +66,12 @@ type TermsANDConditions struct {
 	DocumentHash string `json:"document_hash" validate:"required"`
 }
 
+// GridAccount holds data for system's account
+type GridAccount struct {
+	Mnemonics string `json:"mnemonics" validate:"required"`
+	Network   string `json:"network" validate:"required"`
+}
+
 // Redis struct holds Redis connection information
 type Redis struct {
 	Host     string `json:"host" validate:"required"`
@@ -89,10 +98,10 @@ func ReadConfFile(path string) (Configuration, error) {
 	if err := validate.Struct(config); err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
 			for _, ve := range validationErrors {
-				fmt.Printf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
+				return Configuration{}, fmt.Errorf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
 			}
 		}
-		return Configuration{}, fmt.Errorf("Invalid configuration: %w", err)
+		return Configuration{}, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return config, nil
