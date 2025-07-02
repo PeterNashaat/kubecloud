@@ -127,6 +127,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 // registerHandlers registers all routes
 func (app *App) registerHandlers() {
+	app.router.Use(middlewares.CorsMiddleware())
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
