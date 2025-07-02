@@ -162,6 +162,10 @@ async function changePassword() {
 }
 </script>
 
+export default {
+  name: 'ProfileCard'
+}
+
 <style scoped>
 .dashboard-card.profile-card.compact {
   padding: 1.5rem;

@@ -43,26 +43,6 @@
       </div>
     </div>
 
-    <!-- Recent Activity -->
-    <div class="recent-activity-section">
-      <h3 class="section-title">Recent Activity</h3>
-      <div class="activity-list">
-        <div
-          v-for="activity in recentActivity"
-          :key="activity.id"
-          class="list-item-interactive"
-        >
-          <div class="activity-icon">
-            <v-icon :icon="activity.icon" size="20" :color="activity.iconColor"></v-icon>
-          </div>
-          <div class="activity-content">
-            <div class="activity-text">{{ activity.text }}</div>
-            <div class="activity-time">{{ activity.time }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- System Status -->
     <div class="system-status-section">
       <h3 class="section-title">System Status</h3>
@@ -112,7 +92,6 @@ interface SshKey {
 
 interface Props {
   clusters: Cluster[]
-  recentActivity: Activity[]
   sshKeys: SshKey[]
   totalSpent: string
 }
@@ -205,6 +184,10 @@ const systemStatus = [
 const emit = defineEmits(['navigate'])
 </script>
 
+export default {
+  name: 'OverviewCard'
+}
+
 <style scoped>
 .dashboard-card-header {
   text-align: center;
@@ -250,43 +233,6 @@ const emit = defineEmits(['navigate'])
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-4);
-}
-
-.recent-activity-section {
-  margin-bottom: var(--space-8);
-}
-
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.activity-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--color-primary-subtle);
-  border: 1px solid var(--color-primary);
-}
-
-.activity-content {
-  flex: 1;
-}
-
-.activity-text {
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text);
-  margin: 0 0 var(--space-1) 0;
-}
-
-.activity-time {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin: 0;
 }
 
 .system-status-section {

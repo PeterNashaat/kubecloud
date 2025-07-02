@@ -59,10 +59,10 @@
       </div>
       <div class="table-container">
         <v-data-table
-          :headers="[
-            { title: 'Voucher', key: 'voucher' },
+        :headers="[
+            { title: 'Voucher', key: 'code' },
             { title: 'Value', key: 'value' },
-            { title: 'Used', key: 'used' },
+            { title: 'Redeemed', key: 'redeemed' },
             { title: 'Created At', key: 'created_at' },
             { title: 'Expires At', key: 'expires_at' }
           ]"
@@ -71,11 +71,11 @@
           hide-default-footer
           density="comfortable"
         >
-          <template #item.value="{ item }">
-            {{ item.Value }}
+        <template #item.value="{ item }">
+            {{ item.value }}
           </template>
-          <template #item.used="{ item }">
-            {{ item.used === true || item.used === 'true' ? 'Yes' : 'No' }}
+          <template #item.redeemed="{ item }">
+            {{ item.redeemed === true ? 'Yes' : 'No' }}
           </template>
           <template #item.created_at="{ item }">
             <span>{{ formatDate(item.created_at) }}</span>

@@ -1,34 +1,45 @@
 <template>
   <div class="dashboard-card vouchers-card spacious">
     <div class="dashboard-card-header">
-      <h3 class="dashboard-card-title">Redeem Voucher</h3>
+      <h3 class="dashboard-card-title single-line">Redeem Voucher</h3>
       <p class="dashboard-card-subtitle">Add credits to your balance using a voucher code</p>
     </div>
     <div class="dashboard-card-content">
-      <input
+      <v-text-field
         v-model="code"
-        class="voucher-input bordered"
-        type="text"
-        placeholder="Voucher Code"
+        class="voucher-input-field"
+        label="Voucher Code"
         :disabled="loading"
         @keyup.enter="onRedeem"
+        variant="outlined"
+        color="primary"
+        hide-details="auto"
+        density="comfortable"
+        :append-inner-icon="code ? 'mdi-close' : ''"
+        @click:append-inner="code = ''"
       />
       <v-btn
         color="primary"
         :loading="loading"
-        :disabled="loading"
-        class="redeem-btn action-btn"
+        :disabled="loading || !code.trim()"
+        class="redeem-btn"
         @click="onRedeem"
         prepend-icon="mdi-gift"
       >
         Redeem
       </v-btn>
+      <div v-if="successMessage" class="success-message mt-3">{{ successMessage }}</div>
+      <div v-if="errorMessage" class="error-message mt-3">{{ errorMessage }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { userService } from '../../utils/userService'
+import { useUserStore } from '../../stores/user'
+import { api } from '../../utils/api'
+import type { ApiResponse } from '../../utils/authService'
 
 interface Voucher {
   id: number | string
@@ -41,24 +52,31 @@ interface Voucher {
   iconColor?: string
 }
 
-const props = defineProps<{ vouchers: Voucher[] }>()
-
 const code = ref('')
 const loading = ref(false)
+const successMessage = ref('')
+const errorMessage = ref('')
+const userStore = useUserStore()
 
-function onRedeem() {
-  if (!code.value.trim()) {
-    // For demo, treat any code as success
-    code.value = ''
-  }
+async function onRedeem() {
+  if (!code.value.trim()) return
   loading.value = true
-  // Simulate async redeem
-  setTimeout(() => {
-    loading.value = false
-    // For demo, treat any code as success
+  successMessage.value = ''
+  errorMessage.value = ''
+  try {
+    await userService.redeemVoucher(code.value.trim())
     code.value = ''
-  }, 1200)
-  emit('redeem', code.value)
+    successMessage.value = 'Voucher redeemed successfully!'
+    // Fetch updated balance
+    const res = await api.get<ApiResponse<{ balance_usd: number; debt_usd: number }>>('/v1/user/balance', { requiresAuth: true })
+    if (userStore.user) {
+      userStore.user.credit_card_balance = res.data.data.balance_usd
+    }
+  } catch (err: any) {
+    errorMessage.value = err?.response?.data?.message || 'Failed to redeem voucher.'
+  } finally {
+    loading.value = false
+  }
 }
 
 function isExpired(expiryDate: string) {
@@ -67,8 +85,6 @@ function isExpired(expiryDate: string) {
   const exp = new Date(expiryDate)
   return exp < now
 }
-
-const emit = defineEmits(['redeem'])
 </script>
 
 <script lang="ts">
@@ -82,8 +98,8 @@ export default {
   background: #181f35;
   border-radius: 1.25rem;
   border: 1.5px solid #334155;
-  max-width: 520px;
-  margin: 0;
+  max-width: 50rem;
+  margin-left: 0;
   padding: 2.2rem 2.5rem 2.2rem 2.5rem;
   box-shadow: 0 4px 32px 0 rgba(0,0,0,0.12);
   display: flex;
@@ -92,41 +108,56 @@ export default {
 .dashboard-card-header {
   margin-bottom: 1.5rem;
   width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
 }
 .dashboard-card-title {
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.single-line {
+  white-space: nowrap;
 }
 .dashboard-card-subtitle {
   font-size: 1.05rem;
   color: #60a5fa;
   margin-bottom: 0.5rem;
+  margin-left: 1.5rem;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dashboard-card-content {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  align-items: stretch;
 }
-.voucher-input {
+.voucher-input-field {
   width: 100%;
-  padding: 0.7rem 1.1rem;
+}
+.redeem-btn {
+  max-width: 12rem;
   font-size: 1.1rem;
-  background: #232f47;
-  color: #CBD5E1;
-  margin-bottom: 1.3rem;
-}
-.voucher-input.bordered {
-  border: 1.5px solid #334155;
   border-radius: 0.7rem;
-  outline: none;
-  transition: border-color 0.15s;
+  margin-top: 0.2rem;
 }
-.voucher-input.bordered:focus {
-  border-color: #60a5fa;
+.success-message {
+  color: #10B981;
+  font-weight: 500;
+  font-size: 1rem;
 }
-.redeem-btn.action-btn {
-  margin-top: 1.2rem;
-  font-size: 1.1rem;
-  padding: 0.9rem 0;
-  border-radius: 0.7rem;
+.error-message {
+  color: #EF4444;
+  font-weight: 500;
+  font-size: 1rem;
 }
 </style>

@@ -43,6 +43,7 @@ import ErrorBoundary from './components/ErrorBoundary.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import UnifiedBackground from './components/UnifiedBackground.vue'
 import FloatingClouds from './components/FloatingClouds.vue'
+import { useDeploymentEvents } from './composables/useDeploymentEvents'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -85,6 +86,8 @@ onMounted(async () => {
     
     // Add a small delay to show loading state
     await new Promise(resolve => setTimeout(resolve, 500))
+    // Call the composable to enable deployment events globally
+    useDeploymentEvents()
   } catch (error) {
     console.error('Failed to initialize authentication:', error)
   } finally {

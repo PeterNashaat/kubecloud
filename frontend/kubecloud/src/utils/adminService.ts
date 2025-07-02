@@ -50,6 +50,15 @@ export interface DeleteUserResponse {
   message: string
 }
 
+export interface Invoice {
+  id: number
+  user_id: number
+  total: number
+  nodes: any[]
+  tax: number
+  created_at: string
+}
+
 // Admin service class
 export class AdminService {
   private static instance: AdminService
@@ -117,6 +126,16 @@ export class AdminService {
       errorMessage: 'Failed to load vouchers'
     })
     return response.data.data.vouchers
+  }
+
+  // List all invoices (requires admin auth)
+  async listInvoices(): Promise<Invoice[]> {
+    const response = await api.get<ApiResponse<{ invoices: Invoice[] }>>('/v1/invoices', {
+      requiresAuth: true,
+      showNotifications: true,
+      errorMessage: 'Failed to load invoices'
+    })
+    return response.data.data.invoices
   }
 }
 

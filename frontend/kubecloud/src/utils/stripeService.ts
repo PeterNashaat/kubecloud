@@ -60,7 +60,24 @@ class StripeService {
     return this.stripe
   }
 
-  // Create a payment method from card details
+  // Create a token from card details (for legacy or backend expecting 'tok_' tokens)
+  // Use this when your backend expects a token id (starts with 'tok_') instead of a payment method id (starts with 'pm_')
+  async createToken(cardElement: any, billingDetails?: any): Promise<string> {
+    const stripe = await this.getStripe();
+    const { token, error } = await stripe.createToken(cardElement, billingDetails);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!token) {
+      throw new Error('Token creation failed');
+    }
+    
+    return token.id; // This will be a 'tok_...' string
+  }
+
+  // Create a payment method from card details (for PaymentMethod id 'pm_...')
+  // Use this when your backend expects a payment method id (starts with 'pm_')
   async createPaymentMethod(cardElement: any, billingDetails?: any): Promise<PaymentMethod> {
     const stripe = await this.getStripe()
     
@@ -73,7 +90,8 @@ class StripeService {
     if (error) {
       throw new Error(error.message)
     }
-
+      console.log({paymentMethod});
+      
     return paymentMethod as PaymentMethod
   }
 

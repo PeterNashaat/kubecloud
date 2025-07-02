@@ -34,6 +34,7 @@ const adminNavItems = [
   { key: 'users', title: 'Users', icon: 'mdi-account-group' },
   { key: 'vouchers', title: 'Vouchers', icon: 'mdi-ticket-percent' },
   { key: 'system', title: 'System', icon: 'mdi-cog' },
+  { key: 'invoices', title: 'Invoices', icon: 'mdi-file-document-outline' },
 ]
 
 </script>

@@ -68,6 +68,15 @@ export interface NodesResponse {
   nodes: Node[]
 }
 
+export interface UserInvoice {
+  id: number
+  user_id: number
+  total: number
+  nodes: any[]
+  tax: number
+  created_at: string
+}
+
 export class UserService {
   // List all available nodes
   async listNodes(filters?: any) {
@@ -111,6 +120,35 @@ export class UserService {
   // Replace this stub with a real API call to your backend that returns { clientSecret: string }
   async createPaymentIntent({ amount }: { amount: number }): Promise<{ clientSecret: string }> {
     throw new Error('UserService.createPaymentIntent is not implemented. Please implement this method to call your backend and return { clientSecret: string }.')
+  }
+
+  // List all invoices for the current user
+  async listUserInvoices(): Promise<UserInvoice[]> {
+    const response = await api.get<{ data: { invoices: UserInvoice[] } }>(
+      '/v1/user/invoice/',
+      { requiresAuth: true, showNotifications: true, errorMessage: 'Failed to load invoices' }
+    )
+    return response.data.data.invoices
+  }
+
+  // Download a specific invoice as PDF
+  async downloadInvoice(invoiceId: number): Promise<Blob> {
+    // The backend should return application/pdf for this endpoint
+    const response = await api.get(
+      `/v1/user/invoice/${invoiceId}`,
+      { requiresAuth: true, errorMessage: 'Failed to download invoice' }
+    )
+    return response.data as Blob
+  }
+
+  // Redeem a voucher
+  async redeemVoucher(voucherCode: string): Promise<any> {
+    return api.put(`/v1/user/redeem/${voucherCode}`, {}, {
+      requiresAuth: true,
+      showNotifications: true,
+      successMessage: 'Voucher redeemed successfully',
+      errorMessage: 'Failed to redeem voucher'
+    })
   }
 }
 

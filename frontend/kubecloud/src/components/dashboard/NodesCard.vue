@@ -262,6 +262,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
+import { useNotificationStore } from '../../stores/notifications'
 
 const router = useRouter()
 const {
@@ -275,6 +276,8 @@ const {
   healthyNodes,
   unhealthyNodes
 } = useNodeManagement()
+
+const notificationStore = useNotificationStore()
 
 // Dialog state
 const showUnreserveDialog = ref(false)
@@ -296,13 +299,15 @@ const confirmUnreserve = (node: RentedNode) => {
 
 const handleUnreserve = async () => {
   if (!selectedNode.value?.rentContractId) return
-  
   unreservingNode.value = selectedNode.value.rentContractId.toString()
   try {
     await unreserveNode(selectedNode.value.rentContractId.toString())
     showUnreserveDialog.value = false
     selectedNode.value = null
+    notificationStore.success('Success', 'Node unreserved successfully.')
+    await fetchRentedNodes()
   } catch (err) {
+    notificationStore.error('Error', 'Failed to unreserve node. Please try again.')
     console.error('Failed to unreserve node:', err)
   } finally {
     unreservingNode.value = null
@@ -346,6 +351,10 @@ function getAvailableStorage(node: RentedNode) {
   return Math.max(getTotalStorage(node) - getUsedStorage(node), 0)
 }
 </script>
+
+export default {
+  name: 'NodesCard'
+}
 
 <style scoped>
 .nodes-card {

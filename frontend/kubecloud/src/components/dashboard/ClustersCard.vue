@@ -296,3 +296,7 @@ const goToDeployCluster = () => {
   }
 }
 </style>
+
+export default {
+  name: 'ClustersCard'
+}

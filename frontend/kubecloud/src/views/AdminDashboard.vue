@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest } from '@/utils/adminService'
+import { ref, computed, onMounted, defineAsyncComponent, type Ref } from 'vue'
+import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest, type Invoice } from '@/utils/adminService'
 import AdminUsersTable from '@/components/AdminUsersTable.vue'
 import AdminStatsCards from '@/components/AdminStatsCards.vue'
 import AdminManualCredit from '@/components/AdminManualCredit.vue'
 import AdminVouchersSection from '@/components/AdminVouchersTable.vue'
 import AdminClustersSection from '@/components/AdminClustersSection.vue'
 import AdminSystemSection from '@/components/AdminSystemCard.vue'
+import AdminInvoicesTable from '@/components/AdminInvoicesTable.vue'
 
 // Use defineAsyncComponent to avoid TypeScript issues
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
@@ -146,13 +147,21 @@ const tabs = [
   { key: 'clusters', label: 'Clusters' },
   { key: 'system', label: 'System' },
   { key: 'vouchers', label: 'Vouchers' },
+  { key: 'invoices', label: 'Invoices' },
 ]
+
+const invoices: Ref<Invoice[]> = ref([])
 
 onMounted(async () => {  
   // Load initial data
   await loadUsers()
   await loadVouchers()
+  await loadInvoices()
 })
+
+async function loadInvoices() {
+  invoices.value = await adminService.listInvoices()
+}
 </script>
 
 <template>
@@ -190,6 +199,7 @@ onMounted(async () => {
             @update:voucherCount="voucherCount = $event"
             @update:voucherExpiry="voucherExpiry = $event"
           />
+          <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
           <v-dialog v-model="creditDialog" max-width="500" persistent>
             <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">
               <v-card-title class="text-h6 font-weight-bold mb-2 text-center">Manual Credit</v-card-title>

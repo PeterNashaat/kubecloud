@@ -48,6 +48,10 @@ interface SshKey {
 const props = defineProps<{ sshKeys: SshKey[] }>()
 </script>
 
+export default {
+  name: 'SshKeysCard'
+}
+
 <style scoped>
 .ssh-keys-list {
   display: flex;

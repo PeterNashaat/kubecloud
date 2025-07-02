@@ -15,19 +15,19 @@
           <button
             v-for="preset in presets"
             :key="preset"
-            :class="{ selected: amount === preset }"
+            :class="{ selected: typeof amount === 'number' && amount === preset }"
             @click="selectAmount(preset)"
             type="button"
           >{{ preset }}</button>
-          <template v-if="amount !== 'custom'">
+          <template v-if="typeof amount !== 'string' || amount !== 'custom'">
             <button
-              :class="{ selected: amount === 'custom' }"
+              :class="{ selected: typeof amount === 'string' && amount === 'custom' }"
               @click="selectAmount('custom')"
               type="button"
             >Custom</button>
           </template>
           <input
-            v-if="amount === 'custom'"
+            v-if="typeof amount === 'string' && amount === 'custom'"
             type="number"
             min="1"
             class="amount-input"
@@ -38,28 +38,7 @@
         </div>
       </div>
       <div class="card-details-row">
-        <input
-          type="text"
-          class="card-input bordered"
-          v-model="cardNumber"
-          placeholder="Card Number"
-          maxlength="19"
-        />
-        <input
-          type="text"
-          class="card-input short bordered"
-          v-model="expiryDate"
-          placeholder="MM/YY"
-          maxlength="5"
-          @input="formatExpiryDate"
-        />
-        <input
-          type="text"
-          class="card-input short bordered"
-          v-model="cvv"
-          placeholder="CVV"
-          maxlength="4"
-        />
+        <div id="stripe-card-element" class="stripe-card-element"></div>
       </div>
       <v-btn
         class="action-btn"
@@ -76,33 +55,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, type Ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import { userService } from '../../utils/userService'
 import { api } from '../../utils/api'
 import type { ApiResponse } from '../../utils/authService'
 import type { User } from '../../stores/user'
+import { loadStripe } from '@stripe/stripe-js'
+import type { StripeElementType, StripeElements, StripeCardElement, StripeElementsOptions } from '@stripe/stripe-js'
+import { stripeService } from '../../utils/stripeService'
 
 const { user } = storeToRefs(useUserStore())
 
 const presets = [5, 10, 20, 50]
-const amount = ref<number | 'custom'>(5)
+const amount: Ref<number | 'custom'> = ref(5)
 const customAmount = ref<number | null>(null)
 const loading = ref(false)
 
-// Card details
-const cardNumber = ref('')
-const expiryDate = ref('')
-const cvv = ref('')
+// Stripe Elements
+const stripe = ref<any>(null)
+const elements = ref<StripeElements | null>(null)
+const cardElement = ref<StripeCardElement | null>(null)
+const stripeLoaded = ref(false)
 
-// Form validation
+onMounted(async () => {
+  await stripeService.initialize()
+  stripe.value = await stripeService.getStripe()
+  elements.value = stripe.value.elements()
+  const container = document.getElementById('stripe-card-element')
+  if (elements.value && container) {
+    cardElement.value = elements.value.create('card', {
+      style: { base: { color: '#CBD5E1', fontFamily: 'Inter, sans-serif', fontSize: '16px' } },
+      hidePostalCode: true
+    })
+    cardElement.value.mount('#stripe-card-element')
+    stripeLoaded.value = true
+  } else {
+    errorMessage.value = 'Failed to initialize payment form. Please refresh or contact support.'
+  }
+})
+
 const isFormValid = computed(() => {
   const selectedAmount = getSelectedAmount()
-  return selectedAmount && selectedAmount > 0 && 
-         cardNumber.value.replace(/\s/g, '').length >= 13 &&
-         expiryDate.value.length === 5 &&
-         cvv.value.length >= 3
+  return selectedAmount && selectedAmount > 0 && stripeLoaded.value
 })
 
 function selectAmount(val: number | 'custom') {
@@ -110,65 +106,47 @@ function selectAmount(val: number | 'custom') {
   if (val !== 'custom') customAmount.value = null
 }
 
-function formatCardNumber() {
-  let value = cardNumber.value.replace(/\s/g, '')
-  value = value.replace(/\D/g, '')
-  value = value.replace(/(\d{4})(?=\d)/g, '$1 ')
-  cardNumber.value = value
-}
-
-function formatExpiryDate() {
-  let value = expiryDate.value.replace(/\D/g, '')
-  if (value.length >= 2) {
-    value = value.substring(0, 2) + '/' + value.substring(2, 4)
-  }
-  expiryDate.value = value
-}
-
 async function chargeBalance() {
   loading.value = true
-  
   const selectedAmount = getSelectedAmount()
   if (!selectedAmount || !isFormValid.value) {
+    loading.value = false
     return
   }
-
   try {
-    // For demo purposes, we'll use a mock payment method ID
-    // In production, this would be created through Stripe
-    const mockPaymentMethodId = 'pm_' + Math.random().toString(36).substr(2, 9)
-    
+    // Create token with Stripe (for backend expecting 'tok_' id)
+    const tokenId = await stripeService.createToken(cardElement.value)
     await userService.chargeBalance({
       card_type: 'card',
-      payment_method_id: mockPaymentMethodId,
+      payment_method_id: tokenId, // This is now a 'tok_' id
       amount: Number(selectedAmount)
     })
-    
     // Clear the form
-    cardNumber.value = ''
-    expiryDate.value = ''
-    cvv.value = ''
+    if (cardElement.value) cardElement.value.clear()
     amount.value = 5
     customAmount.value = null
-    
     // Refresh user data to get updated balance
     const userStore = useUserStore()
     try {
       const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
       userStore.user = userRes.data.data.user
     } catch (error) {
-      console.error('Failed to refresh user data:', error)
+      // ignore
     }
-    
   } catch (err: any) {
-    console.error('Failed to charge balance:', err)
   } finally {
     loading.value = false
   }
 }
 
 function getSelectedAmount() {
-  return amount.value === 'custom' ? customAmount.value : amount.value
+  if (typeof amount.value === 'string' && amount.value === 'custom') {
+    return customAmount.value
+  }
+  if (typeof amount.value === 'number') {
+    return amount.value
+  }
+  return null
 }
 </script>
 
@@ -177,7 +155,7 @@ function getSelectedAmount() {
   background: #181f35;
   border-radius: 1.25rem;
   border: 1.5px solid #334155;
-  max-width: 520px;
+  max-width: 50rem;
   margin: 0;
   padding: 2.2rem 2.5rem 2.2rem 2.5rem;
   box-shadow: 0 4px 32px 0 rgba(0,0,0,0.12);
@@ -255,30 +233,35 @@ function getSelectedAmount() {
   gap: 1rem;
   margin-bottom: 1.3rem;
 }
-.card-input {
-  padding: 0.7rem 1.1rem;
-  font-size: 1.1rem;
-  min-width: 0;
-  width: 200px;
+.stripe-card-element {
   background: #232f47;
-  color: #CBD5E1;
-}
-.card-input.short {
-  width: 90px;
-}
-.card-input.bordered {
   border: 1.5px solid #334155;
   border-radius: 0.7rem;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.card-input.bordered:focus {
-  border-color: #60a5fa;
+  padding: 0.7rem 1.1rem;
+  font-size: 1.1rem;
+  color: #CBD5E1;
+  margin-bottom: 1.3rem;
+  min-height: 44px;
+  min-width: 29rem;
+  display: block;
 }
 .action-btn {
   margin-top: 1.2rem;
   font-size: 1.1rem;
-  padding: 0.9rem 0;
   border-radius: 0.7rem;
 }
+.success-message {
+  color: #10B981;
+  font-weight: 500;
+  font-size: 1rem;
+}
+.error-message {
+  color: #EF4444;
+  font-weight: 500;
+  font-size: 1rem;
+}
 </style>
+
+export default {
+  name: 'PaymentCard'
+}

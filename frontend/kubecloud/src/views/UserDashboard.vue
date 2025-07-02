@@ -10,6 +10,7 @@ import ProfileCard from '../components/dashboard/ProfileCard.vue'
 import OverviewCard from '../components/dashboard/OverviewCard.vue'
 import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
+import { userService } from '../utils/userService'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
@@ -17,11 +18,19 @@ const userName = computed(() => userStore.user?.username || 'User')
 // Initialize selected section from localStorage or default to 'overview'
 const selected = ref('overview')
 
-onMounted(() => {
+onMounted(async () => {
   const savedSection = localStorage.getItem('dashboard-section')
   if (savedSection) {
     selected.value = savedSection
   }
+  // Fetch real invoices for billing history
+  const invoices = await userService.listUserInvoices()
+  billingHistory.value = invoices.map(inv => ({
+    id: inv.id,
+    date: inv.created_at,
+    description: `Invoice #${inv.id}`,
+    amount: inv.total
+  }))
 })
 
 const clusters = ref([
@@ -29,15 +38,16 @@ const clusters = ref([
   { id: 2, name: 'Staging Cluster', status: 'stopped', nodes: 2, region: 'US West' },
   { id: 3, name: 'Development Cluster', status: 'running', nodes: 1, region: 'EU West' }
 ])
-const billingHistory = ref([
-  { id: 1, date: '2024-01-15', description: 'Production Cluster Usage', amount: 45.50 },
-  { id: 2, date: '2024-01-10', description: 'Staging Cluster Usage', amount: 22.30 },
-  { id: 3, date: '2024-01-05', description: 'Account Credit', amount: -50.00 }
-])
-const paymentMethods = ref([
-  { id: 1, name: 'Visa ending in 4242', maskedNumber: '**** **** **** 4242', icon: 'mdi-credit-card', iconColor: '#1E40AF' },
-  { id: 2, name: 'PayPal', maskedNumber: 'john.doe@example.com', icon: 'mdi-paypal', iconColor: '#0070BA' }
-])
+
+interface Bill {
+  id: string | number
+  date: string
+  description: string
+  amount: number
+}
+
+const billingHistory = ref<Bill[]>([])
+
 const sshKeys = ref([
   { id: 1, name: 'My Laptop', fingerprint: 'SHA256:Abc123...Xyz789', addedDate: '2024-01-01' },
   { id: 2, name: 'Work PC', fingerprint: 'SHA256:Def456...789', addedDate: '2024-01-05' }
@@ -45,12 +55,6 @@ const sshKeys = ref([
 const vouchers = ref([
   { id: 1, name: 'Welcome Bonus', description: 'New user welcome credit', amount: '$50.00', expiryDate: '2024-12-31', icon: 'mdi-gift', iconColor: '#F472B6' },
   { id: 2, name: 'Referral Credit', description: 'Friend referral bonus', amount: '$25.00', expiryDate: '2024-06-30', icon: 'mdi-account-multiple', iconColor: '#38BDF8' }
-])
-const recentActivity = ref([
-  { id: 1, text: 'Production cluster scaled to 3 nodes', time: '2 hours ago', icon: 'mdi-server', iconColor: '#38BDF8' },
-  { id: 2, text: 'Payment of $45.50 processed', time: '1 day ago', icon: 'mdi-credit-card', iconColor: '#3B82F6' },
-  { id: 3, text: 'New SSH key added', time: '2 days ago', icon: 'mdi-key', iconColor: '#F472B6' },
-  { id: 4, text: 'Staging cluster stopped', time: '3 days ago', icon: 'mdi-stop-circle', iconColor: '#F59E0B' }
 ])
 const totalSpent = computed(() => {
   return billingHistory.value
@@ -99,14 +103,13 @@ function redeemVoucher(voucher: any) {
               <OverviewCard
                 v-if="selected === 'overview'"
                 :clusters="clusters"
-                :recentActivity="recentActivity"
                 :sshKeys="sshKeys"
                 :totalSpent="totalSpent"
                 @navigate="handleNavigate"
               />
               <ClustersCard v-if="selected === 'clusters'" :clusters="clusters" />
               <BillingCard v-if="selected === 'billing'" :billingHistory="billingHistory" />
-              <PaymentCard v-if="selected === 'payment'" :paymentMethods="paymentMethods" />
+              <PaymentCard v-if="selected === 'payment'" />
               <SshKeysCard v-if="selected === 'ssh'" :sshKeys="sshKeys" />
               <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
               <NodesCard v-if="selected === 'nodes'" />
