@@ -1284,7 +1284,8 @@ const docTemplate = `{
                 "confirm_password",
                 "email",
                 "name",
-                "password"
+                "password",
+                "ssh_key"
             ],
             "properties": {
                 "confirm_password": {
@@ -1302,6 +1303,9 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 64,
                     "minLength": 8
+                },
+                "ssh_key": {
+                    "type": "string"
                 }
             }
         },
@@ -1445,6 +1449,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "ssh_key": {
+                    "type": "string"
                 },
                 "stripe_customer_id": {
                     "type": "string"

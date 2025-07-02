@@ -3,6 +3,8 @@ package internal
 import (
 	"math/rand"
 	"net/mail"
+
+	"golang.org/x/crypto/ssh"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -36,4 +38,10 @@ func GenerateRandomCode() int {
 func isValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
+}
+
+// ValidateSSH used for validating ssh keys
+func ValidateSSH(sshKey string) error {
+	_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sshKey))
+	return err
 }

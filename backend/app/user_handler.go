@@ -58,6 +58,7 @@ type RegisterInput struct {
 	Email           string `json:"email" binding:"required,email"`
 	Password        string `json:"password" binding:"required,min=8,max=64"`
 	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
+	SSHKey          string `json:"ssh_key" binding:"required,ssh_key"`
 }
 
 // LoginInput struct for login handler
@@ -148,6 +149,11 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateSSH(request.SSHKey); err != nil {
+		Error(c, http.StatusBadRequest, "Validation Error", "invalid ssh key")
+		return
+	}
+
 	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
 	if getErr != gorm.ErrRecordNotFound {
@@ -155,7 +161,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 			Error(c, http.StatusConflict, "Conflict", "user already registered")
 			return
 		}
-
 	}
 
 	code := internal.GenerateRandomCode()
@@ -178,34 +183,19 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	isAdmin := internal.Contains(h.config.Admins, request.Email)
 
-	mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to setup user on TFChain")
-		InternalServerError(c)
-		return
-	}
-	customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
 	user := models.User{
-		StripeCustomerID: customer.ID,
-		Username:         request.Name,
-		Email:            request.Email,
-		Password:         hashedPassword,
-		Admin:            isAdmin,
-		Code:             code,
-		Mnemonic:         mnemonic,
+		Username: request.Name,
+		Email:    request.Email,
+		Password: hashedPassword,
+		Code:     code,
+		Verified: existingUser.Verified,
+		SSHKey:   request.SSHKey,
+		Admin:    isAdmin,
 	}
 
-	// If user exists but not verified
 	if getErr != gorm.ErrRecordNotFound {
-		if existingUser.Verified {
+		if !user.Verified {
 			user.ID = existingUser.ID
-			user.UpdatedAt = time.Now()
 			err = h.db.UpdateUserByID(&user)
 			if err != nil {
 				log.Error().Err(err).Send()
@@ -217,6 +207,22 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	// create user model in db
 	if getErr != nil {
+		mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to setup user on TFChain")
+			InternalServerError(c)
+			return
+		}
+		customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
+		if err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+
+		user.Mnemonic = mnemonic
+		user.StripeCustomerID = customer.ID
+
 		err = h.db.RegisterUser(&user)
 		if err != nil {
 			log.Error().Err(err).Send()
