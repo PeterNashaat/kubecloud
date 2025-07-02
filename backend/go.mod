@@ -99,4 +99,3 @@ require (
 
 exclude github.com/threefoldtech/zos v0.5.6-0.20240902110349-172a0a29a6ee
 
-replace github.com/threefoldtech/tfgrid-sdk-go/grid-client => /home/omar/github.com/threefoldtech/tfgrid-sdk-go/grid-client
