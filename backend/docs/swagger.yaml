@@ -124,11 +124,14 @@ definitions:
         maxLength: 64
         minLength: 8
         type: string
+      ssh_key:
+        type: string
     required:
     - confirm_password
     - email
     - name
     - password
+    - ssh_key
     type: object
   app.RegisterResponse:
     properties:
@@ -220,6 +223,8 @@ definitions:
         items:
           type: integer
         type: array
+      ssh_key:
+        type: string
       stripe_customer_id:
         type: string
       updated_at:

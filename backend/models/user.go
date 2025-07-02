@@ -16,6 +16,7 @@ type User struct {
 	CreditCardBalance float64   `json:"credit_card_balance" gorm:"default:0"` // money from credit card
 	CreditedBalance   float64   `json:"credited_balance" gorm:"default:0"`    // manually added by admin or from vouchers
 	Mnemonic          string    `json:"-" gorm:"column:mnemonic"`
+	SSHKey            string    `json:"ssh_key"`
 	Debt              float64   `json:"debt"`
 }
 
