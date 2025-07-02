@@ -23,4 +23,11 @@ type DB interface {
 	UpdateInvoicePDF(id int, data []byte) error
 	CreateUserNode(userNode *UserNodes) error
 	ListUserNodes(userID int) ([]UserNodes, error)
+	// Notification methods
+	CreateNotification(notification *Notification) error
+	GetUserNotifications(userID string, limit, offset int) ([]Notification, error)
+	MarkNotificationAsRead(notificationID uint, userID string) error
+	MarkAllNotificationsAsRead(userID string) error
+	GetUnreadNotificationCount(userID string) (int64, error)
+	DeleteNotification(notificationID uint, userID string) error
 }

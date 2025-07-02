@@ -5,7 +5,10 @@ import (
 	"kubecloud/internal"
 	"kubecloud/models"
 	"net/http"
+	"net/url"
+	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,37 +17,29 @@ import (
 	proxyTypes "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
 )
 
-// ListNodesInput struct holds data required for listing nodes
-type ListNodesInput struct {
-	Filter *proxyTypes.NodeFilter `json:"filter"`
-	Limit  *proxyTypes.Limit      `json:"limit"`
-}
-
 // ListNodesHandler requests all nodes from gridproxy
 func (h *Handler) ListNodesHandler(c *gin.Context) {
-	//TODO: convert this to param
-	var request ListNodesInput
+	query := c.Request.URL.Query()
 
-	if err := c.ShouldBindJSON(&request); err != nil {
-		Error(c, http.StatusBadRequest, "Bad Request", "Invalid filter/limit payload")
+	filter := proxyTypes.NodeFilter{}
+	err := queryParamsToStruct(query, &filter)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "Bad Request", "Invalid filter params")
 		return
 	}
 
-	filter := proxyTypes.NodeFilter{}
-	if request.Filter != nil {
-		filter = *request.Filter
+	limit := proxyTypes.DefaultLimit()
+	err = queryParamsToStruct(query, &limit)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "Bad Request", "Invalid limit params")
+		return
 	}
 
+	// Force Healthy and Rentable to true
 	healthy := true
 	rentable := true
-
 	filter.Healthy = &healthy
 	filter.Rentable = &rentable
-
-	limit := proxyTypes.DefaultLimit()
-	if request.Limit != nil {
-		limit = *request.Limit
-	}
 
 	nodes, count, err := h.proxyClient.Nodes(c.Request.Context(), filter, limit)
 	if err != nil {
@@ -235,4 +230,86 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	}
 	Success(c, http.StatusOK, "Node unreserved successfully", nil)
 
+}
+
+func queryParamsToStruct(query url.Values, result interface{}) error {
+	v := reflect.ValueOf(result).Elem()
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+
+		paramName := field.Tag.Get("schema")
+		if paramName == "" {
+			paramName = field.Name
+		}
+		paramName = strings.Split(paramName, ",")[0]
+
+		paramValues, ok := query[paramName]
+		if !ok || len(paramValues) == 0 {
+			continue
+		}
+
+		switch value.Kind() {
+		case reflect.Slice:
+			elemType := value.Type().Elem()
+			slice := reflect.MakeSlice(value.Type(), 0, len(paramValues))
+			for _, pv := range paramValues {
+				elem := reflect.New(elemType).Elem()
+				if err := setValueFromString(elem, pv); err != nil {
+					return err
+				}
+				slice = reflect.Append(slice, elem)
+			}
+			value.Set(slice)
+
+		case reflect.Ptr:
+			ptr := reflect.New(value.Type().Elem())
+			if err := setValueFromString(ptr.Elem(), paramValues[0]); err != nil {
+				return err
+			}
+			value.Set(ptr)
+
+		default:
+			if err := setValueFromString(value, paramValues[0]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func setValueFromString(v reflect.Value, s string) error {
+	switch v.Kind() {
+	case reflect.String:
+		v.SetString(s)
+	case reflect.Bool:
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return err
+		}
+		v.SetBool(b)
+	case reflect.Int, reflect.Int64, reflect.Int32:
+		i, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return err
+		}
+		v.SetInt(i)
+	case reflect.Uint, reflect.Uint64, reflect.Uint32:
+		u, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return err
+		}
+		v.SetUint(u)
+	case reflect.Float32, reflect.Float64:
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return err
+		}
+		v.SetFloat(f)
+	default:
+		return fmt.Errorf("unsupported kind: %s", v.Kind())
+	}
+	return nil
 }

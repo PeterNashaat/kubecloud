@@ -28,10 +28,16 @@ type Handler struct {
 	substrateClient *substrate.Substrate
 	graphqlClient   graphql.GraphQl
 	firesquidClient graphql.GraphQl
+	redis           *internal.RedisClient
+	sseManager      *internal.SSEManager
 }
 
 // NewHandler create new handler
-func NewHandler(tokenManager internal.TokenManager, db models.DB, config internal.Configuration, mailService internal.MailService, gridproxy proxy.Client, substrateClient *substrate.Substrate, graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl) *Handler {
+func NewHandler(tokenManager internal.TokenManager, db models.DB,
+	config internal.Configuration, mailService internal.MailService,
+	gridproxy proxy.Client, substrateClient *substrate.Substrate,
+	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
+	redis *internal.RedisClient, sseManager *internal.SSEManager) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -41,6 +47,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB, config interna
 		substrateClient: substrateClient,
 		graphqlClient:   graphqlClient,
 		firesquidClient: firesquidClient,
+		redis:           redis,
+		sseManager:      sseManager,
 	}
 }
 
@@ -116,7 +124,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	}
 
 	code := internal.GenerateRandomCode()
-	log.Debug().Int("generated_code", code).Send()
 	subject, body := h.mailService.SignUpMailContent(code, h.config.MailSender.Timeout, request.Name, h.config.Server.Host)
 
 	err := h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
@@ -161,7 +168,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	// If user exists but not verified
 	if getErr != gorm.ErrRecordNotFound {
-		if !existingUser.Verified {
+		if existingUser.Verified {
 			user.ID = existingUser.ID
 			user.UpdatedAt = time.Now()
 			err = h.db.UpdateUserByID(&user)

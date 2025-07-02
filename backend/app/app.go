@@ -16,14 +16,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 	"github.com/stripe/stripe-go/v82"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
 // App holds all configurations for the app
 type App struct {
-	router     *gin.Engine
-	httpServer *http.Server
-	config     internal.Configuration
-	handlers   Handler
+	router        *gin.Engine
+	httpServer    *http.Server
+	config        internal.Configuration
+	handlers      Handler
+	db            *sqlite.Sqlite
+	redis         *internal.RedisClient
+	sseManager    *internal.SSEManager
+	workerManager *internal.WorkerManager
+	gridClient    deployer.TFPluginClient
+	appCancel     context.CancelFunc
 }
 
 // NewApp create new instance of the app with all configs
@@ -70,15 +77,50 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to connect to firesquid client: %w", err)
 	}
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient)
+	// handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient)
+	redisClient, err := internal.NewRedisClient(config.Redis)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create Redis client")
+		return nil, fmt.Errorf("failed to create Redis client: %w", err)
+	}
+
+	sseManager := internal.NewSSEManager(redisClient, db)
+
+	// start gridclient
+	gridClient, err := deployer.NewTFPluginClient(
+		config.Grid.Mnemonic,
+		deployer.WithNetwork(config.Grid.Network),
+		// TODO: remove this after testing
+		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
+		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
+	}
+
+	// Create an app-level context for coordinating shutdown
+	_, appCancel := context.WithCancel(context.Background())
+
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
+
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager)
 
 	app := &App{
-		router:   router,
-		config:   config,
-		handlers: *handler,
+		router:        router,
+		config:        config,
+		handlers:      *handler,
+		redis:         redisClient,
+		db:            db,
+		sseManager:    sseManager,
+		workerManager: workerManager,
+		gridClient:    gridClient,
+		appCancel:     appCancel,
 	}
 
 	app.registerHandlers()
+
+	app.workerManager.Start()
 
 	return app, nil
 
@@ -125,8 +167,8 @@ func (app *App) registerHandlers() {
 			{
 				authGroup.GET("/", app.handlers.GetUserHandler)
 				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
-				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
+				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.POST("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
 				authGroup.GET("/balance", app.handlers.GetUserBalance)
@@ -135,6 +177,25 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
 			}
 
+		}
+
+		deployerGroup := v1.Group("")
+		deployerGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
+		{
+			// Deployment routes
+			deployerGroup.POST("/deploy", app.handlers.DeployHandler)
+			deployerGroup.GET("/events", app.sseManager.HandleSSE)
+
+			// Task routes
+			// deployerGroup.GET("/tasks", app.handlers.ListUserTasksHandler)
+			// deployerGroup.GET("/tasks/:task_id", app.handlers.GetTaskStatusHandler)
+
+			// Notification routes
+			deployerGroup.GET("/notifications", app.handlers.GetNotificationsHandler)
+			deployerGroup.PUT("/notifications/:notification_id/read", app.handlers.MarkNotificationReadHandler)
+			deployerGroup.PUT("/notifications/read-all", app.handlers.MarkAllNotificationsReadHandler)
+			deployerGroup.GET("/notifications/unread-count", app.handlers.GetUnreadNotificationCountHandler)
+			deployerGroup.DELETE("/notifications/:notification_id", app.handlers.DeleteNotificationHandler)
 		}
 
 	}
@@ -157,15 +218,46 @@ func (app *App) Run() error {
 
 	if err := app.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Error().Err(err).Msg("Failed to start server")
+		return err
 	}
 
-	return app.httpServer.ListenAndServe()
+	return nil
 }
 
-// Shutdown gracefully shuts down the server
+// Shutdown gracefully shuts down the server and worker manager
 func (app *App) Shutdown(ctx context.Context) error {
-	if app.httpServer != nil {
-		return app.httpServer.Shutdown(ctx)
+	// First, cancel the app context to signal all components to stop
+	if app.appCancel != nil {
+		app.appCancel()
 	}
+
+	if app.httpServer != nil {
+		if err := app.httpServer.Shutdown(ctx); err != nil {
+			log.Error().Err(err).Msg("Failed to shutdown HTTP server")
+		}
+	}
+
+	if app.workerManager != nil {
+		app.workerManager.Stop()
+	}
+
+	if app.sseManager != nil {
+		app.sseManager.Stop()
+	}
+
+	if app.redis != nil {
+		if err := app.redis.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close Redis connection")
+		}
+	}
+
+	if app.db != nil {
+		if err := app.db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database connection")
+		}
+	}
+
+	app.gridClient.Close()
+
 	return nil
 }
