@@ -34,6 +34,7 @@ type CreditUserResponse struct {
 
 // @Summary Get all users
 // @Description Returns a list of all users
+// @Tags admin
 // @ID get-all-users
 // @Accept json
 // @Produce json
@@ -57,6 +58,7 @@ func (h *Handler) ListUsersHandler(c *gin.Context) {
 
 // @Summary Delete a user
 // @Description Deletes a user from the system
+// @Tags admin
 // @ID delete-user
 // @Accept json
 // @Produce json
@@ -101,6 +103,7 @@ func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 
 // @Summary Generate vouchers
 // @Description Generates a bulk of vouchers
+// @Tags admin
 // @ID generate-vouchers
 // @Accept json
 // @Produce json
@@ -150,6 +153,7 @@ func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 
 // @Summary List vouchers
 // @Description Returns all vouchers in the system
+// @Tags admin
 // @ID list-vouchers
 // @Accept json
 // @Produce json
@@ -173,6 +177,7 @@ func (h *Handler) ListVouchersHandler(c *gin.Context) {
 
 // @Summary Credit user balance
 // @Description Credits a specific user's balance
+// @Tags admin
 // @ID credit-user
 // @Accept json
 // @Produce json

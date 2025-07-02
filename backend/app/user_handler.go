@@ -121,6 +121,7 @@ type UserBalanceResponse struct {
 
 // @Summary Register a user
 // @Description Registers a new user to the system
+// @Tags users
 // @ID register-user
 // @Accept json
 // @Produce json
@@ -233,6 +234,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 // @Summary Verify registration code
 // @Description Verifies the email using the registration code
+// @Tags users
 // @ID verify-register-code
 // @Accept json
 // @Produce json
@@ -303,6 +305,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 
 // @Summary Login user
 // @Description Logs a user into the system
+// @Tags users
 // @ID login-user
 // @Accept json
 // @Produce json
@@ -350,6 +353,7 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 
 // @Summary Refresh access token
 // @Description Refreshes the access token using a valid refresh token
+// @Tags users
 // @ID refresh-token
 // @Accept json
 // @Produce json
@@ -384,6 +388,7 @@ func (h *Handler) RefreshTokenHandler(c *gin.Context) {
 
 // @Summary Forgot password
 // @Description Sends a verification code to the user's email for password reset
+// @Tags users
 // @ID forgot-password
 // @Accept json
 // @Produce json
@@ -445,6 +450,7 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 
 // @Summary Verify forgot password code
 // @Description Verifies the code sent to the user's email for password reset
+// @Tags users
 // @ID verify-forgot-password-code
 // @Accept json
 // @Produce json
@@ -502,6 +508,7 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 
 // @Summary Change password
 // @Description Changes the user's password
+// @Tags users
 // @ID change-password
 // @Accept json
 // @Produce json
@@ -556,6 +563,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 
 // @Summary Charge user balance
 // @Description Charges the user's balance using a payment method
+// @Tags users
 // @ID charge-balance
 // @Accept json
 // @Produce json
@@ -636,6 +644,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 // @Summary Get user details
 // @Description Retrieves all data of the user
+// @Tags users
 // @ID get-user
 // @Produce json
 // @Success 200 {object} models.User "User is retrieved successfully"
@@ -660,6 +669,7 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 
 // @Summary Get user balance
 // @Description Retrieves the user's balance in USD
+// @Tags users
 // @ID get-user-balance
 // @Produce json
 // @Success 200 {object} UserBalanceResponse "Balance fetched successfully"
@@ -689,6 +699,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 
 // @Summary Redeem voucher
 // @Description Redeems a voucher for the user
+// @Tags users
 // @ID redeem-voucher
 // @Param voucher_code path string true "Voucher Code"
 // @Produce json

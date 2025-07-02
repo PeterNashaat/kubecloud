@@ -19,6 +19,9 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
+
+	// Import the generated docs package
+	_ "kubecloud/docs"
 )
 
 // App holds all configurations for the app

@@ -1,3 +1,4 @@
+basePath: /api/v1
 definitions:
   app.APIResponse:
     properties:
@@ -249,6 +250,9 @@ definitions:
     type: object
 info:
   contact: {}
+  description: API documentation for KubeCloud.
+  title: KubeCloud API
+  version: "1.0"
 paths:
   /invoices:
     get:
@@ -270,6 +274,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Get all invoices
+      tags:
+      - invoices
   /user:
     get:
       description: Retrieves all data of the user
@@ -290,6 +296,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Get user details
+      tags:
+      - users
   /user/balance:
     get:
       description: Retrieves the user's balance in USD
@@ -310,6 +318,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Get user balance
+      tags:
+      - users
   /user/balance/charge:
     post:
       consumes:
@@ -343,6 +353,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Charge user balance
+      tags:
+      - users
   /user/change_password:
     put:
       consumes:
@@ -376,6 +388,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Change password
+      tags:
+      - users
   /user/forgot_password:
     post:
       consumes:
@@ -409,6 +423,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Forgot password
+      tags:
+      - users
   /user/forgot_password/verify:
     post:
       consumes:
@@ -438,6 +454,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Verify forgot password code
+      tags:
+      - users
   /user/invoice:
     get:
       consumes:
@@ -460,6 +478,8 @@ paths:
       security:
       - UserMiddleware: []
       summary: Get invoices
+      tags:
+      - invoices
   /user/invoice/{invoice_id}:
     get:
       consumes:
@@ -490,6 +510,8 @@ paths:
       security:
       - UserMiddleware: []
       summary: Download invoice
+      tags:
+      - invoices
   /user/login:
     post:
       consumes:
@@ -523,6 +545,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Login user
+      tags:
+      - users
   /user/nodes:
     get:
       consumes:
@@ -545,6 +569,8 @@ paths:
       security:
       - UserMiddleware: []
       summary: List reserved nodes
+      tags:
+      - nodes
   /user/nodes/{node_id}:
     post:
       consumes:
@@ -575,6 +601,8 @@ paths:
       security:
       - UserMiddleware: []
       summary: Reserve node
+      tags:
+      - nodes
   /user/nodes/unreserve/{contract_id}:
     delete:
       consumes:
@@ -605,6 +633,8 @@ paths:
       security:
       - UserMiddleware: []
       summary: Unreserve node
+      tags:
+      - nodes
   /user/redeem/{voucher_code}:
     put:
       description: Redeems a voucher for the user
@@ -635,6 +665,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Redeem voucher
+      tags:
+      - users
   /user/refresh:
     post:
       consumes:
@@ -668,6 +700,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Refresh access token
+      tags:
+      - users
   /user/register:
     post:
       consumes:
@@ -701,6 +735,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Register a user
+      tags:
+      - users
   /user/register/verify:
     post:
       consumes:
@@ -730,6 +766,8 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Verify registration code
+      tags:
+      - users
   /users:
     get:
       consumes:
@@ -752,6 +790,8 @@ paths:
       security:
       - AdminMiddleware: []
       summary: Get all users
+      tags:
+      - admin
   /users/{user_id}:
     delete:
       consumes:
@@ -786,6 +826,8 @@ paths:
       security:
       - AdminMiddleware: []
       summary: Delete a user
+      tags:
+      - admin
   /users/{user_id}/credit:
     post:
       consumes:
@@ -822,6 +864,8 @@ paths:
       security:
       - AdminMiddleware: []
       summary: Credit user balance
+      tags:
+      - admin
   /vouchers:
     get:
       consumes:
@@ -844,6 +888,8 @@ paths:
       security:
       - AdminMiddleware: []
       summary: List vouchers
+      tags:
+      - admin
   /vouchers/generate:
     post:
       consumes:
@@ -877,4 +923,6 @@ paths:
       security:
       - AdminMiddleware: []
       summary: Generate vouchers
+      tags:
+      - admin
 swagger: "2.0"

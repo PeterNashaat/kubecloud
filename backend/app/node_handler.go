@@ -73,6 +73,7 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 
 // @Summary Reserve node
 // @Description Reserves a node for a user
+// @Tags nodes
 // @ID reserve-node
 // @Accept json
 // @Produce json
@@ -173,6 +174,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 // @Summary List reserved nodes
 // @Description Returns a list of reserved nodes for a user
+// @Tags nodes
 // @ID list-reserved-nodes
 // @Accept json
 // @Produce json
@@ -229,6 +231,7 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 
 // @Summary Unreserve node
 // @Description Unreserve a node for a user
+// @Tags nodes
 // @ID unreserve-node
 // @Accept json
 // @Produce json

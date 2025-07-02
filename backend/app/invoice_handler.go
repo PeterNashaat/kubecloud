@@ -16,6 +16,7 @@ import (
 
 // @Summary Get all invoices
 // @Description Returns a list of all invoices
+// @Tags invoices
 // @ID get-all-invoices
 // @Accept json
 // @Produce json
@@ -38,6 +39,7 @@ func (h *Handler) ListAllInvoicesHandler(c *gin.Context) {
 
 // @Summary Get invoices
 // @Description Returns a list of invoices for a user
+// @Tags invoices
 // @ID get-invoices
 // @Accept json
 // @Produce json
@@ -85,6 +87,7 @@ func (h *Handler) MonthlyInvoicesHandler() {
 
 // @Summary Download invoice
 // @Description Downloads an invoice by ID
+// @Tags invoices
 // @ID download-invoice
 // @Accept json
 // @Produce octet-stream
