@@ -31,12 +31,6 @@ func (h *Handler) ListAllInvoicesHandler(c *gin.Context) {
 // ListUserInvoicesHandler lists user invoices by its ID
 func (h *Handler) ListUserInvoicesHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
-	_, err := h.db.GetUserByID(userID)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
 
 	invoices, err := h.db.ListUserInvoices(userID)
 	if err != nil {
@@ -163,11 +157,11 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 		cancellationDate, err := internal.GetRentContractCancellationDate(h.firesquidClient, record.ContractID)
 
 		if errors.Is(err, internal.ErrorEventsNotFound) {
-			totalHours = GetHoursSinceFirstDayOfMonth(rentRecordStart, monthLastDay)
+			totalHours = GetHoursOfGivenPeriod(rentRecordStart, time.Now())
 		} else if err != nil {
 			return err
 		} else {
-			totalHours = GetHoursSinceFirstDayOfMonth(rentRecordStart, cancellationDate)
+			totalHours = GetHoursOfGivenPeriod(rentRecordStart, cancellationDate)
 		}
 
 		nodeItems = append(nodeItems, models.NodeItem{
@@ -204,7 +198,7 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 	return nil
 }
 
-func GetHoursSinceFirstDayOfMonth(startDate, endDate time.Time) int {
+func GetHoursOfGivenPeriod(startDate, endDate time.Time) int {
 	// Calculate the duration between the first day of the month and the specific date
 	duration := endDate.Sub(startDate)
 	// Convert the duration to hours

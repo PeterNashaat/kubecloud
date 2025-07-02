@@ -534,7 +534,7 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "User not found", "")
+		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
 
@@ -551,7 +551,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "User not found", "")
+		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
 	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
@@ -571,23 +571,12 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "Voucher Code is required", "")
 		return
 	}
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		log.Error().Msg("user ID not found in context")
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
-
-	userID, ok := userIDVal.(int)
-	if !ok {
-		Error(c, http.StatusInternalServerError, "internal server error", "")
-		return
-	}
+	userID := c.GetInt("user_id")
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "User not found", "")
+		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
 
@@ -595,7 +584,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	voucher, err := h.db.GetVoucherByCode(voucherCodeParam)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "Voucher not found", "")
+		Error(c, http.StatusNotFound, "Voucher is not found", "")
 		return
 	}
 
@@ -634,6 +623,6 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Voucher is Redeemed Successfully", nil)
+	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
 
 }

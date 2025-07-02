@@ -77,7 +77,6 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to connect to firesquid client: %w", err)
 	}
 
-	// handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient)
 	redisClient, err := internal.NewRedisClient(config.Redis)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create Redis client")
@@ -204,11 +203,14 @@ func (app *App) registerHandlers() {
 
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
+	go internal.TrackUserDebt()
 }
 
 // Run starts the server
 func (app *App) Run() error {
 	addr := fmt.Sprintf("%s:%s", app.config.Server.Host, app.config.Server.Port)
+
+	app.StartBackgroundWorkers()
 	app.httpServer = &http.Server{
 		Addr:    addr,
 		Handler: app.router,

@@ -98,7 +98,7 @@ func ReadConfFile(path string) (Configuration, error) {
 	if err := validate.Struct(config); err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
 			for _, ve := range validationErrors {
-				fmt.Printf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
+				return Configuration{}, fmt.Errorf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
 			}
 		}
 		return Configuration{}, fmt.Errorf("invalid configuration: %w", err)
