@@ -77,7 +77,7 @@ func (h *TokenHandler) VerifyToken(tokenString string) (*TokenClaims, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 
-	if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Before(time.Now()) {
+	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
 		return nil, fmt.Errorf("token has expired")
 	}
 

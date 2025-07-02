@@ -14,6 +14,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// @Summary Get all invoices
+// @Description Returns a list of all invoices
+// @Tags admin
+// @ID get-all-invoices
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.Invoice
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /invoices [get]
 // ListAllInvoicesHandler lists all invoices in system
 func (h *Handler) ListAllInvoicesHandler(c *gin.Context) {
 	invoices, err := h.db.ListInvoices()
@@ -28,6 +38,16 @@ func (h *Handler) ListAllInvoicesHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Get invoices
+// @Description Returns a list of invoices for a user
+// @Tags invoices
+// @ID get-invoices
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.Invoice
+// @Failure 500 {object} APIResponse
+// @Security UserMiddleware
+// @Router /user/invoice [get]
 // ListUserInvoicesHandler lists user invoices by its ID
 func (h *Handler) ListUserInvoicesHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
@@ -66,6 +86,18 @@ func (h *Handler) MonthlyInvoicesHandler() {
 
 }
 
+// @Summary Download invoice
+// @Description Downloads an invoice by ID
+// @Tags invoices
+// @ID download-invoice
+// @Accept json
+// @Produce octet-stream
+// @Param invoice_id path string true "Invoice ID"
+// @Success 200 {file} Invoice
+// @Failure 404 {object} APIResponse "Invoice is not found"
+// @Failure 500 {object} APIResponse
+// @Security UserMiddleware
+// @Router /user/invoice/{invoice_id} [get]
 func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
