@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"kubecloud/kubedeployer"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -56,21 +57,21 @@ func (w *Worker) listenForTasks(ctx context.Context) {
 }
 
 // processTaskCallback is the callback function for processing tasks
-func (w *Worker) processTaskCallback(task *DeploymentTask) {
+func (w *Worker) processTaskCallback(ctx context.Context, task *DeploymentTask) {
 	log.Info().Str("worker_id", w.ID).Str("task_id", task.TaskID).Msg("Processing task")
 
-	if err := w.processTask(task); err != nil {
+	if err := w.processTask(ctx, task); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Str("worker_id", w.ID).Msg("Task processing failed")
 	}
 }
 
 // processTask processes a single deployment task
-func (w *Worker) processTask(task *DeploymentTask) error {
+func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 	task.Status = TaskStatusProcessing
 	now := time.Now()
 	task.StartedAt = &now
 
-	result := w.performDeployment(task)
+	result := w.performDeployment(ctx, task)
 
 	if err := w.redis.AddResult(context.Background(), result); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to add result to stream")
@@ -101,13 +102,13 @@ func (w *Worker) processTask(task *DeploymentTask) error {
 }
 
 // performDeployment executes the actual deployment
-func (w *Worker) performDeployment(task *DeploymentTask) *DeploymentResult {
+func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *DeploymentResult {
 	result := &DeploymentResult{
 		TaskID: task.TaskID,
 		UserID: task.UserID,
 	}
 
-	res, err := DeployKubernetesCluster(context.Background(), w.gridClient, *task.Payload.Master, task.Payload.Workers, "", "", task.UserID)
+	res, err := kubedeployer.DeployCluster(ctx, w.gridClient, task.Payload)
 	if err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
 		result.Status = TaskStatusFailed

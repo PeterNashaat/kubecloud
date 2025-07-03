@@ -3,13 +3,13 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/kubedeployer"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
 type DeploymentResponse struct {
@@ -20,16 +20,12 @@ type DeploymentResponse struct {
 }
 
 func (h *Handler) DeployHandler(c *gin.Context) {
-	var cluster workloads.K8sCluster
+	var cluster kubedeployer.Cluster
 	if err := c.ShouldBindJSON(&cluster); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
 		return
 	}
-
-	if err := cluster.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid deployment object"})
-		return
-	}
+	// TODO: add validation
 
 	// create task and add to queue
 	userID, exists := c.Get("user_id")
