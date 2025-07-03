@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 services:
   redis:
     image: redis
@@ -12,3 +12,6 @@ services:
       - redis
     environment:
       REDIS_HOST: redis
+    volumes:
+      - ./backend/config.json:/app/config.json
+    command: ["/kubecloud", "--config", "/app/config.json"]
