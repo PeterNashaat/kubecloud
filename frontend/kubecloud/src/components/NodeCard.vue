@@ -40,6 +40,8 @@
       class="reserve-btn"
       @click="$emit('reserve', node.nodeId)"
       aria-label="Reserve Node"
+      :loading="loading"
+      :disabled="disabled || loading"
     >
       Reserve Node
     </v-btn>
@@ -60,7 +62,7 @@
 import type { NormalizedNode } from '../types/normalizedNode';
 import { defineProps, defineEmits } from 'vue';
 
-const props = defineProps<{ node: NormalizedNode; isAuthenticated: boolean }>();
+const props = defineProps<{ node: NormalizedNode; isAuthenticated: boolean; loading?: boolean; disabled?: boolean }>();
 const emit = defineEmits(['reserve', 'signin']);
 
 function formatStorage(val: number) {
@@ -99,7 +101,8 @@ function formatStorage(val: number) {
 }
 .node-price {
   font-size: 1.05rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: #10B981;
   padding: 0.2rem 0.7rem;
 }
 .node-location {

@@ -32,7 +32,7 @@
                 <v-icon size="32" color="primary">mdi-server-network</v-icon>
               </div>
               <div class="stat-info">
-                <div class="stat-value">{{ total }}</div>
+                <div class="stat-value">{{ rentedNodes.length }}</div>
                 <div class="stat-label">Total Nodes</div>
               </div>
             </div>
@@ -123,114 +123,53 @@
       <div class="nodes-grid">
         <div v-for="node in rentedNodes" :key="node.id" class="node-card">
           <div class="node-header">
-            <div class="node-title-section">
-              <h3 class="node-title">{{ node.name || `Node #${node.id}` }}</h3>
-              <div class="node-status">
-                <v-chip
-                  :color="node.healthy ? 'success' : 'error'"
-                  size="small"
-                  variant="elevated"
-                >
-                  <v-icon size="16" class="mr-1">
-                    {{ node.healthy ? 'mdi-check-circle' : 'mdi-alert-circle' }}
-                  </v-icon>
-                  {{ node.healthy ? 'Healthy' : 'Unhealthy' }}
-                </v-chip>
-              </div>
-            </div>
+            <h3 class="node-title">Node {{ node.nodeId || node.id }}</h3>
             <div class="node-price">${{ node.price?.toFixed(2) ?? 'N/A' }}/month</div>
           </div>
-
-          <div class="node-location" v-if="node.location">
+          <div class="node-location" v-if="node.country">
             <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
-            {{ node.location }}
+            {{ node.country }}
           </div>
-
           <div class="node-specs">
             <div class="spec-item">
+              <v-icon size="18" class="mr-1" color="primary">mdi-cpu-64-bit</v-icon>
               <span class="spec-label">CPU:</span>
-              <v-progress-linear
-                :model-value="getAvailableCPU(node)"
-                :max="getTotalCPU(node)"
-                height="16"
-                color="primary"
-                rounded
-                class="mb-1 mr-2"
-                style="width: 120px; display: inline-block; vertical-align: middle;"
-              >
-                <template #default>
-                  <span style="font-size: 0.95em;">{{ getAvailableCPU(node) }} / {{ getTotalCPU(node) }} vCPU</span>
-                </template>
-              </v-progress-linear>
+              <span>{{ Math.round(node.resources?.cpu ?? node.total_resources?.cru ?? 0) }} vCPU</span>
             </div>
             <div class="spec-item">
+              <v-icon size="18" class="mr-1" color="success">mdi-memory</v-icon>
               <span class="spec-label">RAM:</span>
-              <v-progress-linear
-                :model-value="getAvailableRAM(node)"
-                :max="getTotalRAM(node)"
-                height="16"
-                color="success"
-                rounded
-                class="mb-1 mr-2"
-                style="width: 120px; display: inline-block; vertical-align: middle;"
-              >
-                <template #default>
-                  <span style="font-size: 0.95em;">{{ getAvailableRAM(node) }} / {{ getTotalRAM(node) }} GB</span>
-                </template>
-              </v-progress-linear>
+              <span>{{ Math.round(node.resources?.memory ?? (node.total_resources?.mru ? node.total_resources.mru / (1024*1024*1024) : 0)) }} GB</span>
             </div>
             <div class="spec-item">
+              <v-icon size="18" class="mr-1" color="info">mdi-harddisk</v-icon>
               <span class="spec-label">Storage:</span>
-              <v-progress-linear
-                :model-value="getAvailableStorage(node)"
-                :max="getTotalStorage(node)"
-                height="16"
-                color="info"
-                rounded
-                class="mb-1 mr-2"
-                style="width: 120px; display: inline-block; vertical-align: middle;"
-              >
-                <template #default>
-                  <span style="font-size: 0.95em;">{{ getAvailableStorage(node) }} / {{ getTotalStorage(node) }} GB</span>
-                </template>
-              </v-progress-linear>
+              <span>{{ formatStorage(node.resources?.storage ?? (node.total_resources?.sru ? node.total_resources.sru / (1024*1024*1024) : 0)) }}</span>
             </div>
           </div>
-
           <div class="node-chips">
             <v-chip v-if="node.gpu || (node.gpus && node.gpus.length > 0)" color="deep-purple-accent-2" text-color="white" size="small" variant="elevated">
               <v-icon size="16" class="mr-1">mdi-nvidia</v-icon>
               GPU
             </v-chip>
-            <v-chip v-if="node.dedicated" color="orange" text-color="white" size="small" variant="elevated">
-              <v-icon size="16" class="mr-1">mdi-star</v-icon>
-              Dedicated
-            </v-chip>
-            <v-chip v-if="node.rentContractId" color="blue" text-color="white" size="small" variant="elevated">
-              <v-icon size="16" class="mr-1">mdi-file-document</v-icon>
-              Contract #{{ node.rentContractId }}
-            </v-chip>
           </div>
-
-          <div class="node-actions">
-            <v-btn
-              color="error"
-              variant="outlined"
-              size="small"
-              @click="confirmUnreserve(node)"
-              :loading="unreservingNode === node.rentContractId?.toString()"
-            >
-              <v-icon size="16" class="mr-1">mdi-close</v-icon>
-              Unreserve
-            </v-btn>
-          </div>
+          <v-btn
+            color="error"
+            variant="outlined"
+            class="reserve-btn"
+            @click="confirmUnreserve(node)"
+            :loading="unreservingNode === node.rentContractId?.toString()"
+            style="margin-top: auto; width: 100%;"
+          >
+            Unreserve
+          </v-btn>
         </div>
       </div>
     </div>
 
     <!-- Unreserve Confirmation Dialog -->
     <v-dialog v-model="showUnreserveDialog" max-width="400">
-      <v-card>
+      <v-card class="pa-3">
         <v-card-title>Confirm Unreservation</v-card-title>
         <v-card-text>
           Are you sure you want to unreserve this node? This action cannot be undone and will cancel your rental contract.
@@ -246,7 +185,7 @@
           </v-btn>
           <v-btn
             color="error"
-            variant="elevated"
+            variant="outlined"
             @click="handleUnreserve"
             :loading="unreservingNode === selectedNode?.rentContractId?.toString()"
           >
@@ -267,7 +206,6 @@ import { useNotificationStore } from '../../stores/notifications'
 const router = useRouter()
 const {
   rentedNodes,
-  total,
   loading,
   error,
   fetchRentedNodes,
@@ -304,7 +242,7 @@ const handleUnreserve = async () => {
     await unreserveNode(selectedNode.value.rentContractId.toString())
     showUnreserveDialog.value = false
     selectedNode.value = null
-    notificationStore.success('Success', 'Node unreserved successfully.')
+    notificationStore.success('Success', 'Node unreserved successfully. It may take a few seconds for your node list to update.')
     await fetchRentedNodes()
   } catch (err) {
     notificationStore.error('Error', 'Failed to unreserve node. Please try again.')
@@ -349,6 +287,13 @@ function getUsedStorage(node: RentedNode) {
 
 function getAvailableStorage(node: RentedNode) {
   return Math.max(getTotalStorage(node) - getUsedStorage(node), 0)
+}
+
+function formatStorage(val: number) {
+  if (val >= 1024) {
+    return (val / 1024).toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' TB';
+  }
+  return Math.round(val).toLocaleString() + ' GB';
 }
 </script>
 
@@ -456,7 +401,7 @@ export default {
 
 .nodes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
   gap: 1.5rem;
 }
 

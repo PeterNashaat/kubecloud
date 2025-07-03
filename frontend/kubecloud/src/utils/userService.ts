@@ -1,4 +1,5 @@
 import { api } from './api'
+import type { ApiResponse } from './authService'
 
 export interface ReserveNodeRequest {
   // Add any required fields if needed
@@ -77,6 +78,19 @@ export interface UserInvoice {
   created_at: string
 }
 
+export interface SshKey {
+  id: number
+  name: string
+  public_key: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AddSshKeyRequest {
+  name: string
+  public_key: string
+}
+
 export class UserService {
   // List all available nodes
   async listNodes(filters?: any) {
@@ -108,7 +122,7 @@ export class UserService {
 
   // Unreserve a node
   async unreserveNode(contractId: string) {
-    return api.post(`/v1/user/nodes/unreserve/${contractId}`, {}, { requiresAuth: true, showNotifications: true })
+    return api.delete(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
   }
 
   // Charge balance
@@ -153,11 +167,41 @@ export class UserService {
 
   // Fetch the user's current balance
   async fetchBalance(): Promise<number> {
-    const response = await api.get<{ balance_usd: number; }>(
+    const response = await api.get<{ data: { balance_usd: number } }>(
       '/v1/user/balance',
       { requiresAuth: true, showNotifications: false }
-    )    
+    )
     return response.data.data.balance_usd
+  }
+
+  // List all SSH keys for the current user
+  async listSshKeys(): Promise<SshKey[]> {
+    const response = await api.get<ApiResponse<SshKey[]>>('/v1/user/ssh-keys', {
+      requiresAuth: true,
+      showNotifications: false
+    })
+    return response.data.data
+  }
+
+  // Add a new SSH key
+  async addSshKey(data: AddSshKeyRequest): Promise<SshKey> {
+    const response = await api.post<ApiResponse<SshKey>>('/v1/user/ssh-keys', data, {
+      requiresAuth: true,
+      showNotifications: true,
+      successMessage: 'SSH key added successfully',
+      errorMessage: 'Failed to add SSH key'
+    })
+    return response.data.data
+  }
+
+  // Delete an SSH key by ID
+  async deleteSshKey(id: number): Promise<void> {
+    await api.delete(`/v1/user/ssh-keys/${id}`, {
+      requiresAuth: true,
+      showNotifications: true,
+      successMessage: 'SSH key deleted successfully',
+      errorMessage: 'Failed to delete SSH key'
+    })
   }
 }
 

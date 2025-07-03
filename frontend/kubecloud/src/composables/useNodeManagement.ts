@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { userService } from '@/utils/userService'
-import { api } from '@/utils/api'
+import { useNotificationStore } from '@/stores/notifications'
 
 // Interface for rented nodes (matches the grid proxy structure)
 export interface RentedNode {
@@ -59,6 +59,8 @@ export function useNodeManagement() {
   const total = ref<number>(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const reserveNodeLoading = ref(false)
+  const notificationStore = useNotificationStore()
 
   // Fetch user's rented nodes
   async function fetchRentedNodes() {
@@ -127,14 +129,18 @@ export function useNodeManagement() {
 
   // Reserve a node
   async function reserveNode(nodeId: number) {
+    reserveNodeLoading.value = true
     try {
       const response = await userService.reserveNode(nodeId)
       // Refresh the rented nodes list after successful reservation
       await fetchRentedNodes()
+      notificationStore.success('Node Reserved', 'Node has been successfully reserved.')
       return response
     } catch (err: any) {
       console.error('Failed to reserve node:', err)
       throw err
+    } finally {
+      reserveNodeLoading.value = false
     }
   }
 
@@ -177,6 +183,7 @@ export function useNodeManagement() {
     unreserveNode,
     totalMonthlyCost,
     healthyNodes,
-    unhealthyNodes
+    unhealthyNodes,
+    reserveNodeLoading
   }
 } 

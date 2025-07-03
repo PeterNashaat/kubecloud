@@ -13,16 +13,12 @@ export interface VM {
   planetary: boolean;
 }
 export interface DeployClusterNode { id: number; label: string; totalCPU: number; totalRAM: number; hasGPU: boolean; location: string; }
-export interface SshKey { id: number; name: string; fingerprint: string; createdAt: string; }
+export interface SshKey { id: number; name: string; public_key: string; created_at: string; updated_at: string; }
 
 export function useDeployCluster() {
   const masters = ref<VM[]>([]);
   const workers = ref<VM[]>([]);
-  const availableSshKeys = ref<SshKey[]>([
-    { id: 1, name: 'my-laptop-key', fingerprint: 'SHA256:abc123...', createdAt: '2024-01-15' },
-    { id: 2, name: 'production-key', fingerprint: 'SHA256:def456...', createdAt: '2024-01-10' },
-    { id: 3, name: 'team-shared-key', fingerprint: 'SHA256:ghi789...', createdAt: '2024-01-05' },
-  ]);
+  const availableSshKeys = ref<SshKey[]>([]);
 
   function addMaster() {
     if (masters.value.length < 3) {

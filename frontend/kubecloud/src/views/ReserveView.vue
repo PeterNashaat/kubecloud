@@ -115,6 +115,8 @@
                       <NodeCard
                         :node="node"
                         :isAuthenticated="isAuthenticated"
+                        :loading="reservingNodeId === node.nodeId"
+                        :disabled="reservingNodeId === node.nodeId"
                         @reserve="reserveNode"
                         @signin="handleSignIn"
                         tabindex="0"
@@ -149,10 +151,12 @@ import { useNormalizedNodes } from '../composables/useNormalizedNodes'
 import { useNodeFilters } from '../composables/useNodeFilters'
 import NodeFilterPanel from '../components/NodeFilterPanel.vue'
 import NodeCard from '../components/NodeCard.vue'
+import { useNotificationStore } from '../stores/notifications'
 
 const router = useRouter()
 const userStore = useUserStore()
 const isAuthenticated = computed(() => userStore.isLoggedIn)
+const notificationStore = useNotificationStore()
 
 const { nodes, total, loading, fetchNodes } = useNodes()
 const normalizedNodes = useNormalizedNodes(() => nodes.value)
@@ -166,6 +170,8 @@ const {
   locationOptions,
   clearFilters
 } = useNodeFilters(() => normalizedNodes.value)
+
+const reservingNodeId = ref<number | null>(null)
 
 onMounted(() => {
   fetchNodes()
@@ -191,7 +197,15 @@ const reserveNode = async (nodeId: number) => {
     router.push('/sign-in')
     return
   }
-  await userService.reserveNode(nodeId)
+  reservingNodeId.value = nodeId
+  try {
+    await userService.reserveNode(nodeId)
+    notificationStore.success('Success', 'Node reserved successfully.')
+  } catch (err) {
+    notificationStore.error('Error', 'Failed to reserve node. Please try again.')
+  } finally {
+    reservingNodeId.value = null
+  }
 }
 
 const handleSignIn = () => {

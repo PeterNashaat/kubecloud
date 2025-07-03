@@ -10,12 +10,24 @@
       </div>
     </div>
     <div class="vm-specs">
-      <div class="spec-item"><span class="spec-label">vCPU:</span> {{ vm.vcpu }}</div>
-      <div class="spec-item"><span class="spec-label">RAM:</span> {{ vm.ram }} GB</div>
-      <div class="spec-item"><span class="spec-label">Rootfs:</span> {{ vm.rootfs }} GB</div>
-      <div class="spec-item"><span class="spec-label">Disk:</span> {{ vm.disk }} GB</div>
-      <div class="spec-item"><span class="spec-label">GPU:</span> <v-icon size="16">{{ vm.gpu ? 'mdi-check' : 'mdi-close' }}</v-icon></div>
-      <div class="spec-item"><span class="spec-label">SSH Keys:</span>
+      <v-chip color="primary" text-color="white" size="small" class="mr-2" variant="outlined">
+        <v-icon size="16" class="mr-1">mdi-cpu-64-bit</v-icon>
+        {{ vm.vcpu }} vCPU
+      </v-chip>
+      <v-chip color="success" text-color="white" size="small" class="mr-2" variant="outlined">
+        <v-icon size="16" class="mr-1">mdi-memory</v-icon>
+        {{ vm.ram }} GB RAM
+      </v-chip>
+      <v-chip color="info" text-color="white" size="small" class="mr-2" variant="outlined">
+        <v-icon size="16" class="mr-1">mdi-harddisk</v-icon>
+        {{ vm.disk }} GB Disk
+      </v-chip>
+      <v-chip v-if="vm.gpu" color="deep-purple-accent-2" text-color="white" size="small" class="mr-2" variant="outlined">
+        <v-icon size="16" class="mr-1">mdi-nvidia</v-icon>
+        GPU
+      </v-chip>
+      <div class="spec-item" style="margin-top: 0.7em;">
+        <span class="spec-label">SSH Keys:</span>
         <span v-for="id in vm.sshKeyIds" :key="id" class="ssh-key-chip">
           {{ availableSshKeys.find(k => k.id === id)?.name || id }}
         </span>

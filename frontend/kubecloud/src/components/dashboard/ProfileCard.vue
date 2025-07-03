@@ -9,37 +9,31 @@
         <div class="profile-row">
           <div class="profile-col">
             <label class="profile-label">Username</label>
-            <v-text-field :model-value="user.username" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
+            <v-text-field :model-value="user.username" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" />
           </div>
           <div class="profile-col">
             <label class="profile-label">Email Address</label>
-            <v-text-field :model-value="user.email" variant="outlined" type="email" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
+            <v-text-field :model-value="user.email" variant="outlined" type="email" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" />
           </div>
         </div>
         <div class="profile-row">
+          <div class="profile-col">
+            <label class="profile-label">Balance</label>
+            <v-text-field :model-value="balanceDisplay" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" :loading="balanceLoading" />
+          </div>
           <div class="profile-col">
             <label class="profile-label">Verified</label>
-            <v-text-field :model-value="user.verified ? 'Yes' : 'No'" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
-          </div>
-        </div>
-        <div class="profile-row">
-          <div class="profile-col">
-            <label class="profile-label">Credit Card Balance</label>
-            <v-text-field :model-value="user.credit_card_balance" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
-          </div>
-          <div class="profile-col">
-            <label class="profile-label">Credited Balance</label>
-            <v-text-field :model-value="user.credited_balance" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
+            <v-text-field :model-value="user.verified ? 'Yes' : 'No'" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" />
           </div>
         </div>
         <div class="profile-row">
           <div class="profile-col">
             <label class="profile-label">Last Updated</label>
-            <v-text-field :model-value="formatDate(user.updated_at)" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
+            <v-text-field :model-value="formatDate(user.updated_at)" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" />
           </div>
           <div class="profile-col">
             <label class="profile-label">Account Status</label>
-            <v-text-field :model-value="user.verified ? 'Active' : 'Pending Verification'" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
+            <v-text-field :model-value="user.verified ? 'Active' : 'Pending Verification'" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" />
           </div>
         </div>
         <v-divider class="my-4"></v-divider>
@@ -87,11 +81,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import { authService } from '../../utils/authService'
 import { useNotificationStore } from '../../stores/notifications'
+import { userService } from '../../utils/userService'
 
 const { user } = storeToRefs(useUserStore())
 const notificationStore = useNotificationStore()
@@ -122,6 +117,24 @@ const confirmPasswordRules = [
 ]
 
 const passwordForm = ref()
+
+// Balance state
+const balance = ref<number | null>(null)
+const balanceLoading = ref(true)
+const balanceDisplay = computed(() =>
+  balanceLoading.value ? 'Loading...' : balance.value !== null ? `$${balance.value.toFixed(2)}` : 'N/A'
+)
+
+onMounted(async () => {
+  balanceLoading.value = true
+  try {
+    balance.value = await userService.fetchBalance()
+  } catch (err) {
+    balance.value = null
+  } finally {
+    balanceLoading.value = false
+  }
+})
 
 function formatDate(dateStr: string) {
   if (!dateStr) return ''
@@ -186,19 +199,19 @@ export default {
 }
 
 .profile-field.compact {
-  color: #CBD5E1;
-  background: rgba(96, 165, 250, 0.08);
-  border: 1px solid rgba(96, 165, 250, 0.12);
+  color: #94a3b8;
+  background: #232946;
+  border: none;
   border-radius: 0.5rem;
   margin-bottom: 0.75rem;
   transition: none;
-  pointer-events: none;
+  opacity: 1;
 }
 
 .profile-field.compact:focus-within,
 .profile-field.compact:hover {
-  border-color: rgba(96, 165, 250, 0.12);
-  background: rgba(96, 165, 250, 0.08);
+  border: none;
+  box-shadow: none;
 }
 
 .profile-field.compact[readonly],
