@@ -24,7 +24,7 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{}, &models.Notification{})
+	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{}, &models.Notification{}, &models.SSHKey{})
 	if err != nil {
 		return nil, err
 	}
@@ -308,16 +308,41 @@ func (s *Sqlite) GetUnreadNotificationCount(userID string) (int64, error) {
 
 // DeleteNotification deletes a notification for a user
 func (s *Sqlite) DeleteNotification(notificationID uint, userID string) error {
-	result := s.db.Where("id = ? AND user_id = ?", notificationID, userID).
-		Delete(&models.Notification{})
+	return s.db.Where("id = ? AND user_id = ?", notificationID, userID).Delete(&models.Notification{}).Error
+}
 
+// CreateSSHKey creates a new SSH key for a user
+func (s *Sqlite) CreateSSHKey(sshKey *models.SSHKey) error {
+	sshKey.CreatedAt = time.Now()
+	sshKey.UpdatedAt = time.Now()
+	return s.db.Create(sshKey).Error
+}
+
+// ListUserSSHKeys returns all SSH keys for a user
+func (s *Sqlite) ListUserSSHKeys(userID int) ([]models.SSHKey, error) {
+	var sshKeys []models.SSHKey
+	err := s.db.Where("user_id = ?", userID).Find(&sshKeys).Error
+	if err != nil {
+		return nil, err
+	}
+	return sshKeys, nil
+}
+
+// DeleteSSHKey deletes an SSH key by ID for a specific user
+func (s *Sqlite) DeleteSSHKey(sshKeyID int, userID int) error {
+	result := s.db.Where("id = ? AND user_id = ?", sshKeyID, userID).Delete(&models.SSHKey{})
 	if result.Error != nil {
 		return result.Error
 	}
-
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("notification not found or access denied")
+		return fmt.Errorf("no SSH key found with ID %d for user %d", sshKeyID, userID)
 	}
-
 	return nil
+}
+
+// GetSSHKeyByID returns an SSH key by ID for a specific user
+func (s *Sqlite) GetSSHKeyByID(sshKeyID int, userID int) (models.SSHKey, error) {
+	var sshKey models.SSHKey
+	query := s.db.Where("id = ? AND user_id = ?", sshKeyID, userID).First(&sshKey)
+	return sshKey, query.Error
 }
