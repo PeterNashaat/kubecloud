@@ -135,14 +135,14 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 	// validate user has enough balance for reserving node
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 	}
 
 	//TODO: check price in month constant
-	if usdBalance < node.PriceUsd/24/30 || user.Debt > 0 {
+	if usdBalance - user.Debt < node.PriceUsd/24/30 {
 		Error(c, http.StatusBadRequest, "You should at least have enough balance for one hour", "")
 		return
 	}
