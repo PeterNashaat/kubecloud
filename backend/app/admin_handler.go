@@ -21,13 +21,29 @@ type GenerateVouchersInput struct {
 
 // CreditRequestInput represents a request to credit a user's balance
 type CreditRequestInput struct {
-	Amount float64 `json:"amount" binding:"required,gt=0" validate:"required,gt=0"`
-	Memo   string  `json:"memo" binding:"required,min=3,max=255" validate:"required"`
+	Amount uint64 `json:"amount" binding:"required,gt=0" validate:"required,gt=0"`
+	Memo   string `json:"memo" binding:"required,min=3,max=255" validate:"required"`
 }
 
+// CreditUserResponse holds the response data after crediting a user
+type CreditUserResponse struct {
+	User   string `json:"user"`
+	Amount uint64 `json:"amount"`
+	Memo   string `json:"memo"`
+}
+
+// @Summary Get all users
+// @Description Returns a list of all users
+// @Tags admin
+// @ID get-all-users
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.User
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /users [get]
 // ListUsersHandler lists all users
 func (h *Handler) ListUsersHandler(c *gin.Context) {
-
 	users, err := h.db.ListAllUsers()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list all users")
@@ -40,6 +56,19 @@ func (h *Handler) ListUsersHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Delete a user
+// @Description Deletes a user from the system
+// @Tags admin
+// @ID delete-user
+// @Accept json
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Success 200 {object} APIResponse
+// @Failure 400 {object} APIResponse "Invalid user ID"
+// @Failure 403 {object} APIResponse "Admins cannot delete their own account"
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /users/{user_id} [delete]
 // DeleteUsersHandler deletes user from system
 func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 	userID := c.Param("user_id")
@@ -72,6 +101,18 @@ func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 
 }
 
+// @Summary Generate vouchers
+// @Description Generates a bulk of vouchers
+// @Tags admin
+// @ID generate-vouchers
+// @Accept json
+// @Produce json
+// @Param body body GenerateVouchersInput true "Generate Vouchers Input"
+// @Success 201 {array} models.Voucher
+// @Failure 400 {object} APIResponse "Invalid request format"
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /vouchers/generate [post]
 // GenerateVouchersHandler generates bulk of vouchers
 func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 	var request GenerateVouchersInput
@@ -90,7 +131,7 @@ func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 		fullCode := fmt.Sprintf("%s-%s", voucherCode, timestampPart)
 
 		voucher := models.Voucher{
-			Voucher:   fullCode,
+			Code:      fullCode,
 			Value:     request.Value,
 			CreatedAt: time.Now(),
 			ExpiresAt: time.Now().Add(time.Duration(request.ExpireAfter) * 24 * time.Hour),
@@ -110,6 +151,16 @@ func (h *Handler) GenerateVouchersHandler(c *gin.Context) {
 	})
 }
 
+// @Summary List vouchers
+// @Description Returns all vouchers in the system
+// @Tags admin
+// @ID list-vouchers
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.Voucher
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /vouchers [get]
 // ListVouchersHandler returns all vouchers in system
 func (h *Handler) ListVouchersHandler(c *gin.Context) {
 
@@ -124,6 +175,19 @@ func (h *Handler) ListVouchersHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Credit user balance
+// @Description Credits a specific user's balance
+// @Tags admin
+// @ID credit-user
+// @Accept json
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Param body body CreditRequestInput true "Credit Request Input"
+// @Success 201 {object} CreditUserResponse
+// @Failure 400 {object} APIResponse "Invalid request format or user ID"
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /users/{user_id}/credit [post]
 // CreditUserHandler lets admin credit specific user with money
 func (h *Handler) CreditUserHandler(c *gin.Context) {
 	userID := c.Param("user_id")
@@ -176,10 +240,17 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "User is credited successfully", map[string]interface{}{
-		"user":   user.Email,
-		"amount": request.Amount,
-		"memo":   request.Memo,
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusCreated, "User is credited successfully", CreditUserResponse{
+		User:   user.Email,
+		Amount: request.Amount,
+		Memo:   request.Memo,
 	})
 
 }

@@ -12,8 +12,17 @@ type DB interface {
 	DeleteUserByID(userID int) error
 	CreateVoucher(voucher *Voucher) error
 	ListAllVouchers() ([]Voucher, error)
+	GetVoucherByCode(code string) (Voucher, error)
+	RedeemVoucher(code string) error
 	CreateTransaction(transaction *Transaction) error
-	CreditUserBalance(userID int, amount float64) error
+	CreditUserBalance(userID int, amount uint64) error
+	CreateInvoice(invoice *Invoice) error
+	GetInvoice(id int) (Invoice, error)
+	ListUserInvoices(userID int) ([]Invoice, error)
+	ListInvoices() ([]Invoice, error)
+	UpdateInvoicePDF(id int, data []byte) error
+	CreateUserNode(userNode *UserNodes) error
+	ListUserNodes(userID int) ([]UserNodes, error)
 	// Notification methods
 	CreateNotification(notification *Notification) error
 	GetUserNotifications(userID string, limit, offset int) ([]Notification, error)

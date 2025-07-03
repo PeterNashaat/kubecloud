@@ -22,9 +22,13 @@ type Configuration struct {
 	TFChainURL           string             `json:"tfchain_url" validate:"required"`
 	TermsANDConditions   TermsANDConditions `json:"terms_and_conditions"`
 	ActivationServiceURL string             `json:"activation_service_url" validate:"required"`
+	GraphqlURL           string             `json:"graphql_url" validate:"required"`
+	FiresquidURL         string             `json:"firesquid_url" validate:"required"`
+	SystemAccount        GridAccount        `json:"system_account"`
 	Redis                Redis              `json:"redis" validate:"required,dive"`
 	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
+	Invoice              InvoiceCompanyData `json:"invoice"`
 }
 
 type GridConfig struct {
@@ -63,12 +67,25 @@ type TermsANDConditions struct {
 	DocumentHash string `json:"document_hash" validate:"required"`
 }
 
+// GridAccount holds data for system's account
+type GridAccount struct {
+	Mnemonics string `json:"mnemonics" validate:"required"`
+	Network   string `json:"network" validate:"required"`
+}
+
 // Redis struct holds Redis connection information
 type Redis struct {
 	Host     string `json:"host" validate:"required"`
 	Port     int    `json:"port" validate:"required,min=1,max=65535"`
 	Password string `json:"password"`
 	DB       int    `json:"db" validate:"min=0"`
+}
+
+// Invoice struct holds needed data for invoice file
+type InvoiceCompanyData struct {
+	Name        string `json:"name" validate:"required"`
+	Address     string `json:"address" validate:"required"`
+	Governorate string `json:"governorate" validate:"required"`
 }
 
 // ReadConfFile read configurations of json file
@@ -89,10 +106,10 @@ func ReadConfFile(path string) (Configuration, error) {
 	if err := validate.Struct(config); err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
 			for _, ve := range validationErrors {
-				fmt.Printf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
+				return Configuration{}, fmt.Errorf("validation error on field '%s': %s", ve.Namespace(), ve.Tag())
 			}
 		}
-		return Configuration{}, fmt.Errorf("Invalid configuration: %w", err)
+		return Configuration{}, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return config, nil

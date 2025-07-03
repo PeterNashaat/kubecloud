@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ERR_CONSUMER_GROUP_EXISTS = errors.New("BUSYGROUP Consumer Group name already exists")
+	ErrConsumerGroupExists = errors.New("BUSYGROUP Consumer Group name already exists")
 )
 
 type RedisClient struct {
@@ -53,13 +53,13 @@ func NewRedisClient(config Redis) (*RedisClient, error) {
 
 func (r *RedisClient) initializeStreams(ctx context.Context) error {
 	if err := r.client.XGroupCreateMkStream(ctx, TaskStreamKey, ConsumerGroup, "0").Err(); err != nil {
-		if err.Error() != ERR_CONSUMER_GROUP_EXISTS.Error() {
+		if err.Error() != ErrConsumerGroupExists.Error() {
 			return fmt.Errorf("failed to create task stream consumer group: %w", err)
 		}
 	}
 
 	if err := r.client.XGroupCreateMkStream(ctx, ResultStreamKey, ConsumerGroup+"_results", "0").Err(); err != nil {
-		if err.Error() != ERR_CONSUMER_GROUP_EXISTS.Error() {
+		if err.Error() != ErrConsumerGroupExists.Error() {
 			return fmt.Errorf("failed to create result stream consumer group: %w", err)
 		}
 	}
