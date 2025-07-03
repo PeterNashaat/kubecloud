@@ -17,6 +17,7 @@ const userName = computed(() => userStore.user?.username || 'User')
 
 // Initialize selected section from localStorage or default to 'overview'
 const selected = ref('overview')
+const balance = ref(0)
 
 onMounted(async () => {
   const savedSection = localStorage.getItem('dashboard-section')
@@ -31,6 +32,9 @@ onMounted(async () => {
     description: `Invoice #${inv.id}`,
     amount: inv.total
   }))
+  // Fetch user balance from /balance endpoint
+  const fetchedBalance = await userService.fetchBalance()
+  balance.value = fetchedBalance || 0
 })
 
 const clusters = ref([
@@ -105,6 +109,7 @@ function redeemVoucher(voucher: any) {
                 :clusters="clusters"
                 :sshKeys="sshKeys"
                 :totalSpent="totalSpent"
+                :balance="balance"
                 @navigate="handleNavigate"
               />
               <ClustersCard v-if="selected === 'clusters'" :clusters="clusters" />

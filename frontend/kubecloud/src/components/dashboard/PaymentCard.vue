@@ -7,7 +7,7 @@
     <div class="dashboard-card-content">
       <div class="balance-row">
         <span>Current Balance:</span>
-        <span class="balance-value">${{ user?.credited_balance ?? 0 }}</span>
+        <span class="balance-value">${{ balance }}</span>
       </div>
       <div class="amount-row">
         <span>Amount:</span>
@@ -72,6 +72,7 @@ const presets = [5, 10, 20, 50]
 const amount: Ref<number | 'custom'> = ref(5)
 const customAmount = ref<number | null>(null)
 const loading = ref(false)
+const balance = ref<number>(0)
 
 // Stripe Elements
 const stripe = ref<any>(null)
@@ -79,7 +80,16 @@ const elements = ref<StripeElements | null>(null)
 const cardElement = ref<StripeCardElement | null>(null)
 const stripeLoaded = ref(false)
 
+const fetchAndSetBalance = async () => {
+  try {
+    balance.value = +(await userService.fetchBalance()).toFixed(2)
+  } catch (e) {
+    balance.value = 0
+  }
+}
+
 onMounted(async () => {
+  await fetchAndSetBalance()
   await stripeService.initialize()
   stripe.value = await stripeService.getStripe()
   elements.value = stripe.value.elements()
@@ -91,8 +101,6 @@ onMounted(async () => {
     })
     cardElement.value.mount('#stripe-card-element')
     stripeLoaded.value = true
-  } else {
-    errorMessage.value = 'Failed to initialize payment form. Please refresh or contact support.'
   }
 })
 
@@ -125,14 +133,8 @@ async function chargeBalance() {
     if (cardElement.value) cardElement.value.clear()
     amount.value = 5
     customAmount.value = null
-    // Refresh user data to get updated balance
-    const userStore = useUserStore()
-    try {
-      const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
-      userStore.user = userRes.data.data.user
-    } catch (error) {
-      // ignore
-    }
+    // Refresh user balance from /balance endpoint
+    await fetchAndSetBalance()
   } catch (err: any) {
   } finally {
     loading.value = false

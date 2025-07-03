@@ -150,6 +150,15 @@ export class UserService {
       errorMessage: 'Failed to redeem voucher'
     })
   }
+
+  // Fetch the user's current balance
+  async fetchBalance(): Promise<number> {
+    const response = await api.get<{ balance_usd: number; }>(
+      '/v1/user/balance',
+      { requiresAuth: true, showNotifications: false }
+    )    
+    return response.data.data.balance_usd
+  }
 }
 
 export const userService = new UserService() 

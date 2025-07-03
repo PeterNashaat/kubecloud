@@ -94,6 +94,7 @@ interface Props {
   clusters: Cluster[]
   sshKeys: SshKey[]
   totalSpent: string
+  balance: number
 }
 
 const props = defineProps<Props>()
@@ -113,9 +114,9 @@ const statsData = computed(() => [
     label: 'Active Clusters'
   },
   {
-    icon: 'mdi-clock-outline',
-    value: uptimeHours.value,
-    label: 'Uptime Hours'
+    icon: 'mdi-currency-usd',
+    value: `$${props.balance.toFixed(2)}`,
+    label: 'Balance'
   },
   {
     icon: 'mdi-currency-usd',

@@ -13,45 +13,6 @@
       </v-btn>
     </div>
     <div class="card-content">
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-icon">
-            <v-icon icon="mdi-server" size="24" color="var(--color-primary)"></v-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-number">12</div>
-            <div class="stat-label">Active Clusters</div>
-          </div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-icon">
-            <v-icon icon="mdi-cube-outline" size="24" color="var(--color-primary)"></v-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-number">156</div>
-            <div class="stat-label">Total Nodes</div>
-          </div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-icon">
-            <v-icon icon="mdi-chart-line" size="24" color="var(--color-primary)"></v-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-number">99.9%</div>
-            <div class="stat-label">Uptime</div>
-          </div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-icon">
-            <v-icon icon="mdi-eye" size="24" color="var(--color-primary)"></v-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-number">24/7</div>
-            <div class="stat-label">Monitoring</div>
-          </div>
-        </div>
-      </div>
-
       <!-- Recent Clusters -->
       <div class="recent-clusters">
         <h3 class="section-title">Recent Clusters</h3>

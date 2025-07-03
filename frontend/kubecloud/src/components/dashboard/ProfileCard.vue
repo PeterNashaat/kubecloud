@@ -21,10 +21,6 @@
             <label class="profile-label">Verified</label>
             <v-text-field :model-value="user.verified ? 'Yes' : 'No'" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
           </div>
-          <div class="profile-col">
-            <label class="profile-label">Admin</label>
-            <v-text-field :model-value="user.admin ? 'Yes' : 'No'" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" readonly density="compact" />
-          </div>
         </div>
         <div class="profile-row">
           <div class="profile-col">

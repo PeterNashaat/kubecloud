@@ -13,13 +13,10 @@
         <label>RAM (GB)</label>
         <input type="number" v-model.number="localNode.ram" />
         <div v-if="errors.ram" class="field-error">{{ errors.ram }}</div>
-        <label>Rootfs Size (GB)</label>
-        <input type="number" v-model.number="localNode.rootfs" />
-        <div v-if="errors.rootfs" class="field-error">{{ errors.rootfs }}</div>
         <label>Disk Size (GB)</label>
         <input type="number" v-model.number="localNode.disk" />
         <div v-if="errors.disk" class="field-error">{{ errors.disk }}</div>
-        <label><input type="checkbox" v-model="localNode.gpu" /> GPU</label>
+        <v-switch v-model="localNode.gpu" label="GPU" inset color="primary" />
         <div class="ssh-key-section" style="margin-top: 1.5rem;">
           <label class="ssh-key-label">SSH Key</label>
           <v-chip-group
@@ -67,7 +64,6 @@ const errors = computed(() => {
   if (!node.name || !node.name.trim()) errs.name = 'Name is required.';
   if (!node.vcpu || node.vcpu <= 0) errs.vcpu = 'vCPU must be a positive number.';
   if (!node.ram || node.ram <= 0) errs.ram = 'RAM must be a positive number.';
-  if (!node.rootfs || node.rootfs <= 0) errs.rootfs = 'Rootfs size must be positive.';
   if (!node.disk || node.disk <= 0) errs.disk = 'Disk size must be positive.';
   if (!node.sshKeyIds || node.sshKeyIds.length === 0) errs.ssh = 'At least one SSH key must be selected.';
   return errs;
