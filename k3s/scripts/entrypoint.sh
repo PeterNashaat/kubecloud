@@ -7,7 +7,7 @@ if [ ! -z "${K3S_DATA_DIR}" ]; then
 fi
 
 if [ -z "${K3S_FLANNEL_IFACE}" ]; then
-    K3S_FLANNEL_IFACE=eth0
+    K3S_FLANNEL_IFACE=mycelium-br
 fi
 
 if [[ "${DUAL_STACK}" = "true" && "${MASTER}" = "true" ]]; then
