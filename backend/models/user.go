@@ -20,6 +20,16 @@ type User struct {
 	Debt              float64   `json:"debt"`
 }
 
+// SSHKey represents an SSH key for a user
+type SSHKey struct {
+	ID        int       `gorm:"primaryKey;autoIncrement;column:id"`
+	UserID    int       `gorm:"user_id" binding:"required"`
+	Name      string    `json:"name" binding:"required"`
+	PublicKey string    `json:"public_key" binding:"required"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // UserNodes model holds info of reserved nodes of user
 type UserNodes struct {
 	ID         int       `gorm:"primaryKey;autoIncrement;column:id"`
