@@ -58,7 +58,6 @@ type RegisterInput struct {
 	Email           string `json:"email" binding:"required,email"`
 	Password        string `json:"password" binding:"required,min=8,max=64"`
 	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
-	SSHKey          string `json:"ssh_key" binding:"required,ssh_key"`
 }
 
 // LoginInput struct for login handler
@@ -155,11 +154,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateSSH(request.SSHKey); err != nil {
-		Error(c, http.StatusBadRequest, "Validation Error", "invalid ssh key")
-		return
-	}
-
 	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
 	if getErr != gorm.ErrRecordNotFound {
@@ -195,7 +189,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		Password: hashedPassword,
 		Code:     code,
 		Verified: existingUser.Verified,
-		SSHKey:   request.SSHKey,
 		Admin:    isAdmin,
 	}
 
