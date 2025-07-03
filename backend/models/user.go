@@ -16,7 +16,18 @@ type User struct {
 	CreditCardBalance float64   `json:"credit_card_balance" gorm:"default:0"` // money from credit card
 	CreditedBalance   float64   `json:"credited_balance" gorm:"default:0"`    // manually added by admin or from vouchers
 	Mnemonic          string    `json:"-" gorm:"column:mnemonic"`
+	SSHKey            string    `json:"ssh_key"`
 	Debt              float64   `json:"debt"`
+}
+
+// SSHKey represents an SSH key for a user
+type SSHKey struct {
+	ID        int       `gorm:"primaryKey;autoIncrement;column:id"`                                                 // Primary key
+	UserID    int       `gorm:"user_id;index:idx_user_name,unique;index:idx_user_pubkey,unique" binding:"required"` // User owner
+	Name      string    `json:"name" binding:"required" gorm:"index:idx_user_name,unique"`                          // Unique name per user
+	PublicKey string    `json:"public_key" binding:"required" gorm:"index:idx_user_pubkey,unique"`                  // Unique public key per user
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // UserNodes model holds info of reserved nodes of user

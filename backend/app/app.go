@@ -16,7 +16,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 	"github.com/stripe/stripe-go/v82"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
+
+	// Import the generated docs package
+	_ "kubecloud/docs"
 )
 
 // App holds all configurations for the app
@@ -166,17 +171,20 @@ func (app *App) registerHandlers() {
 			authGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
 			{
 				authGroup.GET("/", app.handlers.GetUserHandler)
-				authGroup.POST("/change_password", app.handlers.ChangePasswordHandler)
+				authGroup.PUT("/change_password", app.handlers.ChangePasswordHandler)
 				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
-				authGroup.POST("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
-				authGroup.POST("/charge_balance", app.handlers.ChargeBalance)
+				authGroup.DELETE("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
+				authGroup.POST("/balance/charge", app.handlers.ChargeBalance)
 				authGroup.GET("/balance", app.handlers.GetUserBalance)
 				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
 				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
 				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
+				// SSH Key management
+				authGroup.GET("/ssh-keys", app.handlers.ListSSHKeysHandler)
+				authGroup.POST("/ssh-keys", app.handlers.AddSSHKeyHandler)
+				authGroup.DELETE("/ssh-keys/:ssh_key_id", app.handlers.DeleteSSHKeyHandler)
 			}
-
 		}
 
 		deployerGroup := v1.Group("")
@@ -199,7 +207,7 @@ func (app *App) registerHandlers() {
 		}
 
 	}
-
+	app.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }
 
 func (app *App) StartBackgroundWorkers() {

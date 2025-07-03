@@ -17,6 +17,26 @@ import (
 	proxyTypes "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
 )
 
+// ListNodesResponse holds the response for reserved nodes
+type ListNodesResponse struct {
+	Total int               `json:"total"`
+	Nodes []proxyTypes.Node `json:"nodes"`
+}
+
+// @Summary List nodes
+// @Description Retrieves a list of nodes from the grid proxy based on the provided filters.
+// @Tags nodes
+// @ID list-nodes
+// @Accept json
+// @Produce json
+// @Param healthy query bool false "Filter by healthy nodes (default: true)"
+// @Param rentable query bool false "Filter by rentable nodes (default: true)"
+// @Param limit query int false "Limit the number of nodes returned (default: 50)"
+// @Param offset query int false "Offset for pagination (default: 0)"
+// @Success 200 {object} APIResponse "Nodes are retrieved successfully"
+// @Failure 400 {object} APIResponse "Invalid filter parameters"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @Router /nodes [get]
 // ListNodesHandler requests all nodes from gridproxy
 func (h *Handler) ListNodesHandler(c *gin.Context) {
 	query := c.Request.URL.Query()
@@ -47,12 +67,24 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Nodes retrieved successfully", gin.H{
-		"total": count,
-		"nodes": nodes,
+	Success(c, http.StatusOK, "Nodes retrieved successfully", ListNodesResponse{
+		Total: count,
+		Nodes: nodes,
 	})
 }
 
+// @Summary Reserve node
+// @Description Reserves a node for a user
+// @Tags nodes
+// @ID reserve-node
+// @Accept json
+// @Produce json
+// @Param node_id path string true "Node ID"
+// @Success 200 {object} APIResponse
+// @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 500 {object} APIResponse
+// @Security UserMiddleware
+// @Router /user/nodes/{node_id} [post]
 // ReserveNodeHandler reserves node for user
 func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	nodeIDParam := c.Param("node_id")
@@ -64,7 +96,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	nodeID64, err := strconv.ParseUint(nodeIDParam, 10, 32)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusInternalServerError, "internal server error", "")
+		InternalServerError(c)
 		return
 	}
 	nodeID := uint32(nodeID64)
@@ -142,6 +174,16 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 }
 
+// @Summary List reserved nodes
+// @Description Returns a list of reserved nodes for a user
+// @Tags nodes
+// @ID list-reserved-nodes
+// @Accept json
+// @Produce json
+// @Success 201 {array} APIResponse
+// @Failure 500 {object} APIResponse
+// @Security UserMiddleware
+// @Router /user/nodes [get]
 // ListReservedNodeHandler list reserved nodes for user on tfchain
 func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
@@ -182,13 +224,25 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Nodes are retrieved successfully", map[string]interface{}{
-		"total": count,
-		"nodes": nodes,
+	Success(c, http.StatusCreated, "Nodes are retrieved successfully", ListNodesResponse{
+		Total: count,
+		Nodes: nodes,
 	})
 
 }
 
+// @Summary Unreserve node
+// @Description Unreserve a node for a user
+// @Tags nodes
+// @ID unreserve-node
+// @Accept json
+// @Produce json
+// @Param contract_id path string true "Contract ID"
+// @Success 200 {object} APIResponse
+// @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 500 {object} APIResponse
+// @Security UserMiddleware
+// @Router /user/nodes/unreserve/{contract_id} [delete]
 // UnreserveNodeHandler unreserve node for user
 func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	contractIDParam := c.Param("contract_id")
@@ -202,7 +256,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		log.Error().Err(err).Send()
-		Error(c, http.StatusNotFound, "User not found", "")
+		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
 
@@ -227,8 +281,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 		InternalServerError(c)
 		return
 	}
-	Success(c, http.StatusOK, "Node unreserved successfully", nil)
-
+	Success(c, http.StatusAccepted, "Node unreserved successfully", nil)
 }
 
 func queryParamsToStruct(query url.Values, result interface{}) error {

@@ -28,6 +28,7 @@ type Configuration struct {
 	Redis                Redis              `json:"redis" validate:"required,dive"`
 	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
+	Invoice              InvoiceCompanyData `json:"invoice"`
 }
 
 type GridConfig struct {
@@ -80,6 +81,13 @@ type Redis struct {
 	DB       int    `json:"db" validate:"min=0"`
 }
 
+// Invoice struct holds needed data for invoice file
+type InvoiceCompanyData struct {
+	Name        string `json:"name" validate:"required"`
+	Address     string `json:"address" validate:"required"`
+	Governorate string `json:"governorate" validate:"required"`
+}
+
 // ReadConfFile read configurations of json file
 func ReadConfFile(path string) (Configuration, error) {
 	config := Configuration{}
@@ -98,7 +106,7 @@ func ReadConfFile(path string) (Configuration, error) {
 	if err := validate.Struct(config); err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
 			for _, ve := range validationErrors {
-				return Configuration{}, fmt.Errorf("Validation error on field '%s': %s\n", ve.Namespace(), ve.Tag())
+				return Configuration{}, fmt.Errorf("validation error on field '%s': %s", ve.Namespace(), ve.Tag())
 			}
 		}
 		return Configuration{}, fmt.Errorf("invalid configuration: %w", err)
