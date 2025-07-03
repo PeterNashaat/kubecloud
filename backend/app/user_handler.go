@@ -883,7 +883,8 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 
 	// Convert sshKeyID to int
 	var keyID int
-	if _, err := fmt.Sscanf(sshKeyID, "%d", &keyID); err != nil {
+	keyID, err := strconv.Atoi(sshKeyID)
+	if err != nil {
 		Error(c, http.StatusBadRequest, "Invalid request", "invalid SSH key ID format")
 		return
 	}
