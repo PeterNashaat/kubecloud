@@ -692,7 +692,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

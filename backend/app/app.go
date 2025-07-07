@@ -212,7 +212,7 @@ func (app *App) registerHandlers() {
 
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
-	go internal.TrackUserDebt()
+	go app.handlers.TrackUserDebt(app.gridClient)
 }
 
 // Run starts the server
