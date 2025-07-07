@@ -13,9 +13,9 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.4
-	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20250625091136-bcdbec5bf71e
-	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.9-0.20250703092733-f873db14ee5a
-	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.8
+	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20250703093252-e7500b106618
+	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.9-0.20250707084605-fd852df30b94
+	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250707084605-fd852df30b94
 	github.com/tyler-smith/go-bip39 v1.1.0
 	gorm.io/gorm v1.30.0
 )
@@ -61,7 +61,7 @@ require (
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.1-0.20241229121208-76ac3fea5e67 // indirect
+	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.9-0.20250707084605-fd852df30b94 // indirect
 	github.com/threefoldtech/zosbase v0.1.7 // indirect
 	github.com/vedhavyas/go-subkey v1.0.3 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
