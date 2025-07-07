@@ -22,18 +22,16 @@
           </div>
         </div>
         <v-select
-          :items="availableNodes"
-          label="Select Reserved Node"
           v-model="vm.node"
-          item-title="label"
-          item-value="id"
-          prepend-inner-icon="mdi-server-network"
-          variant="outlined"
-          :hint="vm.node !== null && vm.node !== undefined ? getNodeInfo(String(vm.node)) : 'Choose a node for this VM'"
-          persistent-hint
+          :items="availableNodes"
+          :item-title="nodeLabel"
+          item-value="nodeId"
+          label="Select Reserved Node"
+          clearable
           class="node-select"
-          @update:modelValue="val => emit('onAssignNode', index, val)"
-        ></v-select>
+          @update:modelValue="val => props.onAssignNode(index, val)"
+        >
+      </v-select>
       </div>
     </div>
     <div class="step-actions">
@@ -53,7 +51,15 @@ import type { VM } from '../../composables/useDeployCluster';
 import { defineProps, withDefaults, defineEmits } from 'vue';
 const props = withDefaults(defineProps<{
   allVMs: VM[];
-  availableNodes: { id: number; label: string }[];
+  availableNodes: {
+    id: number;
+    cpu: number;
+    ram: number;
+    storage: number;
+    country: string;
+    gpu?: boolean;
+    [key: string]: any;
+  }[];
   getNodeInfo: (id: string) => string;
   onAssignNode: (vmIdx: number, nodeId: number) => void;
   isStep2Valid?: boolean;
@@ -61,6 +67,11 @@ const props = withDefaults(defineProps<{
   isStep2Valid: false
 });
 const emit = defineEmits(['nextStep', 'prevStep']);
+
+function nodeLabel(node: any) {
+  if (!node) return '';
+  return `Node ${node.nodeId}`;
+}
 </script>
 <script lang="ts">
 export default {
@@ -159,5 +170,19 @@ export default {
   .vm-assignment-card {
     min-width: unset;
   }
+}
+.chip {
+  display: inline-block;
+  background: #23243a;
+  color: #b4befe;
+  border-radius: 8px;
+  padding: 2px 8px;
+  margin-right: 4px;
+  font-size: 0.85em;
+}
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 </style> 

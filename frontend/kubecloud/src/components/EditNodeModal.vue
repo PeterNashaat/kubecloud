@@ -20,8 +20,7 @@
         <div class="ssh-key-section" style="margin-top: 1.5rem;">
           <label class="ssh-key-label">SSH Key</label>
           <v-chip-group
-            :model-value="localNode.sshKeyIds"
-            @update:model-value="ids => localNode.sshKeyIds = Array.isArray(ids) ? ids : [ids]"
+            v-model="selectedSshKeyId"
             column
             style="max-width: 600px;"
             :multiple="false"
@@ -31,11 +30,19 @@
               :key="key.id"
               :value="key.id"
               class="ma-1"
-              :class="{ 'selected-chip': localNode.sshKeyIds.includes(key.id) }"
+              :class="{ 'selected-chip': selectedSshKeyId === key.id }"
             >
+              <v-icon v-if="localNode.gpu" start small class="mr-1">mdi-nvidia</v-icon>
               {{ key.name }}
             </v-chip>
           </v-chip-group>
+          <div v-if="!selectedSshKeyId" class="ssh-alert">
+            <v-icon color="error" class="mr-1">mdi-alert-circle</v-icon>
+            <span>Please select an SSH key to proceed.</span>
+          </div>
+          <div v-else class="ssh-selected-name">
+            <span>Selected SSH Key: <b>{{ selectedSshKeyName }}</b></span>
+          </div>
         </div>
         <div v-if="errors.ssh" class="field-error">{{ errors.ssh }}</div>
       </div>
@@ -58,6 +65,21 @@ const props = defineProps({
 const emit = defineEmits<{ (e: 'save', node: VM): void; (e: 'cancel'): void }>();
 const localNode = ref<VM>({ ...props.node });
 watch(() => props.node, (val) => { localNode.value = { ...val }; });
+
+// Use a single value for SSH key selection
+const selectedSshKeyId = ref<number | null>(
+  localNode.value.sshKeyIds && localNode.value.sshKeyIds.length > 0 ? localNode.value.sshKeyIds[0] : null
+);
+
+// Keep selectedSshKeyId in sync with localNode when node changes
+watch(
+  () => localNode.value.sshKeyIds,
+  (ids) => {
+    selectedSshKeyId.value = ids && ids.length > 0 ? ids[0] : null;
+  },
+  { immediate: true }
+);
+
 const errors = computed(() => {
   const node = localNode.value;
   const errs: Record<string, string> = {};
@@ -65,13 +87,21 @@ const errors = computed(() => {
   if (!node.vcpu || node.vcpu <= 0) errs.vcpu = 'vCPU must be a positive number.';
   if (!node.ram || node.ram <= 0) errs.ram = 'RAM must be a positive number.';
   if (!node.disk || node.disk <= 0) errs.disk = 'Disk size must be positive.';
-  if (!node.sshKeyIds || node.sshKeyIds.length === 0) errs.ssh = 'At least one SSH key must be selected.';
+  if (!selectedSshKeyId.value) errs.ssh = 'At least one SSH key must be selected.';
   return errs;
 });
 const valid = computed(() => Object.keys(errors.value).length === 0);
 function onSave() {
-  if (valid.value) emit('save', { ...localNode.value });
+  if (valid.value) {
+    // Save as array for backend compatibility
+    emit('save', { ...localNode.value, sshKeyIds: selectedSshKeyId.value !== null ? [selectedSshKeyId.value] : [] });
+  }
 }
+const selectedSshKeyName = computed(() => {
+  if (!selectedSshKeyId.value) return '';
+  const key = props.availableSshKeys.find(k => k.id === selectedSshKeyId.value);
+  return key ? key.name : '';
+});
 </script>
 <script lang="ts">
 export default {
@@ -99,5 +129,20 @@ export default {
 .v-chip.selected-chip {
   background: var(--color-primary, #6366f1);
   color: #fff;
+}
+.ssh-alert {
+  color: #ff5252;
+  background: #2d1a1a;
+  border-radius: 6px;
+  padding: 0.5em 1em;
+  margin-top: 0.7em;
+  display: flex;
+  align-items: center;
+  font-size: 1em;
+}
+.ssh-selected-name {
+  color: #a5f3a1;
+  margin-top: 0.7em;
+  font-size: 1em;
 }
 </style> 

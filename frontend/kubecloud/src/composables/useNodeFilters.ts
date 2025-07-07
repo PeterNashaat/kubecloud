@@ -16,8 +16,8 @@ export function useNodeFilters(nodes: () => NormalizedNode[], initialPriceRange:
   const cpuMax = computed(() => Math.max(...nodes().map(n => n.cpu).filter(Boolean), 0));
   const ramMin = computed(() => Math.min(...nodes().map(n => Math.round(n.ram)).filter(Boolean), 0));
   const ramMax = computed(() => Math.max(...nodes().map(n => Math.round(n.ram)).filter(Boolean), 0));
-  const priceMin = computed(() => Math.min(...nodes().map(n => typeof n.price === 'number' ? n.price : Infinity)));
-  const priceMax = computed(() => Math.max(...nodes().map(n => typeof n.price === 'number' ? n.price : 0)));
+  const priceMin = computed(() => Math.min(...nodes().map(n => typeof n.price_usd === 'number' ? n.price_usd : Infinity)));
+  const priceMax = computed(() => Math.max(...nodes().map(n => typeof n.price_usd === 'number' ? n.price_usd : 0)));
 
   // Location options
   const locationOptions = computed(() => {
@@ -54,7 +54,7 @@ export function useNodeFilters(nodes: () => NormalizedNode[], initialPriceRange:
       if (node.cpu < filters.value.cpu[0] || node.cpu > filters.value.cpu[1]) return false;
       if (Math.round(node.ram) < filters.value.ram[0] || Math.round(node.ram) > filters.value.ram[1]) return false;
       if (filters.value.gpu && node.gpu === 'none') return false;
-      if (typeof node.price === 'number' && (node.price < filters.value.priceRange[0] || node.price > filters.value.priceRange[1])) return false;
+      if (typeof node.price_usd === 'number' && (node.price_usd < filters.value.priceRange[0] || node.price_usd > filters.value.priceRange[1])) return false;
       if (filters.value.location && node.locationString !== filters.value.location) return false;
       const storageOk = node.storage >= filters.value.storage[0] && node.storage <= filters.value.storage[1]
       return storageOk;

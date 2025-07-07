@@ -4,54 +4,85 @@ import { useNotificationStore } from '@/stores/notifications'
 
 // Interface for rented nodes (matches the grid proxy structure)
 export interface RentedNode {
-  id: number
-  nodeId?: number
-  farmId?: number
-  farmName?: string
-  twinId?: number
-  name?: string
-  location?: string
-  country?: string
-  city?: string
-  gridVersion?: number
-  uptime?: number
-  created?: number
-  updatedAt?: number
-  total_resources?: {
-    cru: number
-    sru: number
-    hru: number
-    mru: number
-  }
-  used_resources?: {
-    cru: number
-    sru: number
-    hru: number
-    mru: number
-  }
-  resources?: {
-    cpu: number
-    memory: number
-    storage: number
-    sru?: number
-    hru?: number
-    mru?: number
-  }
-  gpu?: string
-  gpus?: any[]
-  num_gpu?: number
-  price?: number
-  price_usd?: number
-  status?: string
-  healthy?: boolean
-  rentable?: boolean
-  rented?: boolean
-  rentContractId?: number
-  rentedByTwinId?: number
-  certificationType?: string
-  dedicated?: boolean
-  inDedicatedFarm?: boolean
-  features?: string[]
+  id: string;
+  nodeId: number;
+  farmId: number;
+  farmName: string;
+  twinId: number;
+  country: string;
+  gridVersion: number;
+  city: string;
+  uptime: number;
+  created: number;
+  farmingPolicyId: number;
+  updatedAt: number;
+  total_resources: {
+    cru: number;
+    sru: number;
+    hru: number;
+    mru: number;
+  };
+  used_resources: {
+    cru: number;
+    sru: number;
+    hru: number;
+    mru: number;
+  };
+  location: {
+    country: string;
+    city: string;
+    longitude: number;
+    latitude: number;
+  };
+  publicConfig: {
+    domain: string;
+    gw4: string;
+    gw6: string;
+    ipv4: string;
+    ipv6: string;
+  };
+  status: string;
+  certificationType: string;
+  dedicated: boolean;
+  inDedicatedFarm: boolean;
+  rentContractId: number;
+  rented: boolean;
+  rentable: boolean;
+  rentedByTwinId: number;
+  serialNumber: string;
+  power: {
+    state: string;
+    target: string;
+  };
+  num_gpu: number;
+  extraFee: number;
+  healthy: boolean;
+  dmi: {
+    bios: {
+      vendor: string;
+      version: string;
+    };
+    baseboard: {
+      manufacturer: string;
+      product_name: string;
+    };
+    processor: Array<{
+      version: string;
+      thread_count: string;
+    }>;
+    memory: Array<{
+      manufacturer: string;
+      type: string;
+    }>;
+  };
+  speed: {
+    upload: number;
+    download: number;
+  };
+  gpus: any[];
+  price_usd: number;
+  farm_free_ips: number;
+  features: string[];
 }
 
 export function useNodeManagement() {
@@ -99,7 +130,6 @@ export function useNodeManagement() {
           gpu: node.gpu,
           gpus: node.gpus,
           num_gpu: node.num_gpu,
-          price: node.price_usd,
           price_usd: node.price_usd,
           status: node.status,
           healthy: node.healthy,
@@ -160,8 +190,8 @@ export function useNodeManagement() {
   // Calculate total monthly cost of rented nodes
   const totalMonthlyCost = computed(() => {
     return rentedNodes.value
-      .filter(node => typeof node.price === 'number')
-      .reduce((sum, node) => sum + (node.price || 0), 0)
+      .filter(node => typeof node.price_usd === 'number')
+      .reduce((sum, node) => sum + (node.price_usd || 0), 0)
   })
 
   // Get nodes by status

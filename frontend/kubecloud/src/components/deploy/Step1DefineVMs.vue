@@ -1,5 +1,14 @@
 <template>
   <div>
+    <div v-if="!props.sshKeysLoading && !availableSshKeys.length" class="ssh-key-warning">
+      <v-alert type="warning" border="start" prominent>
+        <div>No SSH keys found. <v-btn color="primary" variant="text" @click="$emit('navigateToSshKeys')">Add SSH Key</v-btn></div>
+        <!-- TODO: Implement real navigation to SSH key management page -->
+      </v-alert>
+    </div>
+    <div v-else-if="props.sshKeysLoading" class="ssh-key-loading">
+      <v-skeleton-loader type="list-item" :loading="true" />
+    </div>
     <div class="vm-config-grid">
       <div class="vm-config-card">
         <div class="card-header">
@@ -7,7 +16,7 @@
             <v-icon icon="mdi-server" class="mr-2"></v-icon>
             Master Nodes
           </h4>
-          <v-btn color="primary" :disabled="masters.length >= 3" prepend-icon="mdi-plus" size="small" variant="outlined" @click="addMaster" class="add-btn">Add Master</v-btn>
+          <v-btn color="primary" :disabled="masters.length >= 3" prepend-icon="mdi-plus" size="small" variant="outlined" @click="addMaster">Add Master</v-btn>
         </div>
         <DeployVMCard v-for="(master, masterIdx) in masters" :key="masterIdx" :vm="master" type="master" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('master', masterIdx)" @delete="() => removeMaster(masterIdx)" />
         <div v-if="!masters.length" class="empty-state">
@@ -51,12 +60,14 @@ const props = withDefaults(defineProps<{
   removeMaster: (idx: number) => void;
   removeWorker: (idx: number) => void;
   openEditNodeModal: (type: 'master' | 'worker', idx: number) => void;
-  selectedSshKeys?: string[];
-  setSelectedSshKeys: (keys: string[]) => void;
+  selectedSshKeys?: number[];
+  setSelectedSshKeys: (keys: number[]) => void;
   isStep1Valid?: boolean;
+  sshKeysLoading?: boolean;
 }>(), {
   selectedSshKeys: () => [],
-  isStep1Valid: false
+  isStep1Valid: false,
+  sshKeysLoading: false
 });
 const emit = defineEmits(['navigateToSshKeys', 'nextStep']);
 </script>
@@ -121,19 +132,6 @@ export default {
   font-size: 1.1rem;
   font-weight: 500;
   gap: 0.5rem;
-}
-.add-btn {
-  margin-left: 1rem;
-  background: var(--color-primary, #6366f1) !important;
-  color: #fff !important;
-  border-radius: 8px;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(99,102,241,0.10);
-  transition: background 0.2s, color 0.2s;
-}
-.add-btn:hover, .add-btn:focus {
-  background: #7b82fa !important;
-  color: #fff !important;
 }
 .empty-state {
   display: flex;

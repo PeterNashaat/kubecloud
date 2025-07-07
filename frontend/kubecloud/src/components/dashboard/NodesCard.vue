@@ -124,7 +124,7 @@
         <div v-for="node in rentedNodes" :key="node.id" class="node-card">
           <div class="node-header">
             <h3 class="node-title">Node {{ node.nodeId || node.id }}</h3>
-            <div class="node-price">${{ node.price?.toFixed(2) ?? 'N/A' }}/month</div>
+            <div class="node-price">${{ node.price_usd?.toFixed(2) ?? 'N/A' }}/month</div>
           </div>
           <div class="node-location" v-if="node.country">
             <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>

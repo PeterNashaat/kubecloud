@@ -17,7 +17,29 @@
             </div>
             <div class="assignment-details">
               <div class="assignment-name">{{ vm.name }}</div>
-              <div class="assignment-node">{{ getNodeInfo(vm.node !== null && vm.node !== undefined ? String(vm.node) : '') }}</div>
+              <div class="assignment-node">Node: {{ vm.node ?? 'Unassigned' }}</div>
+              <div class="assignment-specs">
+                <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                  {{ vm.vcpu }} vCPU
+                </v-chip>
+                <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                  {{ vm.ram }} GB RAM
+                </v-chip>
+                <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                  {{ vm.disk }} GB Disk
+                </v-chip>
+                <v-chip v-if="vm.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                  GPU
+                </v-chip>
+                <span class="ssh-key-label">SSH Key: <b>{{ getSshKeyName(vm.sshKeyIds[0]) }}</b></span>
+              </div>
+              <div v-if="vm.node !== null && nodeResourceErrors[vm.node]" class="node-resource-warning">
+                <v-alert type="error" dense>{{ nodeResourceErrors[vm.node].join(', ') }}</v-alert>
+              </div>
             </div>
           </div>
         </div>
@@ -40,10 +62,12 @@ import type { VM } from '../../composables/useDeployCluster';
 import { defineProps, defineEmits } from 'vue';
 const props = defineProps<{
   allVMs: VM[];
-  getNodeInfo: (id: string) => string;
+  getNodeInfo: (id: number) => string;
   onDeployCluster: () => void;
   prevStep: () => void;
   deploying: boolean;
+  nodeResourceErrors: Record<number, string[]>;
+  getSshKeyName: (id: number) => string;
 }>();
 const emit = defineEmits(['onDeployCluster', 'prevStep']);
 </script>
@@ -119,6 +143,18 @@ export default {
 .assignment-node {
   color: var(--color-text-muted, #7c7fa5);
   font-size: 0.98rem;
+}
+.assignment-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ssh-key-label {
+  color: var(--color-text-muted, #7c7fa5);
+  font-size: 0.98rem;
+}
+.node-resource-warning {
+  margin-top: 0.5rem;
 }
 .step-actions {
   display: flex;

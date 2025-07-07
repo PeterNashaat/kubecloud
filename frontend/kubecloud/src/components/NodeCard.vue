@@ -4,14 +4,14 @@
       <h3 class="node-title">
         Node {{ node.nodeId }}
       </h3>
-      <div class="node-price">${{ node.price ?? 'N/A' }}/month</div>
+      <div class="node-price">${{ node.price_usd ?? 'N/A' }}/month</div>
     </div>
     <div class="node-location d-flex justify-space-between" v-if="node.country">
       <div>
         <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
         {{ node.country }}
       </div>
-      <div class="spec-item" v-if="node.gpu && node.gpu.toLowerCase() !== 'none'">
+      <div class="spec-item" v-if="node.gpu">
         <v-chip color="white" variant="outlined" size="small" class="mr-1">GPU</v-chip>
       </div>
     </div>
@@ -20,17 +20,17 @@
       <div class="spec-item">
         <v-icon size="18" class="mr-1" color="primary">mdi-cpu-64-bit</v-icon>
         <span class="spec-label">CPU:</span>
-        <span>{{ Math.round(node.cpu) }} vCPU</span>
+        <span>{{ node.cpu }} vCPU</span>
       </div>
       <div class="spec-item">
         <v-icon size="18" class="mr-1" color="success">mdi-memory</v-icon>
         <span class="spec-label">RAM:</span>
-        <span>{{ Math.round(node.ram) }} GB</span>
+        <span>{{ node.ram }} GB</span>
       </div>
       <div class="spec-item">
         <v-icon size="18" class="mr-1" color="info">mdi-harddisk</v-icon>
         <span class="spec-label">Storage:</span>
-        <span>{{ formatStorage(node.storage) }}</span>
+        <span>{{ node.storage }} GB</span>
       </div>
     </div>
     <v-btn 
