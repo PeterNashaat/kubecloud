@@ -142,7 +142,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	}
 
 	//TODO: check price in month constant
-	if usdBalance - user.Debt < node.PriceUsd/24/30 {
+	if usdBalance-user.Debt < node.PriceUsd/24/30 {
 		Error(c, http.StatusBadRequest, "You should at least have enough balance for one hour", "")
 		return
 	}

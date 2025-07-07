@@ -14,14 +14,9 @@ func (h *Handler) TrackUserDebt(gridClient deployer.TFPluginClient) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			err := h.updateUserDebt(gridClient)
-			if err != nil {
-				log.Error().Err(err).Send()
-			}
-
+	for range ticker.C {
+		if err := h.updateUserDebt(gridClient); err != nil {
+			log.Error().Err(err).Send()
 		}
 	}
 }
