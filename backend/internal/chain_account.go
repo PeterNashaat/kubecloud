@@ -115,7 +115,7 @@ func TransferTFTs(substrateClient *substrate.Substrate, usdcBalance uint64, user
 }
 
 // GetUserBalanceUSD gets balance of user in USD
-func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string, userDebt float64) (float64, error) {
+func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string) (float64, error) {
 	// Create identity from mnemonic
 	identity, err := substrate.NewIdentityFromSr25519Phrase(userMnemonic)
 	if err != nil {
@@ -138,11 +138,7 @@ func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string
 		return 0, err
 	}
 
-	if userDebt > usdBalance {
-		return 0, nil
-	}
-
-	return usdBalance - userDebt, nil
+	return usdBalance, nil
 
 }
 

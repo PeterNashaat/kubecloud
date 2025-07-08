@@ -45,9 +45,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 	stripe.Key = config.StripeSecret
 
 	tokenHandler := internal.NewTokenHandler(
-		config.JWT.Secret,
-		time.Duration(config.JWT.AccessTokenExpiryMinutes)*time.Minute,
-		time.Duration(config.JWT.RefreshTokenExpiryHours)*time.Hour,
+		config.JwtToken.Secret,
+		time.Duration(config.JwtToken.AccessExpiryMinutes)*time.Minute,
+		time.Duration(config.JwtToken.RefreshExpiryHours)*time.Hour,
 	)
 
 	db, err := sqlite.NewSqliteStorage(config.Database.File)
@@ -180,6 +180,10 @@ func (app *App) registerHandlers() {
 				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
 				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
 				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
+				// SSH Key management
+				authGroup.GET("/ssh-keys", app.handlers.ListSSHKeysHandler)
+				authGroup.POST("/ssh-keys", app.handlers.AddSSHKeyHandler)
+				authGroup.DELETE("/ssh-keys/:ssh_key_id", app.handlers.DeleteSSHKeyHandler)
 			}
 		}
 
@@ -208,7 +212,7 @@ func (app *App) registerHandlers() {
 
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
-	go internal.TrackUserDebt()
+	go app.handlers.TrackUserDebt(app.gridClient)
 }
 
 // Run starts the server

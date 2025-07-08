@@ -5,6 +5,7 @@ import (
 	"kubecloud/internal"
 	"kubecloud/models"
 	"net/http"
+	"strconv"
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -58,7 +59,6 @@ type RegisterInput struct {
 	Email           string `json:"email" binding:"required,email"`
 	Password        string `json:"password" binding:"required,min=8,max=64"`
 	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
-	SSHKey          string `json:"ssh_key" binding:"required,ssh_key"`
 }
 
 // LoginInput struct for login handler
@@ -120,6 +120,12 @@ type UserBalanceResponse struct {
 	DebtUSD    float64 `json:"debt_usd"`
 }
 
+// SSHKeyInput struct for adding SSH keys
+type SSHKeyInput struct {
+	Name      string `json:"name" binding:"required"`
+	PublicKey string `json:"public_key" binding:"required"`
+}
+
 // @Summary Register a user
 // @Description Registers a new user to the system
 // @Tags users
@@ -146,11 +152,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	// password and confirm password should match
 	if request.Password != request.ConfirmPassword {
 		Error(c, http.StatusBadRequest, "Validation Error", "password and confirm password don't match")
-		return
-	}
-
-	if err := internal.ValidateSSH(request.SSHKey); err != nil {
-		Error(c, http.StatusBadRequest, "Validation Error", "invalid ssh key")
 		return
 	}
 
@@ -189,7 +190,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		Password: hashedPassword,
 		Code:     code,
 		Verified: existingUser.Verified,
-		SSHKey:   request.SSHKey,
 		Admin:    isAdmin,
 	}
 
@@ -634,7 +634,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -692,7 +692,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic, user.Debt)
+	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -766,7 +766,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -774,4 +774,131 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	}
 
 	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
+}
+
+// @Summary List user SSH keys
+// @Description Lists all SSH keys for the authenticated user
+// @Tags users
+// @ID list-ssh-keys
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} models.SSHKey
+// @Failure 401 {object} APIResponse "Unauthorized"
+// @Failure 500 {object} APIResponse
+// @Router /user/ssh-keys [get]
+// ListSSHKeysHandler lists all SSH keys for the authenticated user
+func (h *Handler) ListSSHKeysHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	if userID == 0 {
+		Error(c, http.StatusUnauthorized, "Unauthorized", "user not authenticated")
+		return
+	}
+
+	sshKeys, err := h.db.ListUserSSHKeys(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list SSH keys")
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "SSH keys retrieved successfully", sshKeys)
+}
+
+// @Summary Add SSH key
+// @Description Adds a new SSH key for the authenticated user
+// @Tags users
+// @ID add-ssh-key
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body SSHKeyInput true "SSH Key Input"
+// @Success 201 {object} models.SSHKey
+// @Failure 400 {object} APIResponse "Invalid request format"
+// @Failure 401 {object} APIResponse "Unauthorized"
+// @Failure 500 {object} APIResponse
+// @Router /user/ssh-keys [post]
+// AddSSHKeyHandler adds a new SSH key for the authenticated user
+func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	if userID == 0 {
+		Error(c, http.StatusUnauthorized, "Unauthorized", "user not authenticated")
+		return
+	}
+
+	var request SSHKeyInput
+	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	// Validate SSH key format
+	if err := internal.ValidateSSH(request.PublicKey); err != nil {
+		Error(c, http.StatusBadRequest, "Validation Error", "invalid SSH key format")
+		return
+	}
+
+	sshKey := models.SSHKey{
+		UserID:    userID,
+		Name:      request.Name,
+		PublicKey: request.PublicKey,
+	}
+
+	if err := h.db.CreateSSHKey(&sshKey); err != nil {
+		log.Error().Err(err).Msg("failed to create SSH key")
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusCreated, "SSH key added successfully", sshKey)
+}
+
+// @Summary Delete SSH key
+// @Description Deletes an SSH key for the authenticated user
+// @Tags users
+// @ID delete-ssh-key
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param ssh_key_id path int true "SSH Key ID"
+// @Success 200 {object} APIResponse
+// @Failure 400 {object} APIResponse "Invalid SSH key ID"
+// @Failure 401 {object} APIResponse "Unauthorized"
+// @Failure 404 {object} APIResponse "SSH key not found"
+// @Failure 500 {object} APIResponse
+// @Router /user/ssh-keys/{ssh_key_id} [delete]
+// DeleteSSHKeyHandler deletes an SSH key for the authenticated user
+func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	if userID == 0 {
+		Error(c, http.StatusUnauthorized, "Unauthorized", "user not authenticated")
+		return
+	}
+
+	sshKeyID := c.Param("ssh_key_id")
+	if sshKeyID == "" {
+		Error(c, http.StatusBadRequest, "Invalid request", "SSH key ID is required")
+		return
+	}
+
+	// Convert sshKeyID to int
+	var keyID int
+	keyID, err := strconv.Atoi(sshKeyID)
+	if err != nil {
+		Error(c, http.StatusBadRequest, "Invalid request", "invalid SSH key ID format")
+		return
+	}
+
+	if err := h.db.DeleteSSHKey(keyID, userID); err != nil {
+		if err.Error() == fmt.Sprintf("no SSH key found with ID %d for user %d", keyID, userID) {
+			Error(c, http.StatusNotFound, "Not Found", "SSH key not found")
+			return
+		}
+		log.Error().Err(err).Msg("failed to delete SSH key")
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
 }
