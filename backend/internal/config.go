@@ -13,7 +13,7 @@ import (
 type Configuration struct {
 	Server               Server             `json:"server" validate:"required,dive"`
 	Database             DB                 `json:"database" validate:"required"`
-	Token                JwtToken           `json:"token" validate:"required"`
+	JwtToken             JwtToken           `json:"jwt_token" validate:"required"`
 	Admins               []string           `json:"admins" validate:"required"`
 	MailSender           MailSender         `json:"mailSender"`
 	Currency             string             `json:"currency" validate:"required"`

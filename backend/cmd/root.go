@@ -18,69 +18,137 @@ import (
 	"github.com/spf13/viper"
 )
 
-func addFlags() {
+func addFlags() error {
 	rootCmd.PersistentFlags().StringP("config", "c", "./config.json", "Path to the configuration file (default: ./config.json)")
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	if err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config")); err != nil {
+		return fmt.Errorf("failed to bind config flag: %w", err)
+	}
 
 	// === Server ===
-	bindStringFlag(rootCmd, "server.host", "", "Server host")
-	bindStringFlag(rootCmd, "server.port", "", "Server port")
+	if err := bindStringFlag(rootCmd, "server.host", "", "Server host"); err != nil {
+		return fmt.Errorf("failed to bind server.host flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "server.port", "", "Server port"); err != nil {
+		return fmt.Errorf("failed to bind server.port flag: %w", err)
+	}
 
 	// === Database ===
-	bindStringFlag(rootCmd, "database.file", "", "Database file path")
+	if err := bindStringFlag(rootCmd, "database.file", "", "Database file path"); err != nil {
+		return fmt.Errorf("failed to bind database.file flag: %w", err)
+	}
 
 	// === JWT Token ===
-	bindStringFlag(rootCmd, "token.secret", "", "JWT secret")
-	bindIntFlag(rootCmd, "token.access_expiry_minutes", 60, "Access token expiry (minutes)")
-	bindIntFlag(rootCmd, "token.refresh_expiry_hours", 24, "Refresh token expiry (hours)")
+	if err := bindStringFlag(rootCmd, "jwt_token.secret", "", "JWT secret"); err != nil {
+		return fmt.Errorf("failed to bind jwt_token.secret flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "jwt_token.access_expiry_minutes", 60, "Access token expiry (minutes)"); err != nil {
+		return fmt.Errorf("failed to bind jwt_token.access_expiry_minutes flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "jwt_token.refresh_expiry_hours", 24, "Refresh token expiry (hours)"); err != nil {
+		return fmt.Errorf("failed to bind jwt_token.refresh_expiry_hours flag: %w", err)
+	}
 
 	// === Admins ===
-	bindStringFlag(rootCmd, "admins", "", "Comma-separated list of admin emails")
+	if err := bindStringFlag(rootCmd, "admins", "", "Comma-separated list of admin emails"); err != nil {
+		return fmt.Errorf("failed to bind admins flag: %w", err)
+	}
 
 	// === Mail Sender ===
-	bindStringFlag(rootCmd, "mailSender.email", "", "Sender email")
-	bindStringFlag(rootCmd, "mailSender.sendgrid_key", "", "SendGrid API key")
-	bindIntFlag(rootCmd, "mailSender.timeout", 60, "Send timeout (seconds)")
+	if err := bindStringFlag(rootCmd, "mailSender.email", "", "Sender email"); err != nil {
+		return fmt.Errorf("failed to bind mailSender.email flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "mailSender.sendgrid_key", "", "SendGrid API key"); err != nil {
+		return fmt.Errorf("failed to bind mailSender.sendgrid_key flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "mailSender.timeout", 60, "Send timeout (seconds)"); err != nil {
+		return fmt.Errorf("failed to bind mailSender.timeout flag: %w", err)
+	}
 
 	// === Stripe ===
-	bindStringFlag(rootCmd, "currency", "", "Currency (e.g., USD)")
-	bindStringFlag(rootCmd, "stripe_secret", "", "Stripe secret")
+	if err := bindStringFlag(rootCmd, "currency", "", "Currency (e.g., USD)"); err != nil {
+		return fmt.Errorf("failed to bind currency flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "stripe_secret", "", "Stripe secret"); err != nil {
+		return fmt.Errorf("failed to bind stripe_secret flag: %w", err)
+	}
 
 	// === Voucher ===
-	bindIntFlag(rootCmd, "voucher_name_length", 6, "Voucher name length")
+	if err := bindIntFlag(rootCmd, "voucher_name_length", 6, "Voucher name length"); err != nil {
+		return fmt.Errorf("failed to bind voucher_name_length flag: %w", err)
+	}
 
 	// === URLs ===
-	bindStringFlag(rootCmd, "gridproxy_url", "", "GridProxy URL")
-	bindStringFlag(rootCmd, "tfchain_url", "", "TFChain URL")
-	bindStringFlag(rootCmd, "activation_service_url", "", "Activation Service URL")
-	bindStringFlag(rootCmd, "graphql_url", "", "GraphQL URL")
-	bindStringFlag(rootCmd, "firesquid_url", "", "Firesquid URL")
+	if err := bindStringFlag(rootCmd, "gridproxy_url", "", "GridProxy URL"); err != nil {
+		return fmt.Errorf("failed to bind gridproxy_url flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "tfchain_url", "", "TFChain URL"); err != nil {
+		return fmt.Errorf("failed to bind tfchain_url flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "activation_service_url", "", "Activation Service URL"); err != nil {
+		return fmt.Errorf("failed to bind activation_service_url flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "graphql_url", "", "GraphQL URL"); err != nil {
+		return fmt.Errorf("failed to bind graphql_url flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "firesquid_url", "", "Firesquid URL"); err != nil {
+		return fmt.Errorf("failed to bind firesquid_url flag: %w", err)
+	}
 
 	// === Terms and Conditions ===
-	bindStringFlag(rootCmd, "terms_and_conditions.document_link", "", "Terms document link")
-	bindStringFlag(rootCmd, "terms_and_conditions.document_hash", "", "Terms document hash")
+	if err := bindStringFlag(rootCmd, "terms_and_conditions.document_link", "", "Terms document link"); err != nil {
+		return fmt.Errorf("failed to bind terms_and_conditions.document_link flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "terms_and_conditions.document_hash", "", "Terms document hash"); err != nil {
+		return fmt.Errorf("failed to bind terms_and_conditions.document_hash flag: %w", err)
+	}
 
 	// === System Account ===
-	bindStringFlag(rootCmd, "system_account.mnemonic", "", "System account mnemonic")
-	bindStringFlag(rootCmd, "system_account.network", "", "System account network")
+	if err := bindStringFlag(rootCmd, "system_account.mnemonic", "", "System account mnemonic"); err != nil {
+		return fmt.Errorf("failed to bind system_account.mnemonic flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "system_account.network", "", "System account network"); err != nil {
+		return fmt.Errorf("failed to bind system_account.network flag: %w", err)
+	}
 
 	// === Redis ===
-	bindStringFlag(rootCmd, "redis.host", "", "Redis host")
-	bindIntFlag(rootCmd, "redis.port", 6379, "Redis port")
-	bindStringFlag(rootCmd, "redis.password", "", "Redis password")
-	bindIntFlag(rootCmd, "redis.db", 0, "Redis DB number")
+	if err := bindStringFlag(rootCmd, "redis.host", "", "Redis host"); err != nil {
+		return fmt.Errorf("failed to bind redis.host flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "redis.port", 6379, "Redis port"); err != nil {
+		return fmt.Errorf("failed to bind redis.port flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "redis.password", "", "Redis password"); err != nil {
+		return fmt.Errorf("failed to bind redis.password flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "redis.db", 0, "Redis DB number"); err != nil {
+		return fmt.Errorf("failed to bind redis.db flag: %w", err)
+	}
 
 	// === Grid ===
-	bindStringFlag(rootCmd, "grid.mnemonic", "", "Grid mnemonic")
-	bindStringFlag(rootCmd, "grid.net", "", "Grid network")
+	if err := bindStringFlag(rootCmd, "grid.mnemonic", "", "Grid mnemonic"); err != nil {
+		return fmt.Errorf("failed to bind grid.mnemonic flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "grid.net", "", "Grid network"); err != nil {
+		return fmt.Errorf("failed to bind grid.net flag: %w", err)
+	}
 
 	// === Deployer Workers ===
-	bindIntFlag(rootCmd, "deployer_workers_num", 1, "Number of deployer workers")
+	if err := bindIntFlag(rootCmd, "deployer_workers_num", 1, "Number of deployer workers"); err != nil {
+		return fmt.Errorf("failed to bind deployer_workers_num flag: %w", err)
+	}
 
 	// === Invoice ===
-	bindStringFlag(rootCmd, "invoice.name", "", "Invoice company name")
-	bindStringFlag(rootCmd, "invoice.address", "", "Invoice address")
-	bindStringFlag(rootCmd, "invoice.governorate", "", "Invoice governorate")
+	if err := bindStringFlag(rootCmd, "invoice.name", "", "Invoice company name"); err != nil {
+		return fmt.Errorf("failed to bind invoice.name flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "invoice.address", "", "Invoice address"); err != nil {
+		return fmt.Errorf("failed to bind invoice.address flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "invoice.governorate", "", "Invoice governorate"); err != nil {
+		return fmt.Errorf("failed to bind invoice.governorate flag: %w", err)
+	}
+
+	return nil
 }
 
 func init() {
@@ -92,7 +160,9 @@ func init() {
 	// Map environment variables to their corresponding keys
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	addFlags()
+	if err := addFlags(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to add flags")
+	}
 }
 
 func initConfig() {
@@ -176,14 +246,22 @@ func Execute() {
 	}
 }
 
-func bindStringFlag(cmd *cobra.Command, key, defaultVal, usage string) {
+func bindStringFlag(cmd *cobra.Command, key, defaultVal, usage string) error {
 	cmd.PersistentFlags().String(key, defaultVal, usage)
-	viper.BindPFlag(key, cmd.PersistentFlags().Lookup(key))
+	return viper.BindPFlag(key, cmd.PersistentFlags().Lookup(key))
 }
 
-func bindIntFlag(cmd *cobra.Command, key string, defaultVal int, usage string) {
+func bindIntFlag(cmd *cobra.Command, key string, defaultVal int, usage string) error {
 	cmd.PersistentFlags().Int(key, defaultVal, usage)
-	viper.BindPFlag(key, cmd.PersistentFlags().Lookup(key))
-	viper.BindEnv(key)
+	if err := viper.BindPFlag(key, cmd.PersistentFlags().Lookup(key)); err != nil {
+		return fmt.Errorf("failed to bind flag %s: %w", key, err)
+	}
+
+	if err := viper.BindEnv(key); err != nil {
+		return fmt.Errorf("failed to bind environment variable for flag %s: %w", key, err)
+	}
+	// Ensure the value is set as an integer in viper
 	viper.Set(key, viper.GetInt(key))
+
+	return nil
 }
