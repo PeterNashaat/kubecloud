@@ -7,14 +7,8 @@ if [ -z "${DUAL_STACK}" ]; then
   exit 1
 fi
 
-bridge="flannel-br"
+bridge="mycelium-br"
 eth_iface="eth0"
-CUSTOM_TABLE_NAME=myctable
-
-# Step 0: Create bridge
-echo "🔧 Creating bridge: $bridge"
-ip link add name $bridge type bridge
-ip link set $bridge up
 
 echo "[*] Migrating IPv4 configuration from $eth_iface to $bridge..."
 # Step 1: Detect IPv4 address and default gateway
@@ -24,42 +18,16 @@ ipv4_gw=$(ip route show | awk '$1 == "default" && $5 == "'"$eth_iface"'" {print 
 # Step 2: Capture all non-default IPv4 routes on eth0
 mapfile -t old_ipv4_routes < <(ip route show | awk '$1 != "default" && $5 == "'"$eth_iface"'"')
 
-
-# Step 3: Find the interface with 400::/7 route among eth1-eth9
-for iface in eth{1..9}; do
-  if ip -6 route show 400::/7 | grep -qw "dev $iface"; then
-    IPV6_IFACE="$iface"
-    echo "✅ Found IPv6 interface: $IPV6_IFACE (has 400::/7 route)"
-    break
-  fi
-done
-
-if [[ -z "$IPV6_IFACE" ]]; then
-  echo "❌ No interface eth1–eth9 has a route to 400::/7"
-  exit 1
-fi
-ipv6_global=$(ip -6 addr show dev "$IPV6_IFACE" | awk '/inet6/ && !/fe80::/ {print $2}' | head -n1)
-ipv6_ll=$(ip -6 addr show dev "$IPV6_IFACE" | awk '/inet6/ && /fe80::/ {print $2}' | head -n1)
-ipv6_gw=$(ip -6 route show 400::/7 | grep "dev $IPV6_IFACE" | awk '/via/ {print $3}' | head -n1)
-
-
-# Step 3: Clean up
+# Step 3: Clean up eth0
 ip addr del $ipv4 dev $eth_iface
-ip addr del $ipv6_global dev "$IPV6_IFACE"
 
 ip link set "$bridge" up
 ip link set "$eth_iface" master "$bridge"
-ip link set "$IPV6_IFACE" master "$bridge"
 ip link set "$eth_iface" up
-ip link set "$IPV6_IFACE" up
 
 # Step 5: Reassign IPv4 address
 if [[ -n "$ipv4" ]]; then
   ip addr add "$ipv4" dev "$bridge"
-fi
-
-if [[ -n "$ipv6_global" ]]; then
-  ip addr add "$ipv6_global" dev "$bridge"
 fi
 
 # Step 6: Reapply default IPv4 route
@@ -81,14 +49,6 @@ for route in "${old_ipv4_routes[@]}"; do
   echo "    ➤ $new_route"
   ip route replace $new_route
 done
-
-# Step 7: Clean up and re-add 400::/7 route
-echo "🧹 Removing old 400::/7 route via $IPV6_IFACE"
-ip -6 route del 400::/7 dev "$IPV6_IFACE" || true
-
-echo "📡 Adding route: 400::/7 via $ipv6_gw on $bridge"
-ip -6 route add 400::/7 via "$ipv6_gw" dev "$bridge" table "$CUSTOM_TABLE_NAME"
-
 
 echo "[*] Enabling forwarding and proxy features..."
 sysctl -w net.ipv4.ip_forward=1
