@@ -31,7 +31,61 @@
           class="node-select"
           @update:modelValue="val => props.onAssignNode(index, val)"
         >
-      </v-select>
+          <template #item="{ item, index, props: itemProps }">
+            <div>
+              <div v-bind="itemProps" class="node-option-row">
+                <div class="node-id">Node {{ item.raw.nodeId }}</div>
+                <div class="chip-row">
+                  <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                    {{ item.raw.cpu }} vCPU
+                  </v-chip>
+                  <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                    {{ item.raw.ram }} GB RAM
+                  </v-chip>
+                  <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                    {{ item.raw.storage }} GB Disk
+                  </v-chip>
+                  <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                    GPU
+                  </v-chip>
+                  <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    {{ item.raw.country }}
+                  </v-chip>
+                </div>
+              </div>
+              <v-divider v-if="index < availableNodes.length - 1" />
+            </div>
+          </template>
+          <template #selection="{ item }">
+            <div class="node-id">Node {{ item.raw.nodeId }}</div>
+
+            <div class="chip-row">
+              <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                {{ item.raw.cpu }} vCPU
+              </v-chip>
+              <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                {{ item.raw.ram }} GB RAM
+              </v-chip>
+              <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                {{ item.raw.storage }} GB Disk
+              </v-chip>
+              <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                GPU
+              </v-chip>
+              <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                {{ item.raw.country }}
+              </v-chip>
+            </div>
+          </template>
+        </v-select>
       </div>
     </div>
     <div class="step-actions">
@@ -52,15 +106,24 @@ import { defineProps, withDefaults, defineEmits } from 'vue';
 const props = withDefaults(defineProps<{
   allVMs: VM[];
   availableNodes: {
-    id: number;
+    nodeId: number;
     cpu: number;
     ram: number;
     storage: number;
+    price_usd: number | null;
+    gpu: boolean;
+    locationString: string;
     country: string;
-    gpu?: boolean;
+    city: string;
+    status: string;
+    healthy: boolean;
+    rentable: boolean;
+    rented: boolean;
+    dedicated: boolean;
+    certificationType: string;
     [key: string]: any;
   }[];
-  getNodeInfo: (id: string) => string;
+  getNodeInfo: (id: number) => string;
   onAssignNode: (vmIdx: number, nodeId: number) => void;
   isStep2Valid?: boolean;
 }>(), {
@@ -171,6 +234,21 @@ export default {
     min-width: unset;
   }
 }
+.node-option-row {
+  padding: .5rem;
+  margin: .5rem;
+  cursor: pointer;
+}
+.node-id {
+  font-weight: 600;
+  margin-bottom: 2px;
+  margin-right: 1rem;
+}
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 .chip {
   display: inline-block;
   background: #23243a;
@@ -179,10 +257,5 @@ export default {
   padding: 2px 8px;
   margin-right: 4px;
   font-size: 0.85em;
-}
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
 }
 </style> 

@@ -96,6 +96,21 @@ class ApiClient {
         throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`)
       }
 
+      // Handle 204 No Content
+      if (response.status === 204) {
+        if (loadingNotificationId) {
+          notificationStore.removeNotification(loadingNotificationId)
+        }
+        if (showNotifications && successMessage) {
+          notificationStore.success('Success', successMessage)
+        }
+        return {
+          data: {} as T,
+          status: response.status,
+          message: 'No Content'
+        }
+      }
+
       const data = await response.json()
 
       // Clear loading notification if it was shown

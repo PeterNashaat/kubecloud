@@ -77,6 +77,4 @@ const headers = [
 }
 </style>
 
-export default {
-  name: 'BillingCard'
-}
+export default {}

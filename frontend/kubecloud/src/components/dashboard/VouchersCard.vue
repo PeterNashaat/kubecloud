@@ -88,9 +88,7 @@ function isExpired(expiryDate: string) {
 </script>
 
 <script lang="ts">
-export default {
-  name: 'VouchersCard'
-}
+export default {}
 </script>
 
 <style scoped>

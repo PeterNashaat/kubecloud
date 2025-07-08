@@ -19,7 +19,7 @@
         <div class="profile-row">
           <div class="profile-col">
             <label class="profile-label">Balance</label>
-            <v-text-field :model-value="balanceDisplay" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" :loading="balanceLoading" />
+            <v-text-field :model-value="`$${userStore.netBalance.toFixed(2)}`" variant="outlined" class="profile-field compact" color="accent" bg-color="transparent" hide-details="auto" disabled density="compact" />
           </div>
           <div class="profile-col">
             <label class="profile-label">Verified</label>
@@ -81,15 +81,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import { authService } from '../../utils/authService'
 import { useNotificationStore } from '../../stores/notifications'
-import { userService } from '../../utils/userService'
 
 const { user } = storeToRefs(useUserStore())
 const notificationStore = useNotificationStore()
+const userStore = useUserStore()
 
 // Change password form data
 const passwordFormData = ref({
@@ -117,24 +117,6 @@ const confirmPasswordRules = [
 ]
 
 const passwordForm = ref()
-
-// Balance state
-const balance = ref<number | null>(null)
-const balanceLoading = ref(true)
-const balanceDisplay = computed(() =>
-  balanceLoading.value ? 'Loading...' : balance.value !== null ? `$${balance.value.toFixed(2)}` : 'N/A'
-)
-
-onMounted(async () => {
-  balanceLoading.value = true
-  try {
-    balance.value = await userService.fetchBalance()
-  } catch (err) {
-    balance.value = null
-  } finally {
-    balanceLoading.value = false
-  }
-})
 
 function formatDate(dateStr: string) {
   if (!dateStr) return ''
@@ -171,9 +153,7 @@ async function changePassword() {
 }
 </script>
 
-export default {
-  name: 'ProfileCard'
-}
+export default {}
 
 <style scoped>
 .dashboard-card.profile-card.compact {

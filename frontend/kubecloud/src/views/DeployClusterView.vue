@@ -59,11 +59,11 @@
               v-else-if="step === 3"
               :allVMs="allVMs"
               :getNodeInfo="getNodeInfo"
-              :onDeployCluster="onDeployCluster"
-              :prevStep="prevStep"
               :deploying="deploying"
               :nodeResourceErrors="nodeResourceErrors"
               :getSshKeyName="getSshKeyName"
+              @onDeployCluster="onDeployCluster"
+              @prevStep="prevStep"
             />
           </div>
         </div>
@@ -92,6 +92,7 @@ import { useNodes } from '../composables/useNodes';
 import { useNormalizedNodes } from '../composables/useNormalizedNodes';
 import { useRouter } from 'vue-router';
 import { normalizeNode } from '../utils/nodeNormalizer';
+import type { Cluster } from '../types/cluster';
 
 const notificationStore = useNotificationStore();
 const userService = new UserService();
@@ -194,12 +195,11 @@ const clusterNetworkName = ref('');
 const defaultFlist = ref('https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist');
 const defaultEntrypoint = ref('/sbin/zinit init');
 
-// Cluster name generator
 function generateClusterName() {
   const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
   const randomNumber = Math.floor(Math.random() * 999) + 1;
-  clusterName.value = `${randomAdjective}-${randomNoun}-${randomNumber}`;
+  clusterName.value = `${randomAdjective}_${randomNoun}_${randomNumber}`;
 }
 
 // Navigate to SSH keys management
@@ -244,22 +244,23 @@ function prevStep() {
 
 const clusters = useClusterStore();
 
-const clusterPayload = computed(() => {
+const clusterPayload = computed<Cluster>(() => {
   const networkName = clusterNetworkName.value || `${clusterName.value}_network`;
   const token = clusterToken.value;
-  const flist = 'https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist';
-  const entrypoint = '/sbin/zinit init';
+  const flist = defaultFlist.value;
+  const entrypoint = defaultEntrypoint.value;
   const sshKeyObj = availableSshKeys.value.find(k => k.id === selectedSshKeys.value[0]);
   const sshKey = sshKeyObj ? sshKeyObj.public_key : '';
-  function buildVM(vm: VM) {
+
+  function buildNode(vm: VM, type: 'master' | 'worker'): any {
     return {
       Name: vm.name,
+      Type: type === 'master' ? 'master' : 'worker',
       NodeID: vm.node,
       CPU: vm.vcpu,
-      MemoryMB: vm.ram * 1024,
-      NetworkName: networkName,
-      Flist: flist,
-      Entrypoint: entrypoint,
+      Memory: vm.ram * 1024, // GB to MB
+      RootSize: vm.rootfs * 1024, // GB to MB
+      DiskSize: vm.disk * 1024, // GB to MB
       EnvVars: {
         SSH_KEY: sshKey,
         K3S_TOKEN: token,
@@ -268,44 +269,42 @@ const clusterPayload = computed(() => {
         K3S_NODE_NAME: vm.name,
         K3S_URL: '',
       },
-      RootfsSizeMB: (vm.rootfs || 10) * 1024,
-      PublicIP: vm.publicIp,
-      Planetary: vm.planetary,
-      QEMUArgs: [],
+      Flist: flist,
+      Entrypoint: entrypoint,
+      IP: '', // Computed by backend
+      MyceliumIP: '', // Computed by backend
+      PlanetaryIP: '', // Computed by backend
     };
   }
-  const masterNode = masters.value[0];
-  const master = masterNode ? {
-    VM: buildVM(masterNode),
-    DiskSizeGB: masterNode.rootfs || 10,
-  } : null;
-  const workersArr = workers.value.map(worker => ({
-    VM: buildVM(worker),
-    DiskSizeGB: worker.rootfs || 10,
-  }));
+
+  const nodes = [
+    ...masters.value.map(vm => buildNode(vm, 'master')),
+    ...workers.value.map(vm => buildNode(vm, 'worker')),
+  ];
+
   return {
-    Master: master,
-    Workers: workersArr,
+    Name: clusterName.value,
+    Network: networkName,
     Token: token,
-    NetworkName: networkName,
-    SSHKey: sshKey,
-    Flist: flist,
-    SolutionType: `kubernetes/user/${clusterName.value}`,
+    Nodes: nodes,
   };
 });
 
 async function onDeployCluster() {
   deploying.value = true;
   try {
+    // Debug log for outgoing payload
+    // eslint-disable-next-line no-console
+    console.log('Deploy payload:', JSON.stringify(clusterPayload.value, null, 2));
     await api.post('/v1/deploy', clusterPayload.value, {
-      showNotifications: true,
+      showNotifications: false,
       loadingMessage: 'Deploying cluster...',
-      successMessage: 'Cluster deployed successfully!',
       errorMessage: 'Failed to deploy cluster',
       requiresAuth: true
     });
-    router.push('/dashboard/clusters');
-  } catch (err: any) {
+    notificationStore.info('Deployment started', 'Your cluster is being deployed in the background. You will be notified when it is ready.');
+  } catch (err) {
+    // Optionally handle error
   } finally {
     deploying.value = false;
   }

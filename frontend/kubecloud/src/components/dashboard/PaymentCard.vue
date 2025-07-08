@@ -7,7 +7,7 @@
     <div class="dashboard-card-content">
       <div class="balance-row">
         <span>Current Balance:</span>
-        <span class="balance-value">${{ balance }}</span>
+        <span class="balance-value">${{ userStore.netBalance.toFixed(2) }}</span>
       </div>
       <div class="amount-row">
         <span>Amount:</span>
@@ -56,23 +56,17 @@
 
 <script setup lang="ts">
 import { ref, computed, type Ref, onMounted } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import { userService } from '../../utils/userService'
-import { api } from '../../utils/api'
-import type { ApiResponse } from '../../utils/authService'
-import type { User } from '../../stores/user'
-import { loadStripe } from '@stripe/stripe-js'
-import type { StripeElementType, StripeElements, StripeCardElement, StripeElementsOptions } from '@stripe/stripe-js'
+import type { StripeElements, StripeCardElement, StripeElementsOptions } from '@stripe/stripe-js'
 import { stripeService } from '../../utils/stripeService'
 
-const { user } = storeToRefs(useUserStore())
+const userStore = useUserStore()
 
 const presets = [5, 10, 20, 50]
 const amount: Ref<number | 'custom'> = ref(5)
 const customAmount = ref<number | null>(null)
 const loading = ref(false)
-const balance = ref<number>(0)
 
 // Stripe Elements
 const stripe = ref<any>(null)
@@ -80,16 +74,7 @@ const elements = ref<StripeElements | null>(null)
 const cardElement = ref<StripeCardElement | null>(null)
 const stripeLoaded = ref(false)
 
-const fetchAndSetBalance = async () => {
-  try {
-    balance.value = +(await userService.fetchBalance()).toFixed(2)
-  } catch (e) {
-    balance.value = 0
-  }
-}
-
 onMounted(async () => {
-  await fetchAndSetBalance()
   await stripeService.initialize()
   stripe.value = await stripeService.getStripe()
   elements.value = stripe.value.elements()
@@ -133,8 +118,6 @@ async function chargeBalance() {
     if (cardElement.value) cardElement.value.clear()
     amount.value = 5
     customAmount.value = null
-    // Refresh user balance from /balance endpoint
-    await fetchAndSetBalance()
   } catch (err: any) {
   } finally {
     loading.value = false
@@ -264,6 +247,4 @@ function getSelectedAmount() {
 }
 </style>
 
-export default {
-  name: 'PaymentCard'
-}
+export default {}

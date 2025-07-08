@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { authService, type LoginRequest, type RegisterRequest, type VerifyCodeRequest } from '@/utils/authService'
 import { api } from '@/utils/api'
 import type { ApiResponse } from '@/utils/authService'
+import { userService } from '@/utils/userService'
 
 export interface User {
   id: number
@@ -11,8 +12,6 @@ export interface User {
   admin: boolean
   verified: boolean
   updated_at: string
-  credit_card_balance: number
-  credited_balance: number
 }
 
 export interface AuthState {
@@ -30,6 +29,7 @@ export const useUserStore = defineStore('user',
     const token = ref<string | null>(null)
     const isLoading = ref(false)
     const error = ref<string | null>(null)
+    const netBalance = ref(0)
 
     // Computed properties
     const isAdmin = computed(() => user.value?.admin)
@@ -140,12 +140,13 @@ export const useUserStore = defineStore('user',
     }
 
     const refreshToken = async () => {
-      const { refreshToken } = authService.getTokens()
-      if (!refreshToken) return
+      const tokens = authService.getTokens()
+      if (!tokens.refreshToken) return
 
       try {
-        const response = await authService.refreshToken({ refresh_token: refreshToken })
-        authService.storeTokens(response.access_token, response.refresh_token)
+        const response = await authService.refreshToken({ refresh_token: tokens.refreshToken })
+        // Only access_token is returned in RefreshTokenResponse, so keep the old refreshToken
+        authService.storeTokens(response.access_token, tokens.refreshToken)
         token.value = response.access_token
       } catch (err) {
         // If refresh fails, logout user
@@ -167,12 +168,17 @@ export const useUserStore = defineStore('user',
       }
     }
 
+    const updateNetBalance = async () => {
+      netBalance.value = await userService.fetchBalance()
+    }
+
     return {
       // State (raw refs for persistence)
       user,
       token,
       isLoading,
       error,
+      netBalance,
 
       // Computed
       isAdmin,
@@ -186,6 +192,7 @@ export const useUserStore = defineStore('user',
       updateProfile,
       refreshToken,
       initializeAuth,
+      updateNetBalance,
     }
   },
   // Persisted state options

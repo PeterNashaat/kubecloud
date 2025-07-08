@@ -111,7 +111,7 @@ const deleteCluster = (id: number) => {
 }
 
 const viewAllClusters = () => {
-  console.log('View all clusters')
+  router.push('/dashboard/clusters')
 }
 
 const openMetrics = () => {
@@ -258,6 +258,4 @@ const goToDeployCluster = () => {
 }
 </style>
 
-export default {
-  name: 'ClustersCard'
-}
+export default {}

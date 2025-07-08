@@ -280,3 +280,5 @@ onMounted(fetchSshKeys)
   }
 }
 </style>
+
+export default {}
