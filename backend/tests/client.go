@@ -351,3 +351,18 @@ func (c *Client) GetKubeconfig(name string) (string, error) {
 
 	return string(kubeconfig), nil
 }
+
+func (c *Client) DeleteDeployment(name string) error {
+	resp, err := c.makeRequest("DELETE", "/deployments/"+name, nil, true)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("delete deployment failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}

@@ -78,7 +78,7 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 
 	result := w.performDeployment(ctx, task)
 
-	if err := w.redis.AddResult(context.Background(), result); err != nil {
+	if err := w.redis.AddResult(ctx, result); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to add result to stream")
 	}
 
@@ -97,12 +97,11 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 		w.sseManager.Notify(task.UserID, "deployment_update", notificationData, task.TaskID)
 	}
 
-	if err := w.redis.AckTask(context.Background(), task); err != nil {
+	if err := w.redis.AckTask(ctx, task); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to acknowledge task")
 		return err
 	}
 
-	// Save the deployment result to the database if successful
 	if result.Status == TaskStatusCompleted {
 		cluster := &models.Cluster{
 			UserID:      task.UserID,
@@ -112,17 +111,14 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 		if err := cluster.SetClusterResult(result.Result); err != nil {
 			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to serialize cluster result")
 		} else {
-			// Try to create or update the cluster
 			existingCluster, err := w.db.GetClusterByName(task.UserID, result.Result.Name)
 			if err != nil {
-				// Cluster doesn't exist, create it
 				if err := w.db.CreateCluster(cluster); err != nil {
 					log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to create cluster in database")
 				} else {
 					log.Info().Str("task_id", task.TaskID).Str("project_name", result.Result.Name).Msg("Cluster saved to database")
 				}
 			} else {
-				// Cluster exists, update it
 				existingCluster.Result = cluster.Result
 				if err := w.db.UpdateCluster(&existingCluster); err != nil {
 					log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to update cluster in database")

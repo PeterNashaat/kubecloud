@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
@@ -34,7 +35,10 @@ func getRandomMyceliumIPSeed() ([]byte, error) {
 	return key, err
 }
 
-var usedIPsTracker = make(map[string]map[uint32][]byte) // network -> node -> hostIDs
+var (
+	usedIPsTracker = make(map[string]map[uint32][]byte) // network -> node -> hostIDs
+	usedIPsMutex   sync.RWMutex
+)
 
 func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, networkName string, nodeID uint32) (string, error) {
 	network := tfPluginClient.State.Networks.GetNetwork(networkName)
@@ -49,6 +53,9 @@ func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, net
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get used IPs for node %d", nodeID)
 	}
+
+	usedIPsMutex.Lock()
+	defer usedIPsMutex.Unlock()
 
 	if usedIPsTracker[networkName] == nil {
 		usedIPsTracker[networkName] = make(map[uint32][]byte)

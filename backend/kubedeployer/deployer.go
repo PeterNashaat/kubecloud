@@ -26,12 +26,27 @@ func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 	}
 
 	log.Debug().Msgf("Deploying network %s with nodes %v", net.Name, net.Nodes)
-	if err := tfplugin.NetworkDeployer.Deploy(context.Background(), &net); err != nil {
+	if err := tfplugin.NetworkDeployer.Deploy(ctx, &net); err != nil {
 		return Cluster{}, fmt.Errorf("failed to deploy network: %v", err)
 	}
 
 	// 2. make a deployment for each node in the cluster
-	// TODO: if no leader node is defined, pick the first master node as the leader
+	hasLeader := false
+	for _, node := range cluster.Nodes {
+		if node.Type == NodeTypeLeader {
+			hasLeader = true
+			break
+		}
+	}
+
+	if !hasLeader {
+		for i, node := range cluster.Nodes {
+			if node.Type == NodeTypeMaster {
+				cluster.Nodes[i].Type = NodeTypeLeader
+			}
+		}
+	}
+
 	leaderIP := ""
 	for _, node := range cluster.Nodes {
 		// TODO: if multiple vms on same node, a single deployment should be created
@@ -58,7 +73,7 @@ func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 		)
 
 		log.Debug().Msgf("Deploying node %s in cluster %s", node.Name, cluster.Name)
-		if err := tfplugin.DeploymentDeployer.Deploy(context.Background(), &depl); err != nil {
+		if err := tfplugin.DeploymentDeployer.Deploy(ctx, &depl); err != nil {
 			// TODO: if err we should rollback the network deployment and previous VMs
 			return Cluster{}, fmt.Errorf("failed to deploy VMs: %v", err)
 		}
@@ -66,7 +81,7 @@ func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 
 	// 3. Load all deployments to get the IPs
 	for idx, node := range cluster.Nodes {
-		result, err := tfplugin.State.LoadDeploymentFromGrid(context.Background(), node.NodeID, cluster.Name+node.Name)
+		result, err := tfplugin.State.LoadDeploymentFromGrid(ctx, node.NodeID, cluster.Name+node.Name)
 		if err != nil {
 			return Cluster{}, fmt.Errorf("failed to load deployment: %v", err)
 		}
@@ -74,6 +89,7 @@ func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 		cluster.Nodes[idx].IP = result.Vms[0].IP
 		cluster.Nodes[idx].MyceliumIP = result.Vms[0].MyceliumIP
 		cluster.Nodes[idx].PlanetaryIP = result.Vms[0].PlanetaryIP
+		cluster.Nodes[idx].ContractID = result.ContractID
 	}
 
 	return cluster, nil

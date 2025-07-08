@@ -209,10 +209,11 @@ func (app *App) registerHandlers() {
 				deploymentGroup.GET("", app.handlers.HandleListDeployments)
 				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
 				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
-
+				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteDeployment)
+				// TODO: add/remove nodes from deployment
 			}
 
-			// Task routes
+			// TODO: Task routes
 			// deployerGroup.GET("/tasks", app.handlers.ListUserTasksHandler)
 			// deployerGroup.GET("/tasks/:task_id", app.handlers.GetTaskStatusHandler)
 

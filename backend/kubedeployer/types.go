@@ -16,38 +16,33 @@ const (
 	NodeTypeLeader NodeType = "leader"
 )
 
-// final project name is
-// kubecloud/cluster.name and kubecloud/cluster.name_network for net TODO: add username prefix as a namespace
-// cluster.name+cluster.node.name for each deployment
-// list -> get all contract for twin ide then filter where projecName start with kubecloud/
-// get -> get all contracts with project name kubecloud/cluster.name
-
 type Cluster struct {
-	Name    string // the projectname in metadata, to get/list all related deployments
-	Network string
-	Token   string
-	Nodes   []Node
+	Name    string `json:"name"` // the projectname in metadata, to get/list all related deployments
+	Network string `json:"network"`
+	Token   string `json:"token"`
+	Nodes   []Node `json:"nodes"`
 }
 
 type Node struct {
-	Name   string // name of the deployment
-	Type   NodeType
-	NodeID uint32
+	Name   string   `json:"name"` // name of the deployment
+	Type   NodeType `json:"type"`
+	NodeID uint32   `json:"node_id"`
 
-	CPU      uint8
-	Memory   uint64            // Memory in MB
-	RootSize uint64            // Storage in MB
-	DiskSize uint64            // Storage in MB
-	EnvVars  map[string]string // SSH_KEY, etc.
+	CPU      uint8             `json:"cpu"`
+	Memory   uint64            `json:"memory"`    // Memory in MB
+	RootSize uint64            `json:"root_size"` // Storage in MB
+	DiskSize uint64            `json:"disk_size"` // Storage in MB
+	EnvVars  map[string]string `json:"env_vars"`  // SSH_KEY, etc.
 
 	// Optional fields
-	Flist      string
-	Entrypoint string
+	Flist      string `json:"flist,omitempty"`
+	Entrypoint string `json:"entrypoint,omitempty"`
 
 	// Computed
-	IP          string
-	MyceliumIP  string
-	PlanetaryIP string
+	IP          string `json:"ip,omitempty"`
+	MyceliumIP  string `json:"mycelium_ip,omitempty"`
+	PlanetaryIP string `json:"planetary_ip,omitempty"`
+	ContractID  uint64 `json:"contract_id,omitempty"`
 }
 
 func workloadsFromNode(node Node, networkName string, token string, vmIP, leaderIP, sshKey string) (workloads.VM, workloads.Disk, error) {
