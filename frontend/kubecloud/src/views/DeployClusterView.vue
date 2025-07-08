@@ -84,6 +84,7 @@ import Step1DefineVMs from '../components/deploy/Step1DefineVMs.vue';
 import Step2AssignNodes from '../components/deploy/Step2AssignNodes.vue';
 import Step3Review from '../components/deploy/Step3Review.vue';
 import { api } from '../utils/api';
+import type { ApiResponse } from '../utils/api';
 import { useNotificationStore } from '../stores/notifications';
 import { UserService } from '../utils/userService';
 import { useNodeManagement } from '../composables/useNodeManagement';
@@ -92,7 +93,7 @@ import { useNodes } from '../composables/useNodes';
 import { useNormalizedNodes } from '../composables/useNormalizedNodes';
 import { useRouter } from 'vue-router';
 import { normalizeNode } from '../utils/nodeNormalizer';
-import type { Cluster } from '../types/cluster';
+import type { Cluster, ClusterNode } from '../types/cluster';
 
 const notificationStore = useNotificationStore();
 const userService = new UserService();
@@ -252,41 +253,32 @@ const clusterPayload = computed<Cluster>(() => {
   const sshKeyObj = availableSshKeys.value.find(k => k.id === selectedSshKeys.value[0]);
   const sshKey = sshKeyObj ? sshKeyObj.public_key : '';
 
-  function buildNode(vm: VM, type: 'master' | 'worker'): any {
+  function buildNode(vm: VM, type: 'master' | 'worker'): ClusterNode {
     return {
-      Name: vm.name,
-      Type: type === 'master' ? 'master' : 'worker',
-      NodeID: vm.node,
-      CPU: vm.vcpu,
-      Memory: vm.ram * 1024, // GB to MB
-      RootSize: vm.rootfs * 1024, // GB to MB
-      DiskSize: vm.disk * 1024, // GB to MB
-      EnvVars: {
+      name: vm.name,
+      type: type === 'master' ? 'master' : 'worker',
+      node_id: vm.node as number, // node is number | null, but must be number here
+      cpu: vm.vcpu,
+      memory: vm.ram * 1024, // GB to MB
+      root_size: vm.rootfs * 1024, // GB to MB
+      disk_size: vm.disk * 1024, // GB to MB
+      env_vars: {
         SSH_KEY: sshKey,
         K3S_TOKEN: token,
-        K3S_DATA_DIR: '/mnt/data',
-        K3S_FLANNEL_IFACE: 'eth0',
-        K3S_NODE_NAME: vm.name,
-        K3S_URL: '',
       },
-      Flist: flist,
-      Entrypoint: entrypoint,
-      IP: '', // Computed by backend
-      MyceliumIP: '', // Computed by backend
-      PlanetaryIP: '', // Computed by backend
     };
   }
 
-  const nodes = [
+  const nodes: ClusterNode[] = [
     ...masters.value.map(vm => buildNode(vm, 'master')),
     ...workers.value.map(vm => buildNode(vm, 'worker')),
   ];
 
   return {
-    Name: clusterName.value,
-    Network: networkName,
-    Token: token,
-    Nodes: nodes,
+    name: clusterName.value,
+    network: networkName,
+    token: token,
+    nodes: nodes,
   };
 });
 
@@ -296,7 +288,7 @@ async function onDeployCluster() {
     // Debug log for outgoing payload
     // eslint-disable-next-line no-console
     console.log('Deploy payload:', JSON.stringify(clusterPayload.value, null, 2));
-    await api.post('/v1/deploy', clusterPayload.value, {
+    const response = await api.post<ApiResponse<{ task_id: string }>>('/v1/deployments', clusterPayload.value, {
       showNotifications: false,
       loadingMessage: 'Deploying cluster...',
       errorMessage: 'Failed to deploy cluster',
