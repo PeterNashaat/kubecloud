@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
+	"github.com/threefoldtech/zosbase/pkg/netlight/resource"
 )
 
 func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluster, sshKey string) (Cluster, error) {
@@ -96,9 +97,19 @@ func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluste
 		}
 
 		cluster.Nodes[idx].IP = result.Vms[0].IP
-		cluster.Nodes[idx].MyceliumIP = result.Vms[0].MyceliumIP
 		cluster.Nodes[idx].PlanetaryIP = result.Vms[0].PlanetaryIP
 		cluster.Nodes[idx].ContractID = result.ContractID
+
+		seed := cluster.Nodes[idx].EnvVars["NET_SEED"]
+		if seed == "" {
+			return Cluster{}, fmt.Errorf("NET_SEED env var is missing for node %s", node.Name)
+		}
+
+		inspections, err := resource.InspectMycelium([]byte(seed))
+		if err != nil {
+			return Cluster{}, fmt.Errorf("failed to inspect mycelium: %v", err)
+		}
+		cluster.Nodes[idx].MyceliumIP = inspections.IP().String()
 	}
 
 	return cluster, nil

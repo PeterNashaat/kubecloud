@@ -50,10 +50,6 @@ func workloadsFromNode(node Node, networkName string, token string, vmIP, leader
 	if err != nil {
 		return workloads.VM{}, workloads.Disk{}, err
 	}
-	ipSeed, err := getRandomMyceliumIPSeed()
-	if err != nil {
-		return workloads.VM{}, workloads.Disk{}, err
-	}
 
 	disk := workloads.Disk{
 		Name:   fmt.Sprintf("%s_data", node.Name),
@@ -72,9 +68,8 @@ func workloadsFromNode(node Node, networkName string, token string, vmIP, leader
 		Flist:      node.Flist,
 		Entrypoint: node.Entrypoint,
 
-		MyceliumIPSeed: ipSeed,
-		NetworkName:    networkName,
-		IP:             vmIP,
+		NetworkName: networkName,
+		IP:          vmIP,
 		Mounts: []workloads.Mount{
 			{
 				Name:       disk.Name,
