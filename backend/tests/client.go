@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"testing"
 	"time"
 
 	"kubecloud/app"
@@ -86,19 +85,29 @@ func (c *Client) Login(email, password string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("login failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var loginResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
-		return err
+		Status  int    `json:"status"`
+		Message string `json:"message"`
+		Data    struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+		} `json:"data"`
 	}
 
-	c.accessToken = loginResp.AccessToken
+	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+		return fmt.Errorf("failed to decode login response: %w", err)
+	}
+
+	if loginResp.Data.AccessToken == "" {
+		return fmt.Errorf("no access token received in login response")
+	}
+
+	c.accessToken = loginResp.Data.AccessToken
 	return nil
 }
 
@@ -111,7 +120,7 @@ func (c *Client) DeployCluster(clusterName string) (string, error) {
 				Name:     "leader",
 				Type:     kubedeployer.NodeTypeLeader,
 				CPU:      1,
-				Memory:   2 * 1024, // 1 GB
+				Memory:   2 * 1024, // 2 GB
 				RootSize: 10240,    // 10 GB
 				DiskSize: 10240,    // 10 GB
 				EnvVars: map[string]string{
@@ -123,7 +132,7 @@ func (c *Client) DeployCluster(clusterName string) (string, error) {
 				Name:     "master",
 				Type:     kubedeployer.NodeTypeMaster,
 				CPU:      1,
-				Memory:   2 * 1024, // 1 GB
+				Memory:   2 * 1024, // 2 GB
 				RootSize: 10240,    // 10 GB
 				DiskSize: 10240,    // 10 GB
 				EnvVars: map[string]string{
@@ -135,7 +144,7 @@ func (c *Client) DeployCluster(clusterName string) (string, error) {
 				Name:     "worker",
 				Type:     kubedeployer.NodeTypeWorker,
 				CPU:      1,
-				Memory:   2 * 1024, // 1 GB
+				Memory:   2 * 1024, // 2 GB
 				RootSize: 10240,    // 10 GB
 				DiskSize: 10240,    // 10 GB
 				EnvVars: map[string]string{
@@ -146,7 +155,7 @@ func (c *Client) DeployCluster(clusterName string) (string, error) {
 		},
 	}
 
-	resp, err := c.makeRequest("POST", "/deploy", cluster, true)
+	resp, err := c.makeRequest("POST", "/deployments", cluster, true)
 	if err != nil {
 		return "", err
 	}
@@ -157,7 +166,7 @@ func (c *Client) DeployCluster(clusterName string) (string, error) {
 		return "", fmt.Errorf("deploy request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var deployResp app.DeploymentResponse
+	var deployResp app.DeployResponse
 	if err := json.NewDecoder(resp.Body).Decode(&deployResp); err != nil {
 		return "", err
 	}
@@ -220,32 +229,125 @@ func (c *Client) ListenToSSE(taskID string) error {
 	}
 }
 
-func TestRegister(t *testing.T) {
-	client := NewClient()
+func (c *Client) ListenToSSEWithLogger(taskID string, logFunc func(string, ...interface{})) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
-	err := client.Register("Test User", "testuser@example.com", "testpassword123", "testpassword123")
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/events", nil)
 	if err != nil {
-		t.Logf("Registration failed (might already exist): %v", err)
+		return err
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	if c.accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	}
+
+	sseClient := &http.Client{Timeout: 0}
+
+	resp, err := sseClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("SSE connection failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	logFunc("SSE connection established, listening for deployment updates...")
+
+	scanner := bufio.NewScanner(resp.Body)
+	for {
+		select {
+		case <-ctx.Done():
+			logFunc("SSE connection timeout reached")
+			return nil
+		default:
+			if !scanner.Scan() {
+				if err := scanner.Err(); err != nil {
+					if ctx.Err() != nil {
+						return nil
+					}
+					return err
+				}
+				logFunc("SSE connection ended normally")
+				return nil
+			}
+
+			line := scanner.Text()
+			if strings.HasPrefix(line, "data: ") {
+				data := strings.TrimPrefix(line, "data: ")
+				if data != "" {
+					logFunc("SSE Update: %s", data)
+				}
+			}
+		}
 	}
 }
 
-func TestDeploy(t *testing.T) {
-	client := NewClient()
-
-	err := client.Login("testuser@example.com", "testpassword123")
+func (c *Client) ListDeployments() ([]interface{}, error) {
+	resp, err := c.makeRequest("GET", "/deployments", nil, true)
 	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list deployments failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	taskID, err := client.DeployCluster("test-cluster")
-	if err != nil {
-		t.Fatalf("Deployment failed: %v", err)
+	var listResp struct {
+		Deployments []interface{} `json:"deployments"`
+		Count       int           `json:"count"`
 	}
 
-	t.Logf("Deployment started with task ID: %s", taskID)
-
-	err = client.ListenToSSE(taskID)
-	if err != nil {
-		t.Logf("SSE listening ended: %v", err)
+	if err := json.NewDecoder(resp.Body).Decode(&listResp); err != nil {
+		return nil, fmt.Errorf("failed to decode list response: %w", err)
 	}
+
+	return listResp.Deployments, nil
+}
+
+func (c *Client) GetDeployment(name string) (interface{}, error) {
+	resp, err := c.makeRequest("GET", "/deployments/"+name, nil, true)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get deployment failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var deployment interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&deployment); err != nil {
+		return nil, fmt.Errorf("failed to decode deployment response: %w", err)
+	}
+
+	return deployment, nil
+}
+
+func (c *Client) GetKubeconfig(name string) (string, error) {
+	resp, err := c.makeRequest("GET", "/deployments/"+name+"/kubeconfig", nil, true)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get kubeconfig failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	kubeconfig, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read kubeconfig response: %w", err)
+	}
+
+	return string(kubeconfig), nil
 }

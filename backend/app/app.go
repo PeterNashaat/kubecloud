@@ -7,6 +7,8 @@ import (
 	"kubecloud/middlewares"
 	"kubecloud/models/sqlite"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -95,9 +97,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
 		// TODO: remove this after testing
-		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
-		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
+		deployer.WithRelayURL("wss://relay.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
@@ -106,9 +108,18 @@ func NewApp(config internal.Configuration) (*App, error) {
 	// Create an app-level context for coordinating shutdown
 	_, appCancel := context.WithCancel(context.Background())
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
+	// read the SSH public key from file
+	sshPublicKeyBytes, err := os.ReadFile(config.SSH.PublicKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SSH public key from %s: %w", config.SSH.PublicKeyPath, err)
+	}
+	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager)
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient, sshPublicKey, db)
+
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
+		substrateClient, graphqlClient, firesquidClient, redisClient,
+		sseManager, gridClient)
 
 	app := &App{
 		router:        router,
@@ -190,9 +201,16 @@ func (app *App) registerHandlers() {
 		deployerGroup := v1.Group("")
 		deployerGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
 		{
-			// Deployment routes
-			deployerGroup.POST("/deploy", app.handlers.DeployHandler)
 			deployerGroup.GET("/events", app.sseManager.HandleSSE)
+
+			deploymentGroup := deployerGroup.Group("/deployments")
+			{
+				deploymentGroup.POST("", app.handlers.HandleAsyncDeploy)
+				deploymentGroup.GET("", app.handlers.HandleListDeployments)
+				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
+				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
+
+			}
 
 			// Task routes
 			// deployerGroup.GET("/tasks", app.handlers.ListUserTasksHandler)

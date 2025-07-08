@@ -16,15 +16,21 @@ const (
 	NodeTypeLeader NodeType = "leader"
 )
 
+// final project name is
+// kubecloud/cluster.name and kubecloud/cluster.name_network for net TODO: add username prefix as a namespace
+// cluster.name+cluster.node.name for each deployment
+// list -> get all contract for twin ide then filter where projecName start with kubecloud/
+// get -> get all contracts with project name kubecloud/cluster.name
+
 type Cluster struct {
-	Name    string
+	Name    string // the projectname in metadata, to get/list all related deployments
 	Network string
 	Token   string
 	Nodes   []Node
 }
 
 type Node struct {
-	Name   string
+	Name   string // name of the deployment
 	Type   NodeType
 	NodeID uint32
 
@@ -44,7 +50,7 @@ type Node struct {
 	PlanetaryIP string
 }
 
-func workloadsFromNode(node Node, networkName string, token string, vmIP, leaderIP string) (workloads.VM, workloads.Disk, error) {
+func workloadsFromNode(node Node, networkName string, token string, vmIP, leaderIP, sshKey string) (workloads.VM, workloads.Disk, error) {
 	netSeed, err := getRandomMyceliumNetSeed()
 	if err != nil {
 		return workloads.VM{}, workloads.Disk{}, err
@@ -112,6 +118,9 @@ func workloadsFromNode(node Node, networkName string, token string, vmIP, leader
 	if vm.Entrypoint == "" {
 		vm.Entrypoint = K3S_ENTRYPOINT
 	}
+
+	// append master ssh key to the VM env vars
+	vm.EnvVars["SSH_KEY"] = node.EnvVars["SSH_KEY"] + "\n" + sshKey
 
 	return vm, disk, nil
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
-func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster) (Cluster, error) {
+func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster, sshKey string) (Cluster, error) {
 	// 1. Deploy network on all related nodes
 	gridNodes := []uint32{}
 	for _, node := range cluster.Nodes {
@@ -44,7 +44,7 @@ func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 			leaderIP = ip
 		}
 
-		vm, disk, err := workloadsFromNode(node, networkName, cluster.Token, ip, leaderIP)
+		vm, disk, err := workloadsFromNode(node, networkName, cluster.Token, ip, leaderIP, sshKey)
 		if err != nil {
 			return Cluster{}, fmt.Errorf("failed to create workloads for node %s: %v", node.Name, err)
 		}

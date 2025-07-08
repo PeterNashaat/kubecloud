@@ -65,7 +65,7 @@ func TestDeployCluster(t *testing.T) {
 		t.Fatalf("failed to create TF plugin client: %v", err)
 	}
 
-	cls, err := DeployCluster(context.Background(), tfplugin, cluster)
+	cls, err := DeployCluster(context.Background(), tfplugin, cluster, "")
 	if err != nil {
 		t.Fatalf("failed to deploy cluster: %v", err)
 	}
