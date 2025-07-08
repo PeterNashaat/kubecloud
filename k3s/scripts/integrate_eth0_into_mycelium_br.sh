@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+
+if [ -z "${DUAL_STACK}" ]; then
+  echo "❌ Not a dual stack setup"
+  exit 1
+fi
+
 bridge="flannel-br"
 eth_iface="eth0"
 CUSTOM_TABLE_NAME=myctable
@@ -38,13 +44,8 @@ ipv6_gw=$(ip -6 route show 400::/7 | grep "dev $IPV6_IFACE" | awk '/via/ {print 
 
 
 # Step 3: Clean up
-ip link set "$eth_iface" nomaster || true
-ip link set "$eth_iface" down
-ip addr flush dev "$eth_iface"
-
-ip link set "$IPV6_IFACE" nomaster || true
-ip link set "$IPV6_IFACE" down
-ip addr flush dev "$IPV6_IFACE"
+ip addr del $ipv4 dev $eth_iface
+ip addr del $ipv6_global dev "$IPV6_IFACE"
 
 ip link set "$bridge" up
 ip link set "$eth_iface" master "$bridge"
