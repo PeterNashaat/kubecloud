@@ -7,9 +7,12 @@ import (
 	"kubecloud/middlewares"
 	"kubecloud/models/sqlite"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
@@ -18,7 +21,6 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 
 	// Import the generated docs package
 	_ "kubecloud/docs"
@@ -95,20 +97,27 @@ func NewApp(config internal.Configuration) (*App, error) {
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
 		// TODO: remove this after testing
-		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
-		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
+		deployer.WithRelayURL("wss://relay.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
-	// Create an app-level context for coordinating shutdown
+	sshPublicKeyBytes, err := os.ReadFile(config.SSH.PublicKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SSH public key from %s: %w", config.SSH.PublicKeyPath, err)
+	}
+	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
+
 	_, appCancel := context.WithCancel(context.Background())
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager)
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
+		substrateClient, graphqlClient, firesquidClient, redisClient,
+		sseManager, config.SystemAccount.Network)
 
 	app := &App{
 		router:        router,
@@ -118,8 +127,8 @@ func NewApp(config internal.Configuration) (*App, error) {
 		db:            db,
 		sseManager:    sseManager,
 		workerManager: workerManager,
-		gridClient:    gridClient,
 		appCancel:     appCancel,
+		gridClient:    gridClient,
 	}
 
 	app.registerHandlers()
@@ -190,11 +199,19 @@ func (app *App) registerHandlers() {
 		deployerGroup := v1.Group("")
 		deployerGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
 		{
-			// Deployment routes
-			deployerGroup.POST("/deploy", app.handlers.DeployHandler)
 			deployerGroup.GET("/events", app.sseManager.HandleSSE)
 
-			// Task routes
+			deploymentGroup := deployerGroup.Group("/deployments")
+			{
+				deploymentGroup.POST("", app.handlers.HandleAsyncDeploy)
+				deploymentGroup.GET("", app.handlers.HandleListDeployments)
+				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
+				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
+				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteDeployment)
+				// TODO: add/remove nodes from deployment
+			}
+
+			// TODO: Task routes
 			// deployerGroup.GET("/tasks", app.handlers.ListUserTasksHandler)
 			// deployerGroup.GET("/tasks/:task_id", app.handlers.GetTaskStatusHandler)
 
@@ -268,7 +285,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	app.gridClient.Close()
+	// app.gridClient.Close()
 
 	return nil
 }

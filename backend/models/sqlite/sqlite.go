@@ -24,7 +24,7 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{}, &models.Notification{}, &models.SSHKey{})
+	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{}, &models.Notification{}, &models.SSHKey{}, &models.Cluster{})
 	if err != nil {
 		return nil, err
 	}
@@ -345,4 +345,38 @@ func (s *Sqlite) GetSSHKeyByID(sshKeyID int, userID int) (models.SSHKey, error) 
 	var sshKey models.SSHKey
 	query := s.db.Where("id = ? AND user_id = ?", sshKeyID, userID).First(&sshKey)
 	return sshKey, query.Error
+}
+
+// CreateCluster creates a new cluster in the database
+func (s *Sqlite) CreateCluster(cluster *models.Cluster) error {
+	cluster.CreatedAt = time.Now()
+	cluster.UpdatedAt = time.Now()
+	return s.db.Create(cluster).Error
+}
+
+// ListUserClusters returns all clusters for a specific user
+func (s *Sqlite) ListUserClusters(userID string) ([]models.Cluster, error) {
+	var clusters []models.Cluster
+	query := s.db.Where("user_id = ?", userID).Find(&clusters)
+	return clusters, query.Error
+}
+
+// GetClusterByName returns a cluster by name for a specific user
+func (s *Sqlite) GetClusterByName(userID string, projectName string) (models.Cluster, error) {
+	var cluster models.Cluster
+	query := s.db.Where("user_id = ? AND project_name = ?", userID, projectName).First(&cluster)
+	return cluster, query.Error
+}
+
+// UpdateCluster updates an existing cluster
+func (s *Sqlite) UpdateCluster(cluster *models.Cluster) error {
+	cluster.UpdatedAt = time.Now()
+	return s.db.Model(&models.Cluster{}).
+		Where("user_id = ? AND project_name = ?", cluster.UserID, cluster.ProjectName).
+		Updates(cluster).Error
+}
+
+// DeleteCluster deletes a cluster by name for a specific user
+func (s *Sqlite) DeleteCluster(userID string, projectName string) error {
+	return s.db.Where("user_id = ? AND project_name = ?", userID, projectName).Delete(&models.Cluster{}).Error
 }

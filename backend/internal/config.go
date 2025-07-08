@@ -29,6 +29,12 @@ type Configuration struct {
 	Redis                Redis              `json:"redis" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
 	Invoice              InvoiceCompanyData `json:"invoice"`
+	SSH                  SSHConfig          `json:"ssh" validate:"required,dive"`
+}
+
+type SSHConfig struct {
+	PrivateKeyPath string `json:"private_key_path" validate:"required"`
+	PublicKeyPath  string `json:"public_key_path" validate:"required"`
 }
 
 // Server struct holds server's information
