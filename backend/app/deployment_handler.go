@@ -222,13 +222,13 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 }
 
 func (h *Handler) getKubeconfigViaSSH(privateKey string, node *kubedeployer.Node) (string, error) {
-	// Try planetary IP first, then mycelium IP as fallback
+	// Try mycelium IP first (seems more reliable), then planetary IP as fallback
 	ips := []string{}
-	if node.PlanetaryIP != "" {
-		ips = append(ips, node.PlanetaryIP)
-	}
 	if node.MyceliumIP != "" {
 		ips = append(ips, node.MyceliumIP)
+	}
+	if node.PlanetaryIP != "" {
+		ips = append(ips, node.PlanetaryIP)
 	}
 
 	if len(ips) == 0 {
@@ -239,19 +239,35 @@ func (h *Handler) getKubeconfigViaSSH(privateKey string, node *kubedeployer.Node
 	for _, ip := range ips {
 		log.Info().Str("ip", ip).Str("node", node.Name).Msg("Attempting SSH connection")
 
-		kubeconfig, err := h.executeSSHCommand(privateKey, ip, "kubectl config view --minify --raw")
-		if err != nil {
-			log.Warn().Err(err).Str("ip", ip).Str("node", node.Name).Msg("SSH connection failed, trying next IP")
-			lastErr = err
-			continue
+		// Try multiple commands to get kubeconfig
+		commands := []string{
+			"kubectl config view --minify --raw",
+			"cat /etc/rancher/k3s/k3s.yaml",
+			"cat ~/.kube/config",
+			"sudo cat /etc/rancher/k3s/k3s.yaml",
 		}
 
-		// Validate that we got a valid kubeconfig
-		if strings.Contains(kubeconfig, "apiVersion") && strings.Contains(kubeconfig, "clusters") {
-			log.Info().Str("ip", ip).Str("node", node.Name).Msg("Successfully retrieved kubeconfig")
-			return kubeconfig, nil
+		var kubeconfig string
+		var cmdErr error
+
+		for _, cmd := range commands {
+			kubeconfig, cmdErr = h.executeSSHCommand(privateKey, ip, cmd)
+			if cmdErr == nil && strings.Contains(kubeconfig, "apiVersion") && strings.Contains(kubeconfig, "clusters") {
+				// Post-process kubeconfig to use the correct external IP
+				processedConfig := h.postProcessKubeconfig(kubeconfig, ip)
+				log.Info().Str("ip", ip).Str("node", node.Name).Str("command", cmd).Msg("Successfully retrieved kubeconfig")
+				return processedConfig, nil
+			}
+			if cmdErr != nil {
+				log.Debug().Err(cmdErr).Str("ip", ip).Str("command", cmd).Msg("Command failed, trying next")
+			}
+		}
+
+		if cmdErr != nil {
+			log.Warn().Err(cmdErr).Str("ip", ip).Str("node", node.Name).Msg("All commands failed on this IP, trying next IP")
+			lastErr = cmdErr
 		} else {
-			lastErr = fmt.Errorf("invalid kubeconfig received from node %s", node.Name)
+			lastErr = fmt.Errorf("no valid kubeconfig found on node %s at IP %s", node.Name, ip)
 		}
 	}
 
@@ -270,14 +286,27 @@ func (h *Handler) executeSSHCommand(privateKey, address, command string) (string
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(key),
 		},
-		Timeout: 30 * time.Second,
+		Timeout: 15 * time.Second, // Reduced timeout for faster fallback
 	}
 
-	// Connect to SSH
+	// Connect to SSH with retry logic
 	port := "22"
-	client, err := ssh.Dial("tcp", net.JoinHostPort(address, port), config)
+	var client *ssh.Client
+
+	// Try connection with retries for transient network issues
+	for attempt := 1; attempt <= 3; attempt++ {
+		client, err = ssh.Dial("tcp", net.JoinHostPort(address, port), config)
+		if err == nil {
+			break
+		}
+		if attempt < 3 {
+			log.Debug().Err(err).Str("address", address).Int("attempt", attempt).Msg("SSH connection attempt failed, retrying")
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+	}
+
 	if err != nil {
-		return "", fmt.Errorf("could not establish SSH connection to %s: %w", address, err)
+		return "", fmt.Errorf("could not establish SSH connection to %s after 3 attempts: %w", address, err)
 	}
 	defer client.Close()
 
@@ -293,4 +322,25 @@ func (h *Handler) executeSSHCommand(privateKey, address, command string) (string
 	}
 
 	return string(output), nil
+}
+
+func (h *Handler) postProcessKubeconfig(kubeconfig string, nodeIP string) string {
+	// Replace localhost/127.0.0.1 with the actual node IP
+	processed := strings.ReplaceAll(kubeconfig, "server: https://127.0.0.1:6443", fmt.Sprintf("server: https://[%s]:6443", nodeIP))
+	processed = strings.ReplaceAll(processed, "server: https://localhost:6443", fmt.Sprintf("server: https://[%s]:6443", nodeIP))
+
+	// Also handle cases where the server might already be set to the internal IP
+	if strings.Contains(processed, "server: https://10.") {
+		// Replace internal network IP with external IP
+		lines := strings.Split(processed, "\n")
+		for i, line := range lines {
+			if strings.Contains(line, "server: https://10.") {
+				lines[i] = fmt.Sprintf("    server: https://[%s]:6443", nodeIP)
+				break
+			}
+		}
+		processed = strings.Join(lines, "\n")
+	}
+
+	return processed
 }

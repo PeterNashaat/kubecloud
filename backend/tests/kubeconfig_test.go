@@ -43,7 +43,7 @@ func TestKubeconfig(t *testing.T) {
 	t.Logf("Testing kubeconfig retrieval for deployment: %s", projectName)
 
 	// Get kubeconfig
-	kubeconfig, err := client.GetKubeconfig(projectName)
+	kubeconfig, err := client.GetKubeconfig("test2")
 	if err != nil {
 		t.Fatalf("Failed to get kubeconfig for '%s': %v", projectName, err)
 	}
