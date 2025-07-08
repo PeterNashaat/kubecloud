@@ -1,0 +1,282 @@
+<template>
+  <div class="dashboard-card">
+    <div class="dashboard-card-header row-between">
+      <div>
+        <h3 class="dashboard-card-title">SSH Keys</h3>
+        <p class="dashboard-card-subtitle">Manage your SSH keys for secure server access</p>
+      </div>
+      <v-btn variant="outlined" class="add-key-btn" @click="openAddDialog">
+        <v-icon icon="mdi-plus" size="20" class="mr-2"></v-icon>
+        Add SSH Key
+      </v-btn>
+    </div>
+    <div class="ssh-keys-list">
+      <div v-for="key in sshKeys" :key="key.id" class="ssh-key-item">
+        <div class="ssh-key-content">
+          <div class="ssh-key-info">
+            <v-icon size="28" color="primary" class="mr-3">mdi-key</v-icon>
+            <div style="width:100%">
+              <div class="ssh-key-name-row">
+                <span class="ssh-key-name">{{ key.name }}</span>
+              </div>
+              <div class="ssh-key-fingerprint-row">
+                <pre class="ssh-key-fingerprint">{{ truncateKey(key.public_key) }}</pre>
+                <v-tooltip location="top">
+                  <template #activator="{ props }">
+                    <v-btn icon small v-bind="props" @click="copyKey(key.public_key)" title="Copy full public key">
+                      <v-icon size="18">mdi-content-copy</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>Copy full public key</span>
+                </v-tooltip>
+                <span v-if="copySuccess" class="copy-success">{{ copySuccess }}</span>
+              </div>
+              <div class="ssh-key-date">Added {{ new Date(key.created_at).toLocaleDateString() }}</div>
+            </div>
+          </div>
+          <v-btn color="error" variant="outlined" size="small" class="action-btn" @click="handleDeleteKey(key.id)">
+            <v-icon left size="16">mdi-delete</v-icon> Remove
+          </v-btn>
+        </div>
+      </div>
+    </div>
+    <v-dialog v-model="addDialog" max-width="500">
+      <template #default>
+        <v-card>
+          <v-card-title>
+            <span class="text-h6">Add SSH Key</span>
+          </v-card-title>
+          <v-card-text>
+            <div class="mb-2 text-body-2">
+              Enter a unique name and your SSH public key.<br>
+              <span class="text-caption text-grey">Only valid public keys are accepted.</span>
+            </div>
+            <v-text-field
+              ref="nameField"
+              v-model="newKey.name"
+              label="Key Name"
+              required
+              :error-messages="nameError"
+              autofocus
+              class="mb-4"
+              @keyup.enter="handleAddKey"
+            />
+            <v-textarea
+              v-model="newKey.public_key"
+              label="Public Key"
+              required
+              rows="4"
+              :error-messages="keyError"
+              class="mb-4"
+              append-inner-icon="mdi-content-paste"
+              @click:append-inner="pasteFromClipboard"
+              @keyup.enter="handleAddKey"
+            />
+            <div v-if="addError" class="field-error">{{ addError }}</div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn color="primary" :disabled="!newKey.name || !newKey.public_key" @click="handleAddKey">
+              Add
+            </v-btn>
+            <v-btn variant="outlined" @click="addDialog = false">Cancel</v-btn>
+          </v-card-actions>
+        </v-card>
+      </template>
+    </v-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, nextTick } from 'vue'
+import { userService, type SshKey, type AddSshKeyRequest } from '../../utils/userService'
+
+const sshKeys = ref<SshKey[]>([])
+const addDialog = ref(false)
+const newKey = ref<AddSshKeyRequest>({ name: '', public_key: '' })
+const addError = ref('')
+const nameError = ref('')
+const keyError = ref('')
+const nameField = ref()
+const copySuccess = ref('')
+
+async function fetchSshKeys() {
+  sshKeys.value = await userService.listSshKeys()
+}
+
+async function handleAddKey() {
+  addError.value = ''
+  nameError.value = ''
+  keyError.value = ''
+  if (!newKey.value.name) {
+    nameError.value = 'Key name is required.'
+    return
+  }
+  if (!newKey.value.public_key) {
+    keyError.value = 'Public key is required.'
+    return
+  }
+  try {
+    const added = await userService.addSshKey(newKey.value)
+    sshKeys.value.push(added)
+    addDialog.value = false
+    newKey.value = { name: '', public_key: '' }
+  } catch (e: any) {
+    if (e?.message?.toLowerCase().includes('name')) {
+      nameError.value = e.message
+    } else if (e?.message?.toLowerCase().includes('key')) {
+      keyError.value = e.message
+    } else {
+      addError.value = e?.message || 'Failed to add SSH key'
+    }
+  }
+}
+
+async function handleDeleteKey(id: number) {
+  await userService.deleteSshKey(id)
+  sshKeys.value = sshKeys.value.filter(k => k.id !== id)
+}
+
+async function pasteFromClipboard() {
+  try {
+    newKey.value.public_key = await navigator.clipboard.readText()
+  } catch (e) {
+    keyError.value = 'Could not read from clipboard'
+  }
+}
+
+function openAddDialog() {
+  addDialog.value = true
+  nextTick(() => {
+    if (nameField.value?.focus) nameField.value.focus()
+  })
+}
+
+async function copyKey(key: string) {
+  try {
+    await navigator.clipboard.writeText(key)
+    copySuccess.value = 'Copied!'
+    setTimeout(() => (copySuccess.value = ''), 1200)
+  } catch {}
+}
+
+function truncateKey(key: string) {
+  if (!key) return ''
+  const start = key.slice(0, 25)
+  const end = key.slice(-20)
+  return key.length > 40 ? `${start}...${end}` : key
+}
+
+onMounted(fetchSshKeys)
+</script>
+
+<style scoped>
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ssh-keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: var(--space-10);
+}
+.ssh-key-item {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1.5px solid #334155;
+  border-radius: 12px;
+  margin-bottom: 0;
+  padding: 1.2rem 1.5rem;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.07);
+}
+.ssh-key-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+.ssh-key-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.2rem;
+  flex: 1;
+  min-width: 0;
+}
+.ssh-key-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ssh-key-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  margin: 0;
+  line-height: 1.2;
+}
+.ssh-key-fingerprint-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+.ssh-key-fingerprint {
+  font-family: 'Fira Mono', 'Courier New', monospace;
+  font-size: 0.97rem;
+  color: #60a5fa;
+  background: none;
+  margin: 0.3rem 0 0.5rem 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.ssh-key-date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.2;
+}
+.copy-success {
+  color: #10B981;
+  font-size: 0.95em;
+  margin-left: 0.5em;
+}
+.action-btn {
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text) !important;
+  font-weight: var(--font-weight-medium);
+  transition: background 0.18s, border-color 0.18s;
+  white-space: nowrap;
+  box-shadow: none !important;
+}
+.action-btn:hover {
+  background: rgba(59, 130, 246, 0.07) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+.add-key-btn {
+  font-weight: var(--font-weight-medium);
+  height: 44px;
+  min-width: 180px;
+}
+@media (max-width: 960px) {
+  .ssh-key-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .ssh-key-actions {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 600px) {
+  .ssh-key-item {
+    padding: var(--space-5);
+  }
+  .ssh-key-info {
+    gap: var(--space-4);
+  }
+}
+</style>

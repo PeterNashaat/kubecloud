@@ -1,85 +1,146 @@
-<script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <ErrorBoundary>
+    <v-app class="kubecloud-app">
+      <!-- Loading overlay while checking authentication -->
+      <div v-if="isInitializing" class="auth-loading-overlay">
+        <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+        <p class="loading-text">Initializing...</p>
+      </div>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+      <!-- Main app content -->
+      <template v-else>
+        <!-- Floating Cloud Animation - Site-wide -->
+        <FloatingClouds />
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
+        <!-- Shared Moving Background - Persists across route changes -->
+        <UnifiedBackground :theme="currentTheme" />
 
-  <RouterView />
+        <!-- Navigation Bar -->
+        <NavBar v-if="!isAuthPage" />
+
+        <!-- Main Content Area -->
+        <v-main class="app-main">
+          <RouterView />
+        </v-main>
+
+        <!-- Footer -->
+        <AppFooter v-if="!isAuthPage" />
+
+        <!-- Global Notifications -->
+        <NotificationToast />
+      </template>
+    </v-app>
+  </ErrorBoundary>
 </template>
 
+<script lang="ts" setup>
+import { RouterView, useRoute } from 'vue-router'
+import { computed, ref, onMounted } from 'vue'
+import { useUserStore } from './stores/user'
+import NavBar from './components/NavBar.vue'
+import AppFooter from './components/AppFooter.vue'
+import ErrorBoundary from './components/ErrorBoundary.vue'
+import NotificationToast from './components/NotificationToast.vue'
+import UnifiedBackground from './components/UnifiedBackground.vue'
+import FloatingClouds from './components/FloatingClouds.vue'
+import { useDeploymentEvents } from './composables/useDeploymentEvents'
+
+const route = useRoute()
+const userStore = useUserStore()
+const isInitializing = ref(true)
+
+// Determine if current page is an authentication page
+const isAuthPage = computed(() => {
+  const authRoutes = ['/sign-in', '/sign-up', '/register/verify']
+  return authRoutes.includes(route.path)
+})
+
+// Dynamic theme based on current route
+const currentTheme = computed(() => {
+  const path = route.path
+
+  // Theme mapping for different routes
+  const themeMap: Record<string, 'default' | 'home' | 'features' | 'pricing' | 'use-cases' | 'docs' | 'nodes' | 'dashboard'> = {
+    '/': 'home',
+    '/features': 'features',
+    '/pricing': 'pricing',
+    '/usecases': 'use-cases',
+    '/docs': 'docs',
+    '/nodes': 'nodes',
+    '/deploy': 'dashboard'
+  }
+
+  // Check for dashboard routes
+  if (path.startsWith('/dashboard')) {
+    return 'dashboard'
+  }
+
+  return themeMap[path] || 'default'
+})
+
+// Initialize authentication state
+onMounted(async () => {
+  try {
+    // Initialize auth state (check localStorage for tokens)
+    userStore.initializeAuth()
+    
+    // Add a small delay to show loading state
+    await new Promise(resolve => setTimeout(resolve, 500))
+    // Call the composable to enable deployment events globally
+    useDeploymentEvents()
+  } catch (error) {
+    console.error('Failed to initialize authentication:', error)
+  } finally {
+    isInitializing.value = false
+  }
+})
+</script>
+
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
+.kubecloud-app {
+  min-height: 100vh;
+  background: var(--color-bg);
   color: var(--color-text);
+  font-family: 'Inter', sans-serif;
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.app-main {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 72px); /* Account for navbar height */
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.auth-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
 }
 
-nav a:first-of-type {
-  border: 0;
+.loading-text {
+  margin-top: 1rem;
+  color: var(--color-text);
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+/* Responsive adjustments */
+@media (max-width: 960px) {
+  .app-main {
+    min-height: calc(100vh - 64px);
   }
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
+@media (max-width: 600px) {
+  .app-main {
+    min-height: calc(100vh - 56px);
   }
 }
 </style>
