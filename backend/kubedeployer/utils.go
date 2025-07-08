@@ -29,12 +29,6 @@ func getRandomMyceliumNetSeed() (string, error) {
 	return hex.EncodeToString(key), err
 }
 
-func getRandomMyceliumIPSeed() ([]byte, error) {
-	key := make([]byte, MYC_IP_SEED_LEN)
-	_, err := rand.Read(key)
-	return key, err
-}
-
 var (
 	usedIPsTracker = make(map[string]map[uint32][]byte) // network -> node -> hostIDs
 	usedIPsMutex   sync.RWMutex

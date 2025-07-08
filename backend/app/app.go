@@ -105,15 +105,13 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
-	// Create an app-level context for coordinating shutdown
-	_, appCancel := context.WithCancel(context.Background())
-
-	// read the SSH public key from file
 	sshPublicKeyBytes, err := os.ReadFile(config.SSH.PublicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SSH public key from %s: %w", config.SSH.PublicKeyPath, err)
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
+
+	_, appCancel := context.WithCancel(context.Background())
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
 
