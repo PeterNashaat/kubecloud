@@ -12,6 +12,7 @@ import (
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 
 	// Import the generated docs package
 	_ "kubecloud/docs"
@@ -36,8 +36,8 @@ type App struct {
 	redis         *internal.RedisClient
 	sseManager    *internal.SSEManager
 	workerManager *internal.WorkerManager
-	gridClient    deployer.TFPluginClient
-	appCancel     context.CancelFunc
+	// gridClient    deployer.TFPluginClient
+	appCancel context.CancelFunc
 }
 
 // NewApp create new instance of the app with all configs
@@ -115,11 +115,11 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient, sshPublicKey, db, config.Grid.Network)
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.Grid.Network)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, gridClient, config.Grid.Network)
+		sseManager, config.Grid.Network)
 
 	app := &App{
 		router:        router,
@@ -129,7 +129,6 @@ func NewApp(config internal.Configuration) (*App, error) {
 		db:            db,
 		sseManager:    sseManager,
 		workerManager: workerManager,
-		gridClient:    gridClient,
 		appCancel:     appCancel,
 	}
 
@@ -231,7 +230,7 @@ func (app *App) registerHandlers() {
 
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
-	go app.handlers.TrackUserDebt(app.gridClient)
+	// go app.handlers.TrackUserDebt(app.gridClient)
 }
 
 // Run starts the server
@@ -287,7 +286,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	app.gridClient.Close()
+	// app.gridClient.Close()
 
 	return nil
 }

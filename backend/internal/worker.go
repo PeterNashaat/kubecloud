@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
 // Worker represents a deployment worker
@@ -17,19 +16,17 @@ type Worker struct {
 	ID         string
 	redis      *RedisClient
 	sseManager *SSEManager
-	gridClient deployer.TFPluginClient
 	sshKey     string
 	db         models.DB
 	gridNet    string // Network name for the grid
 }
 
 // NewWorker creates a new worker instance
-func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, gridClient deployer.TFPluginClient, sshKey string, db models.DB, gridNet string) *Worker {
+func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, sshKey string, db models.DB, gridNet string) *Worker {
 	return &Worker{
 		ID:         id,
 		redis:      redis,
 		sseManager: sseManager,
-		gridClient: gridClient,
 		sshKey:     sshKey,
 		db:         db,
 		gridNet:    gridNet,
@@ -188,7 +185,7 @@ type WorkerManager struct {
 }
 
 // NewWorkerManager creates a new worker manager
-func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, gridClient deployer.TFPluginClient, sshKey string, db models.DB, gridNet string) *WorkerManager {
+func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, sshKey string, db models.DB, gridNet string) *WorkerManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	manager := &WorkerManager{
@@ -198,7 +195,7 @@ func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount in
 
 	for i := 0; i < workerCount; i++ {
 		workerID := fmt.Sprintf("worker-%d", i+1)
-		worker := NewWorker(workerID, redis, sseManager, gridClient, sshKey, db, gridNet)
+		worker := NewWorker(workerID, redis, sseManager, sshKey, db, gridNet)
 		manager.workers = append(manager.workers, worker)
 	}
 

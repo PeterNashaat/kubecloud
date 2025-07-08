@@ -9,7 +9,6 @@ import (
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 
@@ -32,7 +31,6 @@ type Handler struct {
 	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
-	gridClient      deployer.TFPluginClient
 	gridNet         string // Network name for the grid
 }
 
@@ -42,7 +40,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridClient deployer.TFPluginClient, gridNet string) *Handler {
+	gridNet string) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -54,7 +52,6 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
-		gridClient:      gridClient,
 		gridNet:         gridNet,
 	}
 }
