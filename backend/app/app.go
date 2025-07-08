@@ -45,9 +45,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 	stripe.Key = config.StripeSecret
 
 	tokenHandler := internal.NewTokenHandler(
-		config.JWT.Secret,
-		time.Duration(config.JWT.AccessTokenExpiryMinutes)*time.Minute,
-		time.Duration(config.JWT.RefreshTokenExpiryHours)*time.Hour,
+		config.JwtToken.Secret,
+		time.Duration(config.JwtToken.AccessExpiryMinutes)*time.Minute,
+		time.Duration(config.JwtToken.RefreshExpiryHours)*time.Hour,
 	)
 
 	db, err := sqlite.NewSqliteStorage(config.Database.File)
