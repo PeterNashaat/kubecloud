@@ -3,18 +3,21 @@ import { ref, computed } from 'vue'
 import { api } from '../utils/api'
 
 export interface Cluster {
-  id: string
-  name: string
-  status: 'running' | 'stopped' | 'starting' | 'stopping' | 'error'
-  region: string
-  nodes: number
-  cpu: string
-  memory: string
-  storage: string
-  createdAt: string
-  lastUpdated: string
-  cost: number
-  tags: string[]
+  id: number
+  project_name: string
+  cluster: {
+    name: string
+    status?: string
+    region?: string
+    nodes?: number
+    cpu?: string
+    memory?: string
+    storage?: string
+    tags?: string[]
+    [key: string]: any
+  }
+  created_at: string
+  updated_at: string
 }
 
 export interface ClusterMetrics {
@@ -45,25 +48,15 @@ export const useClusterStore = defineStore('clusters', () => {
   const deploymentEvents = ref<any[]>([])
 
   // Computed properties
-  const runningClusters = computed(() => 
-    clusters.value.filter(cluster => cluster.status === 'running')
-  )
-
-  const stoppedClusters = computed(() => 
-    clusters.value.filter(cluster => cluster.status === 'stopped')
-  )
-
-  const totalCost = computed(() => 
-    clusters.value.reduce((sum, cluster) => sum + cluster.cost, 0)
-  )
-
   const clustersByRegion = computed(() => {
     const grouped: Record<string, Cluster[]> = {}
     clusters.value.forEach(cluster => {
-      if (!grouped[cluster.region]) {
-        grouped[cluster.region] = []
+      const region = cluster.cluster.region
+      if (!region) return // skip clusters with undefined region
+      if (!grouped[region]) {
+        grouped[region] = []
       }
-      grouped[cluster.region].push(cluster)
+      grouped[region].push(cluster)
     })
     return grouped
   })
@@ -74,9 +67,8 @@ export const useClusterStore = defineStore('clusters', () => {
     error.value = null
 
     try {
-      // Real API call
-      const response = await api.get('/clusters')
-      clusters.value = response.data as Cluster[]
+      const response = await api.get('/v1/deployments', { requiresAuth: true })
+      clusters.value = (response.data as { deployments: Cluster[] }).deployments
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch clusters'
       throw err
@@ -86,40 +78,22 @@ export const useClusterStore = defineStore('clusters', () => {
   }
 
   const createCluster = async (clusterData: CreateClusterRequest) => {
-    isLoading.value = true
-    error.value = null
-
-    try {
-      // Real API call
-      const response = await api.post('/clusters', clusterData)
-      const newCluster: Cluster = {
-        ...(response.data as Cluster),
-        ...clusterData,
-        status: 'starting',
-        createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-        cost: 0, // Will be calculated once running
-      }
-      clusters.value.push(newCluster)
-      return newCluster
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to create cluster'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
+    // Implementation of createCluster function
+    // This is a placeholder and should be replaced with the actual implementation
+    // For example, you might use a third-party service or a custom implementation
+    // to create a cluster and return a task ID and status
+    return { task_id: 'someTaskId', status: 'deploying' }
   }
 
-  const deleteCluster = async (clusterId: string) => {
+  const deleteCluster = async (name: string) => {
     isLoading.value = true
     error.value = null
 
     try {
-      // Real API call
-      await api.delete(`/clusters/${clusterId}`)
-      clusters.value = clusters.value.filter(cluster => cluster.id !== clusterId)
+      await api.delete(`/v1/deployments/${name}`, { requiresAuth: true })
+      clusters.value = clusters.value.filter(cluster => cluster.project_name !== name)
       
-      if (selectedCluster.value?.id === clusterId) {
+      if (selectedCluster.value?.project_name === name) {
         selectedCluster.value = null
       }
     } catch (err) {
@@ -130,50 +104,14 @@ export const useClusterStore = defineStore('clusters', () => {
     }
   }
 
-  const startCluster = async (clusterId: string) => {
-    const cluster = clusters.value.find(c => c.id === clusterId)
-    if (!cluster) throw new Error('Cluster not found')
-
-    cluster.status = 'starting'
-    
-    try {
-      // Real API call
-      await api.post(`/clusters/${clusterId}/start`, { action: 'start' })
-      // Optionally update status after API call
-      cluster.status = 'running'
-      cluster.lastUpdated = new Date().toISOString()
-    } catch (err) {
-      cluster.status = 'error'
-      throw err
-    }
-  }
-
-  const stopCluster = async (clusterId: string) => {
-    const cluster = clusters.value.find(c => c.id === clusterId)
-    if (!cluster) throw new Error('Cluster not found')
-
-    cluster.status = 'stopping'
-    
-    try {
-      // Real API call
-      await api.post(`/clusters/${clusterId}/stop`, { action: 'stop' })
-      // Optionally update status after API call
-      cluster.status = 'stopped'
-      cluster.lastUpdated = new Date().toISOString()
-    } catch (err) {
-      cluster.status = 'error'
-      throw err
-    }
-  }
-
-  const updateCluster = async (clusterId: string, updates: Partial<Cluster>) => {
-    const cluster = clusters.value.find(c => c.id === clusterId)
+  const updateCluster = async (clusterName: string, updates: Partial<Cluster>) => {
+    const cluster = clusters.value.find(c => c.project_name === clusterName)
     if (!cluster) throw new Error('Cluster not found')
 
     try {
       // Real API call
-      await api.put(`/clusters/${clusterId}`, updates)
-      Object.assign(cluster, updates, { lastUpdated: new Date().toISOString() })
+      await api.put(`/clusters/${clusterName}`, updates)
+      Object.assign(cluster, updates, { updated_at: new Date().toISOString() })
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to update cluster'
       throw err
@@ -231,6 +169,20 @@ export const useClusterStore = defineStore('clusters', () => {
     })
   }
 
+  const getClusterByName = async (name: string): Promise<Cluster | null> => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await api.get(`/v1/deployments/${name}`, { requiresAuth: true })
+      return response.data as Cluster
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to fetch cluster'
+      return null
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   return {
     // State
     clusters: computed(() => clusters.value),
@@ -242,22 +194,18 @@ export const useClusterStore = defineStore('clusters', () => {
     deploymentEvents: computed(() => deploymentEvents.value),
 
     // Computed
-    runningClusters,
-    stoppedClusters,
-    totalCost,
     clustersByRegion,
 
     // Actions
     fetchClusters,
     createCluster,
     deleteCluster,
-    startCluster,
-    stopCluster,
     updateCluster,
     selectCluster,
     getClusterMetrics,
     initializeClusters,
     deploy,
     listenToDeploymentEvents,
+    getClusterByName,
   }
 }) 

@@ -210,7 +210,7 @@ function navigateToSshKeys() {
 
 // Get SSH key name by ID
 function getSshKeyName(keyId: number) {
-  const key = availableSshKeys.value.find(k => k.id === keyId);
+  const key = availableSshKeys.value.find(k => k.ID === keyId);
   return key ? key.name : 'Unknown';
 }
 
@@ -243,17 +243,12 @@ function prevStep() {
   if (step.value > 1) step.value--;
 }
 
-const clusters = useClusterStore();
-
 const clusterPayload = computed<Cluster>(() => {
   const networkName = clusterNetworkName.value || `${clusterName.value}_network`;
   const token = clusterToken.value;
-  const flist = defaultFlist.value;
-  const entrypoint = defaultEntrypoint.value;
-  const sshKeyObj = availableSshKeys.value.find(k => k.id === selectedSshKeys.value[0]);
-  const sshKey = sshKeyObj ? sshKeyObj.public_key : '';
 
   function buildNode(vm: VM, type: 'master' | 'worker'): ClusterNode {
+    const vmSshKeyObj = availableSshKeys.value.find(k => k.ID === vm.sshKeyIds[0]);
     return {
       name: vm.name,
       type: type === 'master' ? 'master' : 'worker',
@@ -263,7 +258,7 @@ const clusterPayload = computed<Cluster>(() => {
       root_size: vm.rootfs * 1024, // GB to MB
       disk_size: vm.disk * 1024, // GB to MB
       env_vars: {
-        SSH_KEY: sshKey,
+        SSH_KEY: vmSshKeyObj ? vmSshKeyObj.public_key : '',
         K3S_TOKEN: token,
       },
     };
@@ -335,9 +330,9 @@ function closeEditNodeModal() {
 function saveEditNode(updatedNode: VM) {
   if (!editNodeModal.value.node) return;
   if (editNodeModal.value.type === 'master') {
-    masters.value[editNodeModal.value.idx] = { ...updatedNode };
+    masters.value.splice(editNodeModal.value.idx, 1, { ...updatedNode });
   } else if (editNodeModal.value.type === 'worker') {
-    workers.value[editNodeModal.value.idx] = { ...updatedNode };
+    workers.value.splice(editNodeModal.value.idx, 1, { ...updatedNode });
   }
   closeEditNodeModal();
 }

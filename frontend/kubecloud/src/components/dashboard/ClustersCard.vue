@@ -21,19 +21,19 @@
             v-for="cluster in recentClusters"
             :key="cluster.id"
             class="list-item-interactive"
-            @click="viewCluster(cluster.id)"
+            @click="viewCluster(cluster.project_name)"
           >
             <div class="cluster-info">
-              <div class="cluster-name">{{ cluster.name }}</div>
+              <div class="cluster-name">{{ cluster.project_name }}</div>
               <div class="cluster-details">
-                <span class="cluster-region">{{ cluster.region }}</span>
+                <span class="cluster-region">{{ cluster.cluster.region }}</span>
                 <span>•</span>
-                <span>{{ cluster.nodes }} nodes</span>
+                <span>{{ Array.isArray(cluster.cluster.nodes) ? cluster.cluster.nodes.length : (typeof cluster.cluster.nodes === 'number' ? cluster.cluster.nodes : 0) }} nodes</span>
               </div>
             </div>
-            <div class="cluster-status" :class="cluster.status.toLowerCase()">
-              <span class="status-dot" :class="cluster.status.toLowerCase()"></span>
-              {{ cluster.status }}
+            <div class="cluster-status" :class="(cluster.cluster.status || '').toLowerCase()">
+              <span class="status-dot" :class="(cluster.cluster.status || '').toLowerCase()"></span>
+              {{ cluster.cluster.status }}
             </div>
             <div class="cluster-actions">
               <v-btn
@@ -48,7 +48,7 @@
                 variant="outlined"
                 size="small"
                 class="btn btn-outline btn-sm"
-                @click.stop="deleteCluster(cluster.id)"
+                @click.stop="deleteCluster(cluster.project_name)"
               >
                 <v-icon icon="mdi-delete" size="16"></v-icon>
               </v-btn>
@@ -72,42 +72,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useClusterStore } from '../../stores/clusters'
 
 const router = useRouter()
+const clusterStore = useClusterStore()
 
-// Mock data for recent clusters
-const recentClusters = ref([
-  {
-    id: 1,
-    name: 'Production API',
-    status: 'Running',
-    region: 'Ghent, Belgium',
-    nodes: 3
-  },
-  {
-    id: 2,
-    name: 'Staging Environment',
-    status: 'Running',
-    region: 'Ghent, Belgium',
-    nodes: 2
-  },
-  {
-    id: 3,
-    name: 'Development Cluster',
-    status: 'Stopped',
-    region: 'Ghent, Belgium',
-    nodes: 1
-  }
-])
+onMounted(() => {
+  clusterStore.fetchClusters()
+})
 
-const viewCluster = (id: number) => {
-  router.push(`/clusters/${id}`)
+const recentClusters = computed(() => {
+  // Show up to 3 most recently created clusters
+  return [...clusterStore.clusters].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 3)
+})
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const deleteCluster = (id: number) => {
-  console.log('Delete cluster:', id)
+const viewCluster = (projectName: string) => {
+  router.push(`/clusters/${projectName}`)
+}
+
+async function deleteCluster(projectName: string) {
+  if (confirm('Are you sure you want to delete this cluster? This action cannot be undone.')) {
+    await clusterStore.deleteCluster(projectName)
+    await clusterStore.fetchClusters()
+  }
 }
 
 const viewAllClusters = () => {
@@ -115,7 +110,7 @@ const viewAllClusters = () => {
 }
 
 const openMetrics = () => {
-  console.log('Open metrics')
+  // Implement metrics view if available
 }
 
 const goToDeployCluster = () => {

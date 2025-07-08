@@ -11,12 +11,16 @@ import OverviewCard from '../components/dashboard/OverviewCard.vue'
 import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
+import { useClusterStore } from '../stores/clusters'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
 
 // Initialize selected section from localStorage or default to 'overview'
 const selected = ref('overview')
+
+const clusterStore = useClusterStore()
+const clusters = computed(() => clusterStore.clusters)
 
 onMounted(async () => {
   const savedSection = localStorage.getItem('dashboard-section')
@@ -34,12 +38,6 @@ onMounted(async () => {
   // Fetch user net balance
   await userStore.updateNetBalance()
 })
-
-const clusters = ref([
-  { id: 1, name: 'Production Cluster', status: 'running', nodes: 3, region: 'US East' },
-  { id: 2, name: 'Staging Cluster', status: 'stopped', nodes: 2, region: 'US West' },
-  { id: 3, name: 'Development Cluster', status: 'running', nodes: 1, region: 'EU West' }
-])
 
 interface Bill {
   id: string | number

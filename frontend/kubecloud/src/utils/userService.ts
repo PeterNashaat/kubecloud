@@ -79,7 +79,7 @@ export interface UserInvoice {
 }
 
 export interface SshKey {
-  id: number
+  ID: number
   name: string
   public_key: string
   created_at: string

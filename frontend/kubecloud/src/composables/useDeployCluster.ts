@@ -13,7 +13,7 @@ export interface VM {
   planetary: boolean;
 }
 export interface DeployClusterNode { id: number; label: string; totalCPU: number; totalRAM: number; hasGPU: boolean; location: string; }
-export interface SshKey { id: number; name: string; public_key: string; created_at: string; updated_at: string; }
+export interface SshKey { ID: number; name: string; public_key: string; created_at: string; updated_at: string; }
 
 export function useDeployCluster() {
   const masters = ref<VM[]>([]);
@@ -23,14 +23,14 @@ export function useDeployCluster() {
   function addMaster() {
     if (masters.value.length < 3) {
       masters.value.push({
-        name: `Master-${masters.value.length + 1}`,
+        name: `Master${masters.value.length + 1}`,
         vcpu: 2,
         ram: 4,
         node: null,
         rootfs: 10,
         disk: 10,
         gpu: false,
-        sshKeyIds: availableSshKeys.value.length ? [availableSshKeys.value[0].id] : [],
+        sshKeyIds: availableSshKeys.value.length ? [availableSshKeys.value[0].ID] : [],
         publicIp: false,
         planetary: false,
       });
@@ -38,14 +38,14 @@ export function useDeployCluster() {
   }
   function addWorker() {
     workers.value.push({
-      name: `Worker-${workers.value.length + 1}`,
+      name: `Worker${workers.value.length + 1}`,
       vcpu: 2,
       ram: 4,
       node: null,
       rootfs: 10,
       disk: 10,
       gpu: false,
-      sshKeyIds: availableSshKeys.value.length ? [availableSshKeys.value[0].id] : [],
+      sshKeyIds: availableSshKeys.value.length ? [availableSshKeys.value[0].ID] : [],
       publicIp: false,
       planetary: false,
     });

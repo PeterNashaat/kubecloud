@@ -19,37 +19,16 @@
           </div>
         </div>
         <div v-if="!loading && !notFound && cluster" class="manage-content-wrapper">
-          <!-- Status Bar & Actions -->
-          <div class="card status-bar">
-            <div class="status-bar-content">
-              <div class="status-indicator">
-                <span class="status-dot" :class="cluster.status === 'running' ? 'running' : 'stopped'"></span>
-                <span class="status-text">{{ cluster.status }}</span>
-              </div>
-              <div class="status-actions">
-                <v-btn variant="outlined" class="btn btn-outline" @click="downloadKubeconfig">
+              <div class="status-actions align-end">
+                <v-btn variant="outlined" class="btn btn-outline" @click="openKubeconfigModal">
                   <v-icon icon="mdi-download" class="mr-2"></v-icon>
-                  Download Kubeconfig
+                  Show Kubeconfig
                 </v-btn>
-                <v-btn variant="outlined" class="btn btn-outline" @click="openDashboard">
-                  <v-icon icon="mdi-view-dashboard" class="mr-2"></v-icon>
-                  Open Dashboard
-                </v-btn>
-                <v-btn variant="outlined" class="btn btn-outline" color="success" v-if="cluster.status !== 'running'" @click="startCluster">
-                  <v-icon icon="mdi-play" class="mr-2"></v-icon>
-                  Start
-                </v-btn>
-                <v-btn variant="outlined" class="btn btn-outline" color="warning" v-if="cluster.status === 'running'" @click="stopCluster">
-                  <v-icon icon="mdi-stop" class="mr-2"></v-icon>
-                  Stop
-                </v-btn>
-                <v-btn variant="outlined" class="btn btn-outline" color="error" @click="deleteCluster">
+                <v-btn variant="outlined" class="btn btn-outline" color="error" @click="openDeleteModal">
                   <v-icon icon="mdi-delete" class="mr-2"></v-icon>
                   Delete
                 </v-btn>
               </div>
-            </div>
-          </div>
 
           <!-- Tabs for Overview, Nodes, Metrics, Events -->
           <v-tabs v-model="tab" class="mb-4">
@@ -72,19 +51,19 @@
                     <div class="resource-list">
                       <div class="resource-item">
                         <span class="resource-label">Nodes:</span>
-                        <span class="resource-value">{{ cluster.nodes }}</span>
+                        <span class="resource-value">{{ filteredNodes.length }}</span>
                       </div>
                       <div class="resource-item">
                         <span class="resource-label">vCPU:</span>
-                        <span class="resource-value">{{ cluster.cpu }}</span>
+                        <span class="resource-value">{{ totalVcpu }}</span>
                       </div>
                       <div class="resource-item">
                         <span class="resource-label">RAM:</span>
-                        <span class="resource-value">{{ cluster.memory }}</span>
+                        <span class="resource-value">{{ totalRam }} MB</span>
                       </div>
                       <div class="resource-item">
                         <span class="resource-label">Storage:</span>
-                        <span class="resource-value">{{ cluster.storage }}</span>
+                        <span class="resource-value">{{ totalStorage }} MB</span>
                       </div>
                     </div>
                   </div>
@@ -95,20 +74,20 @@
                     </h3>
                     <div class="details-grid">
                       <div class="detail-item">
-                        <span class="detail-label">Region:</span>
-                        <span class="detail-value">{{ cluster.region }}</span>
+                        <span class="detail-label">Project Name:</span>
+                        <span class="detail-value">{{ cluster.project_name || '-' }}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Cluster Name:</span>
+                        <span class="detail-value">{{ cluster.cluster.name || '-' }}</span>
                       </div>
                       <div class="detail-item">
                         <span class="detail-label">Created:</span>
-                        <span class="detail-value">{{ cluster.createdAt }}</span>
-                      </div>
-                      <div class="detail-item">
-                        <span class="detail-label">Est. Cost:</span>
-                        <span class="detail-value">${{ cluster.cost }}/month</span>
+                        <span class="detail-value">{{ formatDate(cluster.created_at) }}</span>
                       </div>
                       <div class="detail-item">
                         <span class="detail-label">Last Updated:</span>
-                        <span class="detail-value">{{ cluster.lastUpdated }}</span>
+                        <span class="detail-value">{{ formatDate(cluster.updated_at) }}</span>
                       </div>
                     </div>
                   </div>
@@ -121,7 +100,7 @@
                   <v-icon icon="mdi-lan" class="mr-2"></v-icon>
                   Cluster Nodes
                 </h3>
-                <v-table v-if="clusterNodes.length">
+                <v-table v-if="filteredNodes.length">
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -132,12 +111,12 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="node in clusterNodes" :key="node.Name">
-                      <td>{{ node.Name }}</td>
-                      <td>{{ node.Type }}</td>
-                      <td>{{ node.CPU }}</td>
-                      <td>{{ node.Memory }} MB</td>
-                      <td>{{ node.RootSize + node.DiskSize }} MB</td>
+                    <tr v-for="node in filteredNodes" :key="node.node_id">
+                      <td>{{ node.name }}</td>
+                      <td>{{ node.type }}</td>
+                      <td>{{ node.cpu }}</td>
+                      <td>{{ node.memory }} MB</td>
+                      <td>{{ node.root_size + node.disk_size }} MB</td>
                     </tr>
                   </tbody>
                 </v-table>
@@ -221,6 +200,35 @@
         </div>
       </v-container>
     </div>
+
+    <!-- Kubeconfig Modal -->
+    <v-dialog v-model="kubeconfigDialog" max-width="600">
+      <v-card>
+        <v-card-title>Kubeconfig</v-card-title>
+        <v-card-text>
+          <v-alert v-if="kubeconfigError" type="error" class="mb-4">{{ kubeconfigError }}</v-alert>
+          <v-progress-linear v-if="kubeconfigLoading" indeterminate color="primary" class="mb-4" />
+          <pre v-if="kubeconfigContent">{{ kubeconfigContent }}</pre>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="primary" @click="copyKubeconfig">Copy</v-btn>
+          <v-btn color="primary" @click="downloadKubeconfigFile">Download</v-btn>
+          <v-btn color="primary" @click="kubeconfigDialog = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Delete Confirmation Modal -->
+    <v-dialog v-model="showDeleteModal" max-width="400">
+      <v-card>
+        <v-card-title>Confirm Delete</v-card-title>
+        <v-card-text>Are you sure you want to delete this cluster?</v-card-text>
+        <v-card-actions>
+          <v-btn color="primary" @click="showDeleteModal = false" :disabled="deletingCluster">Cancel</v-btn>
+          <v-btn color="primary" @click="confirmDelete" :loading="deletingCluster" :disabled="deletingCluster">Delete</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -228,6 +236,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
+import { api } from '../../utils/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -236,25 +245,99 @@ const clusterStore = useClusterStore()
 const loading = ref(true)
 const notFound = ref(false)
 
-const clusterId = computed(() => route.params.id?.toString() || '')
+const projectName = computed(() => route.params.id?.toString() || '')
 const cluster = computed(() =>
-  clusterStore.clusters.find(c => c.id === clusterId.value)
+  clusterStore.clusters.find(c => c.project_name === projectName.value)
 )
 
 const tab = ref('overview')
 
-// Node details (mocked or fetched from backend if available)
-const clusterNodes = ref<any[]>([])
+const filteredNodes = computed(() => {
+  if (Array.isArray(cluster.value?.cluster.nodes)) {
+    return cluster.value.cluster.nodes.filter(node => typeof node === 'object' && node !== null)
+  }
+  return []
+})
 
-// Metrics
-const metrics = ref<any>(null)
-const metricsLoading = ref(false)
-const metricsError = ref<string | null>(null)
+const totalVcpu = computed(() => {
+  return filteredNodes.value.length
+    ? filteredNodes.value.reduce((sum, node) => sum + (typeof node.cpu === 'number' ? node.cpu : 0), 0)
+    : '-'
+})
+const totalRam = computed(() => {
+  return filteredNodes.value.length
+    ? filteredNodes.value.reduce((sum, node) => sum + (typeof node.memory === 'number' ? node.memory : 0), 0)
+    : '-'
+})
+const totalStorage = computed(() => {
+  return filteredNodes.value.length
+    ? filteredNodes.value.reduce((sum, node) => sum + ((typeof node.root_size === 'number' ? node.root_size : 0) + (typeof node.disk_size === 'number' ? node.disk_size : 0)), 0)
+    : '-'
+})
 
-// Events
-const events = ref<any[]>([])
-const eventsLoading = ref(false)
-const eventsError = ref<string | null>(null)
+const kubeconfigDialog = ref(false)
+const kubeconfigContent = ref('')
+const kubeconfigLoading = ref(false)
+const kubeconfigError = ref('')
+
+async function showKubeconfig() {
+  kubeconfigLoading.value = true
+  kubeconfigError.value = ''
+  kubeconfigContent.value = ''
+  try {
+    const response = await api.get(`/v1/deployments/${projectName.value}/kubeconfig`, { requiresAuth: true })
+    kubeconfigContent.value = response.data.kubeconfig || ''
+  } catch (err: any) {
+    kubeconfigError.value = err?.message || 'Failed to fetch kubeconfig'
+  } finally {
+    kubeconfigLoading.value = false
+  }
+}
+
+function openKubeconfigModal() {
+  kubeconfigDialog.value = true
+  if (!kubeconfigContent.value && !kubeconfigLoading.value) {
+    showKubeconfig()
+  }
+}
+
+function copyKubeconfig() {
+  if (kubeconfigContent.value) {
+    navigator.clipboard.writeText(kubeconfigContent.value)
+  }
+}
+
+function downloadKubeconfigFile() {
+  if (!kubeconfigContent.value) return
+  const blob = new Blob([kubeconfigContent.value], { type: 'application/x-yaml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${projectName.value}-kubeconfig.yaml`
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 100)
+}
+
+const showDeleteModal = ref(false)
+const deletingCluster = ref(false)
+
+async function confirmDelete() {
+  deletingCluster.value = true
+  showDeleteModal.value = false
+  if (cluster.value) {
+    await clusterStore.deleteCluster(cluster.value.project_name)
+    router.push('/dashboard/clusters')
+  }
+  deletingCluster.value = false
+}
+
+function openDeleteModal() {
+  showDeleteModal.value = true
+}
 
 const loadCluster = async () => {
   loading.value = true
@@ -266,17 +349,8 @@ const loadCluster = async () => {
     if (!cluster.value) {
       notFound.value = true
     } else {
-      // Optionally fetch node details here
-      // clusterNodes.value = await api.get(`/clusters/${clusterId.value}/nodes`)
-      // For now, mock nodes if needed
-      clusterNodes.value = [
-        { Name: 'master-1', Type: 'master', CPU: 2, Memory: 4096, RootSize: 10240, DiskSize: 10240 },
-        { Name: 'worker-1', Type: 'worker', CPU: 2, Memory: 4096, RootSize: 10240, DiskSize: 10240 },
-      ]
-      // Fetch metrics
-      fetchMetrics()
-      // Fetch events
-      fetchEvents()
+      // Fetch kubeconfig in the background
+      showKubeconfig()
     }
   } catch (e) {
     notFound.value = true
@@ -286,7 +360,7 @@ const loadCluster = async () => {
 }
 
 onMounted(loadCluster)
-watch(() => clusterId.value, loadCluster)
+watch(() => projectName.value, loadCluster)
 
 const goBack = () => {
   router.push('/dashboard')
@@ -298,38 +372,21 @@ function formatDate(dateStr: string) {
 }
 
 // Actions
-function downloadKubeconfig() {
-  // TODO: Implement download logic
-  // eslint-disable-next-line no-console
-  console.log('Download kubeconfig')
-}
-function openDashboard() {
-  // TODO: Implement open dashboard logic
-  // eslint-disable-next-line no-console
-  console.log('Open dashboard')
-}
-function startCluster() {
-  // TODO: Implement start logic
-  // eslint-disable-next-line no-console
-  console.log('Start cluster')
-}
-function stopCluster() {
-  // TODO: Implement stop logic
-  // eslint-disable-next-line no-console
-  console.log('Stop cluster')
-}
-function deleteCluster() {
-  // TODO: Implement delete logic
-  // eslint-disable-next-line no-console
-  console.log('Delete cluster')
-}
+const metrics = ref<any>(null)
+const metricsLoading = ref(false)
+const metricsError = ref<string | null>(null)
+
+// Events
+const events = ref<any[]>([])
+const eventsLoading = ref(false)
+const eventsError = ref<string | null>(null)
 
 // Metrics fetching
 async function fetchMetrics() {
   metricsLoading.value = true
   metricsError.value = null
   try {
-    metrics.value = await clusterStore.getClusterMetrics(clusterId.value)
+    metrics.value = await clusterStore.getClusterMetrics(projectName.value)
   } catch (e: any) {
     metricsError.value = e.message || 'Failed to fetch metrics'
   } finally {
@@ -337,23 +394,6 @@ async function fetchMetrics() {
   }
 }
 
-// Events fetching (mocked for now)
-async function fetchEvents() {
-  eventsLoading.value = true
-  eventsError.value = null
-  try {
-    // TODO: Replace with real API call
-    events.value = [
-      { id: 1, message: 'Cluster created', timestamp: new Date().toISOString() },
-      { id: 2, message: 'Node master-1 started', timestamp: new Date().toISOString() },
-      { id: 3, message: 'Node worker-1 started', timestamp: new Date().toISOString() },
-    ]
-  } catch (e: any) {
-    eventsError.value = e.message || 'Failed to fetch events'
-  } finally {
-    eventsLoading.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -456,6 +496,13 @@ async function fetchEvents() {
 .status-actions {
   display: flex;
   gap: var(--space-3);
+}
+
+.status-actions.align-end {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .main-content-card {
