@@ -32,6 +32,11 @@ type Configuration struct {
 	SSH                  SSHConfig          `json:"ssh" validate:"required,dive"`
 }
 
+type SSHConfig struct {
+	PrivateKeyPath string `json:"private_key_path" validate:"required"`
+	PublicKeyPath  string `json:"public_key_path" validate:"required"`
+}
+
 // Server struct holds server's information
 type Server struct {
 	Host string `json:"host" validate:"required,hostname|ip"`

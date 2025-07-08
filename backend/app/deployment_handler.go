@@ -551,7 +551,7 @@ func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
 		return
 	}
 
-	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.Grid.Network))
+	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.SystemAccount.Network))
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to create grid client")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create grid client"})

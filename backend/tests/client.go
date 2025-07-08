@@ -219,8 +219,8 @@ func (c *Client) ListenToSSE(taskID string) error {
 			}
 
 			line := scanner.Text()
-			if strings.HasPrefix(line, "data: ") {
-				data := strings.TrimPrefix(line, "data: ")
+			if strings.HasPrefix(line, "data:") {
+				data := strings.TrimPrefix(line, "data:")
 				if data != "" {
 					fmt.Printf("SSE Update: %s\n", data)
 				}
@@ -278,8 +278,8 @@ func (c *Client) ListenToSSEWithLogger(taskID string, logFunc func(string, ...in
 			}
 
 			line := scanner.Text()
-			if strings.HasPrefix(line, "data: ") {
-				data := strings.TrimPrefix(line, "data: ")
+			if strings.HasPrefix(line, "data:") {
+				data := strings.TrimPrefix(line, "data:")
 				if data != "" {
 					logFunc("SSE Update: %s", data)
 				}

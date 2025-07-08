@@ -36,8 +36,8 @@ type App struct {
 	redis         *internal.RedisClient
 	sseManager    *internal.SSEManager
 	workerManager *internal.WorkerManager
-	// gridClient    deployer.TFPluginClient
-	appCancel context.CancelFunc
+	gridClient    deployer.TFPluginClient
+	appCancel     context.CancelFunc
 }
 
 // NewApp create new instance of the app with all configs
@@ -115,11 +115,11 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.Grid.Network)
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, config.Grid.Network)
+		sseManager, config.SystemAccount.Network)
 
 	app := &App{
 		router:        router,
@@ -130,6 +130,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		sseManager:    sseManager,
 		workerManager: workerManager,
 		appCancel:     appCancel,
+		gridClient:    gridClient,
 	}
 
 	app.registerHandlers()
@@ -230,7 +231,7 @@ func (app *App) registerHandlers() {
 
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
-	// go app.handlers.TrackUserDebt(app.gridClient)
+	go app.handlers.TrackUserDebt(app.gridClient)
 }
 
 // Run starts the server
