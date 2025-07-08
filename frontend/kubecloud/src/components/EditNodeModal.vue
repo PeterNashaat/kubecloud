@@ -1,0 +1,148 @@
+<template>
+  <div v-if="visible && localNode">
+    <div class="modal-backdrop" @click="$emit('cancel')"></div>
+    <div class="edit-node-modal">
+      <h3>Edit Node</h3>
+      <div class="modal-fields">
+        <label>Name</label>
+        <input type="text" v-model="localNode.name" />
+        <div v-if="errors.name" class="field-error">{{ errors.name }}</div>
+        <label>vCPU</label>
+        <input type="number" v-model.number="localNode.vcpu" />
+        <div v-if="errors.vcpu" class="field-error">{{ errors.vcpu }}</div>
+        <label>RAM (GB)</label>
+        <input type="number" v-model.number="localNode.ram" />
+        <div v-if="errors.ram" class="field-error">{{ errors.ram }}</div>
+        <label>Disk Size (GB)</label>
+        <input type="number" v-model.number="localNode.disk" />
+        <div v-if="errors.disk" class="field-error">{{ errors.disk }}</div>
+        <v-switch v-model="localNode.gpu" label="GPU" inset color="primary" />
+        <div class="ssh-key-section" style="margin-top: 1.5rem;">
+          <label class="ssh-key-label">SSH Key</label>
+          <v-chip-group
+            v-model="selectedSshKeyId"
+            column
+            style="max-width: 600px;"
+            :multiple="false"
+          >
+            <v-chip
+              v-for="key in availableSshKeys"
+              :key="key.id"
+              :value="key.id"
+              class="ma-1"
+              :class="{ 'selected-chip': selectedSshKeyId === key.id }"
+            >
+              <v-icon v-if="localNode.gpu" start small class="mr-1">mdi-nvidia</v-icon>
+              {{ key.name }}
+            </v-chip>
+          </v-chip-group>
+          <div v-if="!selectedSshKeyId" class="ssh-alert">
+            <v-icon color="error" class="mr-1">mdi-alert-circle</v-icon>
+            <span>Please select an SSH key to proceed.</span>
+          </div>
+          <div v-else class="ssh-selected-name">
+            <span>Selected SSH Key: <b>{{ selectedSshKeyName }}</b></span>
+          </div>
+        </div>
+        <div v-if="errors.ssh" class="field-error">{{ errors.ssh }}</div>
+      </div>
+      <div class="modal-actions">
+        <button @click="onSave" :disabled="!valid">Save</button>
+        <button @click="$emit('cancel')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</template>
+<script setup lang="ts">
+import { defineProps, defineEmits, watch, ref, computed } from 'vue';
+import type { PropType } from 'vue';
+import type { VM, SshKey } from '../composables/useDeployCluster';
+const props = defineProps({
+  node: { type: Object as PropType<VM>, required: true },
+  visible: { type: Boolean, required: true },
+  availableSshKeys: { type: Array as PropType<SshKey[]>, required: true }
+});
+const emit = defineEmits<{ (e: 'save', node: VM): void; (e: 'cancel'): void }>();
+const localNode = ref<VM>({ ...props.node });
+watch(() => props.node, (val) => { localNode.value = { ...val }; });
+
+// Use a single value for SSH key selection
+const selectedSshKeyId = ref<number | null>(
+  localNode.value.sshKeyIds && localNode.value.sshKeyIds.length > 0 ? localNode.value.sshKeyIds[0] : null
+);
+
+// Keep selectedSshKeyId in sync with localNode when node changes
+watch(
+  () => localNode.value.sshKeyIds,
+  (ids) => {
+    selectedSshKeyId.value = ids && ids.length > 0 ? ids[0] : null;
+  },
+  { immediate: true }
+);
+
+const errors = computed(() => {
+  const node = localNode.value;
+  const errs: Record<string, string> = {};
+  if (!node.name || !node.name.trim()) errs.name = 'Name is required.';
+  if (!node.vcpu || node.vcpu <= 0) errs.vcpu = 'vCPU must be a positive number.';
+  if (!node.ram || node.ram <= 0) errs.ram = 'RAM must be a positive number.';
+  if (!node.disk || node.disk <= 0) errs.disk = 'Disk size must be positive.';
+  if (!selectedSshKeyId.value) errs.ssh = 'At least one SSH key must be selected.';
+  return errs;
+});
+const valid = computed(() => Object.keys(errors.value).length === 0);
+function onSave() {
+  if (valid.value) {
+    // Save as array for backend compatibility
+    emit('save', { ...localNode.value, sshKeyIds: selectedSshKeyId.value !== null ? [selectedSshKeyId.value] : [] });
+  }
+}
+const selectedSshKeyName = computed(() => {
+  if (!selectedSshKeyId.value) return '';
+  const key = props.availableSshKeys.find(k => k.id === selectedSshKeyId.value);
+  return key ? key.name : '';
+});
+</script>
+<script lang="ts">
+export default {
+  name: 'EditNodeModal'
+};
+</script>
+<style scoped>
+.modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+.edit-node-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #232946; color: #fff; border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25); padding: 2rem 2.5rem; z-index: 1001; min-width: 320px; max-width: 90vw; }
+.edit-node-modal h3 { margin-top: 0; margin-bottom: 1.2rem; font-size: 1.3rem; font-weight: 700; }
+.modal-fields label { display: block; margin-top: 1rem; font-weight: 500; }
+.modal-fields input[type="number"], .modal-fields input[type="text"] { width: 100%; margin-top: 0.3rem; padding: 0.4em 0.7em; border-radius: 6px; border: 1px solid #4f8cff; background: #1a1f2b; color: #fff; }
+.modal-actions { display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end; }
+.modal-actions button { background: #4f8cff; color: #fff; border: none; border-radius: 8px; padding: 0.5em 1.2em; font-size: 1em; cursor: pointer; transition: background 0.2s; }
+.modal-actions button:last-child { background: #232946; border: 1px solid #4f8cff; color: #4f8cff; }
+.field-error { color: #ff5252; font-size: 0.97em; margin-top: 0.2em; }
+.ssh-key-section {
+  margin-top: 1.5rem;
+}
+.ssh-key-label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.v-chip.selected-chip {
+  background: var(--color-primary, #6366f1);
+  color: #fff;
+}
+.ssh-alert {
+  color: #ff5252;
+  background: #2d1a1a;
+  border-radius: 6px;
+  padding: 0.5em 1em;
+  margin-top: 0.7em;
+  display: flex;
+  align-items: center;
+  font-size: 1em;
+}
+.ssh-selected-name {
+  color: #a5f3a1;
+  margin-top: 0.7em;
+  font-size: 1em;
+}
+</style> 
