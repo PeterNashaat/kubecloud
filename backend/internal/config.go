@@ -27,14 +27,8 @@ type Configuration struct {
 	FiresquidURL         string             `json:"firesquid_url" validate:"required"`
 	SystemAccount        GridAccount        `json:"system_account"`
 	Redis                Redis              `json:"redis" validate:"required,dive"`
-	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
 	Invoice              InvoiceCompanyData `json:"invoice"`
-}
-
-type GridConfig struct {
-	Mnemonic string `json:"mnemonic" validate:"required"`
-	Network  string `json:"net" validate:"required"`
 }
 
 // Server struct holds server's information

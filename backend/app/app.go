@@ -92,8 +92,8 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	// start gridclient
 	gridClient, err := deployer.NewTFPluginClient(
-		config.Grid.Mnemonic,
-		deployer.WithNetwork(config.Grid.Network),
+		config.SystemAccount.Mnemonic,
+		deployer.WithNetwork(config.SystemAccount.Network),
 		// TODO: remove this after testing
 		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
 		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
