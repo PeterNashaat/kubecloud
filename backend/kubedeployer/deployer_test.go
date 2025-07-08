@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
 func TestDeployCluster(t *testing.T) {
@@ -55,17 +53,17 @@ func TestDeployCluster(t *testing.T) {
 		},
 	}
 
-	tfplugin, err := deployer.NewTFPluginClient(mnemonic,
-		deployer.WithNetwork(network),
-		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		deployer.WithRelayURL("wss://relay.dev.grid.tf"),
-		deployer.WithLogs(),
-	)
-	if err != nil {
-		t.Fatalf("failed to create TF plugin client: %v", err)
-	}
+	// tfplugin, err := deployer.NewTFPluginClient(mnemonic,
+	// 	deployer.WithNetwork(network),
+	// 	deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+	// 	deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+	// 	deployer.WithLogs(),
+	// )
+	// if err != nil {
+	// 	t.Fatalf("failed to create TF plugin client: %v", err)
+	// }
 
-	cls, err := DeployCluster(context.Background(), tfplugin, cluster, "")
+	cls, err := DeployCluster(context.Background(), network, mnemonic, cluster, "")
 	if err != nil {
 		t.Fatalf("failed to deploy cluster: %v", err)
 	}

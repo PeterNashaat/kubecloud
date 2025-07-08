@@ -115,11 +115,11 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient, sshPublicKey, db)
+	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient, sshPublicKey, db, config.Grid.Network)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, gridClient)
+		sseManager, gridClient, config.Grid.Network)
 
 	app := &App{
 		router:        router,

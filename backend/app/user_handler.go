@@ -33,6 +33,7 @@ type Handler struct {
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
 	gridClient      deployer.TFPluginClient
+	gridNet         string // Network name for the grid
 }
 
 // NewHandler create new handler
@@ -41,7 +42,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridClient deployer.TFPluginClient) *Handler {
+	gridClient deployer.TFPluginClient, gridNet string) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -54,6 +55,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		redis:           redis,
 		sseManager:      sseManager,
 		gridClient:      gridClient,
+		gridNet:         gridNet,
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kubecloud/kubedeployer"
 	"kubecloud/models"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -19,10 +20,11 @@ type Worker struct {
 	gridClient deployer.TFPluginClient
 	sshKey     string
 	db         models.DB
+	gridNet    string // Network name for the grid
 }
 
 // NewWorker creates a new worker instance
-func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, gridClient deployer.TFPluginClient, sshKey string, db models.DB) *Worker {
+func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, gridClient deployer.TFPluginClient, sshKey string, db models.DB, gridNet string) *Worker {
 	return &Worker{
 		ID:         id,
 		redis:      redis,
@@ -30,6 +32,7 @@ func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, gridClient
 		gridClient: gridClient,
 		sshKey:     sshKey,
 		db:         db,
+		gridNet:    gridNet,
 	}
 }
 
@@ -140,7 +143,21 @@ func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *D
 		UserID: task.UserID,
 	}
 
-	res, err := kubedeployer.DeployCluster(ctx, w.gridClient, task.Payload, w.sshKey)
+	userID, err := strconv.Atoi(task.UserID)
+	if err != nil {
+		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to parse user ID")
+		result.Status = TaskStatusFailed
+		return result
+	}
+
+	user, err := w.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to get user")
+		result.Status = TaskStatusFailed
+		return result
+	}
+
+	res, err := kubedeployer.DeployCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey)
 	if err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
 		result.Status = TaskStatusFailed
@@ -171,7 +188,7 @@ type WorkerManager struct {
 }
 
 // NewWorkerManager creates a new worker manager
-func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, gridClient deployer.TFPluginClient, sshKey string, db models.DB) *WorkerManager {
+func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, gridClient deployer.TFPluginClient, sshKey string, db models.DB, gridNet string) *WorkerManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	manager := &WorkerManager{
@@ -181,7 +198,7 @@ func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount in
 
 	for i := 0; i < workerCount; i++ {
 		workerID := fmt.Sprintf("worker-%d", i+1)
-		worker := NewWorker(workerID, redis, sseManager, gridClient, sshKey, db)
+		worker := NewWorker(workerID, redis, sseManager, gridClient, sshKey, db, gridNet)
 		manager.workers = append(manager.workers, worker)
 	}
 

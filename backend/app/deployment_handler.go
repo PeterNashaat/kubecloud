@@ -7,12 +7,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -535,7 +537,28 @@ func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
 		}
 	}
 
-	if err := h.gridClient.BatchCancelContract(contracts); err != nil {
+	// get user client
+	userIDInt, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to parse user ID")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user ID"})
+		return
+	}
+	user, err := h.db.GetUserByID(userIDInt)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to get user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
+		return
+	}
+
+	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.Grid.Network))
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to create grid client")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create grid client"})
+		return
+	}
+
+	if err := gridClient.BatchCancelContract(contracts); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel deployment contracts"})
 		return
 	}

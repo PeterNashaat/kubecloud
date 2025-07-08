@@ -9,7 +9,16 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
-func DeployCluster(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster, sshKey string) (Cluster, error) {
+func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluster, sshKey string) (Cluster, error) {
+	tfplugin, err := deployer.NewTFPluginClient(
+		mnemonic,
+		deployer.WithNetwork(gridNet),
+	)
+	if err != nil {
+		return Cluster{}, fmt.Errorf("failed to create TFPluginClient with mnemonic: %v", err)
+	}
+	defer tfplugin.Close()
+
 	// 1. Deploy network on all related nodes
 	gridNodes := []uint32{}
 	for _, node := range cluster.Nodes {
