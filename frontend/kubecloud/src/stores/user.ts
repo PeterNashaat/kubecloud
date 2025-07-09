@@ -12,6 +12,7 @@ export interface User {
   admin: boolean
   verified: boolean
   updated_at: string
+  balance_usd?: number
 }
 
 export interface AuthState {

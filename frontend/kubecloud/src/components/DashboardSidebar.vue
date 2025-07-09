@@ -71,7 +71,9 @@ const navigationItems = [
 ]
 </script>
 
+<script lang="ts">
 export default {}
+</script>
 
 <style scoped>
 .sidebar-card {

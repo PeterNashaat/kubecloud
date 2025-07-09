@@ -11,7 +11,7 @@
       </v-btn>
     </div>
     <div class="ssh-keys-list">
-      <div v-for="key in sshKeys" :key="key.id" class="ssh-key-item">
+      <div v-for="key in sshKeys" :key="key.ID" class="ssh-key-item">
         <div class="ssh-key-content">
           <div class="ssh-key-info">
             <v-icon size="28" color="primary" class="mr-3">mdi-key</v-icon>
@@ -34,7 +34,7 @@
               <div class="ssh-key-date">Added {{ new Date(key.created_at).toLocaleDateString() }}</div>
             </div>
           </div>
-          <v-btn color="error" variant="outlined" size="small" class="action-btn" @click="handleDeleteKey(key.id)">
+          <v-btn color="error" variant="outlined" size="small" class="action-btn" @click="handleDeleteKey(key.ID)">
             <v-icon left size="16">mdi-delete</v-icon> Remove
           </v-btn>
         </div>
@@ -134,7 +134,7 @@ async function handleAddKey() {
 
 async function handleDeleteKey(id: number) {
   await userService.deleteSshKey(id)
-  sshKeys.value = sshKeys.value.filter(k => k.id !== id)
+  sshKeys.value = sshKeys.value.filter(k => k.ID !== id)
 }
 
 async function pasteFromClipboard() {
@@ -168,6 +168,10 @@ function truncateKey(key: string) {
 }
 
 onMounted(fetchSshKeys)
+</script>
+
+<script lang="ts">
+export default {}
 </script>
 
 <style scoped>
@@ -280,5 +284,3 @@ onMounted(fetchSshKeys)
   }
 }
 </style>
-
-export default {}

@@ -28,6 +28,19 @@ export interface RentedNode {
     hru: number;
     mru: number;
   };
+  resources?: {
+    cpu: number;
+    memory: number;
+    storage: number;
+    sru?: number;
+    hru?: number;
+    mru?: number;
+  };
+  gpu?: boolean;
+  gpus: any[];
+  price_usd: number;
+  farm_free_ips: number;
+  features: string[];
   location: {
     country: string;
     city: string;
@@ -79,10 +92,6 @@ export interface RentedNode {
     upload: number;
     download: number;
   };
-  gpus: any[];
-  price_usd: number;
-  farm_free_ips: number;
-  features: string[];
 }
 
 export function useNodeManagement() {

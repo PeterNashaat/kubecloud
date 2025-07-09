@@ -110,7 +110,7 @@ class ApiClient {
           if (!response.ok) throw new Error('Retry after refresh failed')
         } catch (refreshError) {
           userStore.logout()
-          router.push('/login')
+          router.push('/sign-in')
           throw new Error('Session expired. Please log in again.')
         }
       }

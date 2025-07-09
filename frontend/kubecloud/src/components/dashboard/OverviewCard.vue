@@ -187,7 +187,9 @@ const systemStatus = [
 const emit = defineEmits(['navigate'])
 </script>
 
+<script lang="ts">
 export default {}
+</script>
 
 <style scoped>
 .dashboard-card-header {

@@ -40,9 +40,9 @@
                 variant="outlined"
                 size="small"
                 class="btn btn-outline btn-sm"
-                @click.stop="openMetrics()"
+                @click.stop="viewCluster(cluster.project_name)"
               >
-                <v-icon icon="mdi-chart-line" size="16"></v-icon>
+                <v-icon icon="mdi-eye" size="16"></v-icon>
               </v-btn>
               <v-btn
                 variant="outlined"
@@ -109,13 +109,13 @@ const viewAllClusters = () => {
   router.push('/dashboard/clusters')
 }
 
-const openMetrics = () => {
-  // Implement metrics view if available
-}
-
 const goToDeployCluster = () => {
   router.push('/deploy')
 }
+</script>
+
+<script lang="ts">
+export default {}
 </script>
 
 <style scoped>
@@ -146,7 +146,7 @@ const goToDeployCluster = () => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-3) 0;
+  padding: var(--space-3) 1rem;
 }
 
 .cluster-info {
@@ -252,5 +252,3 @@ const goToDeployCluster = () => {
   }
 }
 </style>
-
-export default {}

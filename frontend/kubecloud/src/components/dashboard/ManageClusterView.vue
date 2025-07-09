@@ -11,17 +11,16 @@
         </div>
         <div v-else-if="cluster" class="manage-header mb-6">
           <div class="manage-header-content">
-            <h1 class="manage-title">{{ cluster.name }}</h1>
+            <h1 class="manage-title">{{ cluster?.cluster?.name || '-' }}</h1>
             <p class="manage-subtitle">Manage your Kubernetes cluster configuration and resources</p>
             <div class="tag-list mt-2">
-              <v-chip v-for="tag in cluster.tags" :key="tag" size="x-small" class="mr-1">{{ tag }}</v-chip>
             </div>
           </div>
         </div>
         <div v-if="!loading && !notFound && cluster" class="manage-content-wrapper">
               <div class="status-actions align-end">
                 <v-btn variant="outlined" class="btn btn-outline" @click="openKubeconfigModal">
-                  <v-icon icon="mdi-download" class="mr-2"></v-icon>
+                  <v-icon icon="mdi-eye" class="mr-2"></v-icon>
                   Show Kubeconfig
                 </v-btn>
                 <v-btn variant="outlined" class="btn btn-outline" color="error" @click="openDeleteModal">
@@ -79,7 +78,7 @@
                       </div>
                       <div class="detail-item">
                         <span class="detail-label">Cluster Name:</span>
-                        <span class="detail-value">{{ cluster.cluster.name || '-' }}</span>
+                        <span class="detail-value">{{ cluster.cluster?.name || '-' }}</span>
                       </div>
                       <div class="detail-item">
                         <span class="detail-label">Created:</span>
@@ -108,6 +107,10 @@
                       <th>CPU</th>
                       <th>RAM</th>
                       <th>Storage</th>
+                      <th>IP</th>
+                      <th>Mycelium IP</th>
+                      <th>Planetary IP</th>
+                      <th>Contract ID</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -117,6 +120,34 @@
                       <td>{{ node.cpu }}</td>
                       <td>{{ node.memory }} MB</td>
                       <td>{{ node.root_size + node.disk_size }} MB</td>
+                      <td>
+                        <span class="truncate-cell">
+                          {{ node.ip || '-' }}
+                        </span>
+                      </td>
+                      <td>
+                        <v-tooltip activator="parent" location="top" v-if="node.mycelium_ip">
+                          <template #activator="{ props }">
+                            <span class="truncate-cell" v-bind="props">
+                              {{ node.mycelium_ip }}
+                            </span>
+                          </template>
+                          <span>{{ node.mycelium_ip }}</span>
+                        </v-tooltip>
+                        <span v-else>-</span>
+                      </td>
+                      <td>
+                        <v-tooltip activator="parent" location="top" v-if="node.planetary_ip">
+                          <template #activator="{ props }">
+                            <span class="truncate-cell" v-bind="props">
+                              {{ node.planetary_ip }}
+                            </span>
+                          </template>
+                          <span>{{ node.planetary_ip }}</span>
+                        </v-tooltip>
+                        <span v-else>-</span>
+                      </td>
+                      <td>{{ node.contract_id || '-' }}</td>
                     </tr>
                   </tbody>
                 </v-table>
@@ -237,10 +268,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
+import { useNotificationStore } from '../../stores/notifications'
 
 const router = useRouter()
 const route = useRoute()
 const clusterStore = useClusterStore()
+const notificationStore = useNotificationStore()
 
 const loading = ref(true)
 const notFound = ref(false)
@@ -285,8 +318,11 @@ async function showKubeconfig() {
   kubeconfigError.value = ''
   kubeconfigContent.value = ''
   try {
-    const response = await api.get(`/v1/deployments/${projectName.value}/kubeconfig`, { requiresAuth: true })
-    kubeconfigContent.value = response.data.kubeconfig || ''
+    const response = await api.get(`/v1/deployments/${projectName.value}/kubeconfig`, { requiresAuth: true, showNotifications: false })
+    const data = response.data as { kubeconfig?: string }
+    console.log({data});
+    
+    kubeconfigContent.value = data.kubeconfig || ''
   } catch (err: any) {
     kubeconfigError.value = err?.message || 'Failed to fetch kubeconfig'
   } finally {
@@ -348,9 +384,6 @@ const loadCluster = async () => {
     }
     if (!cluster.value) {
       notFound.value = true
-    } else {
-      // Fetch kubeconfig in the background
-      showKubeconfig()
     }
   } catch (e) {
     notFound.value = true
@@ -370,7 +403,6 @@ function formatDate(dateStr: string) {
   const date = new Date(dateStr)
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
-
 // Actions
 const metrics = ref<any>(null)
 const metricsLoading = ref(false)
@@ -626,68 +658,13 @@ async function fetchMetrics() {
   font-size: var(--font-size-sm);
 }
 
-@media (max-width: 1100px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-  .details-card {
-    grid-column: auto;
-  }
-}
-
-@media (max-width: 768px) {
-  .manage-cluster-container {
-    padding: var(--space-4);
-  }
-  
-  .manage-title {
-    font-size: var(--font-size-2xl);
-  }
-  
-  .manage-subtitle {
-    font-size: var(--font-size-base);
-  }
-  
-  .status-bar-content {
-    flex-direction: column;
-    gap: var(--space-4);
-    align-items: flex-start;
-  }
-  
-  .status-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  
-  .tab-content {
-    padding: var(--space-6) var(--space-4) var(--space-4) var(--space-4);
-  }
-  
-  .overview-grid {
-    gap: var(--space-4);
-  }
-  
-  .details-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .manage-cluster-container {
-    padding: var(--space-3);
-  }
-  
-  .manage-title {
-    font-size: var(--font-size-xl);
-  }
-  
-  .status-actions {
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  
-  .tab-content {
-    padding: var(--space-4) var(--space-3) var(--space-3) var(--space-3);
-  }
+.truncate-cell {
+  display: inline-flex;
+  align-items: center;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 </style>

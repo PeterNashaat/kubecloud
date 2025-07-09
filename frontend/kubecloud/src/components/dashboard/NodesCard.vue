@@ -297,7 +297,9 @@ function formatStorage(val: number) {
 }
 </script>
 
+<script lang="ts">
 export default {}
+</script>
 
 <style scoped>
 .nodes-card {

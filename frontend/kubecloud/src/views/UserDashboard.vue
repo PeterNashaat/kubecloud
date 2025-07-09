@@ -21,6 +21,17 @@ const selected = ref('overview')
 
 const clusterStore = useClusterStore()
 const clusters = computed(() => clusterStore.clusters)
+const clustersArray = computed(() =>
+  Array.isArray(clusters.value)
+    ? clusters.value.map((c, idx) => ({
+        id: c.id ?? idx,
+        name: c.cluster.name,
+        status: c.cluster.status ?? '',
+        nodes: typeof c.cluster.nodes === 'number' ? c.cluster.nodes : 0,
+        region: c.cluster.region ?? ''
+      }))
+    : []
+)
 
 onMounted(async () => {
   const savedSection = localStorage.getItem('dashboard-section')
@@ -102,7 +113,7 @@ function redeemVoucher(voucher: any) {
             <div class="dashboard-cards">
               <OverviewCard
                 v-if="selected === 'overview'"
-                :clusters="clusters"
+                :clusters="clustersArray"
                 :sshKeys="sshKeys"
                 :totalSpent="totalSpent"
                 :balance="userStore.netBalance"

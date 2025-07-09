@@ -11,6 +11,10 @@ export interface ClusterNode {
   root_size: number;    // MB
   disk_size: number;    // MB
   env_vars: Record<string, string>;
+  ip?: string;
+  mycelium_ip?: string;
+  planetary_ip?: string;
+  contract_id?: number;
 }
 
 export interface Cluster {

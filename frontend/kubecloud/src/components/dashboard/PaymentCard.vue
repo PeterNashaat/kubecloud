@@ -135,6 +135,10 @@ function getSelectedAmount() {
 }
 </script>
 
+<script lang="ts">
+export default {}
+</script>
+
 <style scoped>
 .dashboard-card.payment-card.spacious {
   background: #181f35;
@@ -246,5 +250,3 @@ function getSelectedAmount() {
   font-size: 1rem;
 }
 </style>
-
-export default {}
