@@ -339,12 +339,15 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 // IP addresses, trying multiple commands to locate and retrieve the kubeconfig file.
 // It includes retry logic and fallback mechanisms for robustness.
 //
+// The retrieved kubeconfig is automatically processed to replace local/internal IP addresses
+// with the external IP address used for the SSH connection, ensuring external connectivity.
+//
 // Parameters:
 //   - privateKey: SSH private key in PEM format for authentication
 //   - node: Target node containing IP addresses and metadata
 //
 // Returns:
-//   - string: Post-processed kubeconfig YAML content
+//   - string: Post-processed kubeconfig YAML content with external IP addresses
 //   - error: Connection or retrieval error
 //
 // The method tries the following kubeconfig locations in order:
@@ -380,7 +383,12 @@ func (h *Handler) getKubeconfigViaSSH(privateKey string, node *kubedeployer.Node
 		for _, cmd := range commands {
 			kubeconfig, cmdErr = h.executeSSHCommand(privateKey, ip, cmd)
 			if cmdErr == nil && strings.Contains(kubeconfig, "apiVersion") && strings.Contains(kubeconfig, "clusters") {
-				return kubeconfig, nil
+				processedKubeconfig, processErr := h.processKubeconfig(kubeconfig, ip)
+				if processErr != nil {
+					log.Warn().Err(processErr).Str("ip", ip).Msg("Failed to process kubeconfig, returning original")
+					return kubeconfig, nil
+				}
+				return processedKubeconfig, nil
 			}
 			if cmdErr != nil {
 				log.Debug().Err(cmdErr).Str("ip", ip).Str("command", cmd).Msg("Command failed, trying next")
@@ -463,6 +471,45 @@ func (h *Handler) executeSSHCommand(privateKey, address, command string) (string
 	}
 
 	return string(output), nil
+}
+
+func (h *Handler) processKubeconfig(kubeconfigYAML, externalIP string) (string, error) {
+	updatedConfig := kubeconfigYAML
+
+	var targetIP string
+	if strings.Contains(externalIP, ":") {
+		parts := strings.Split(externalIP, ":")
+		if len(parts) >= 4 {
+			targetIP = strings.Join(parts[:4], ":") + "::1"
+		} else {
+			targetIP = externalIP
+		}
+
+		log.Debug().
+			Str("original_ipv6", externalIP).
+			Str("modified_ipv6", targetIP).
+			Msg("Modified IPv6 address for kubeconfig")
+	} else {
+		targetIP = externalIP
+	}
+
+	oldPattern := "server: https://127.0.0.1:"
+	var newPattern string
+
+	if strings.Contains(targetIP, ":") {
+		newPattern = fmt.Sprintf("server: https://[%s]:", targetIP)
+	} else {
+		newPattern = fmt.Sprintf("server: https://%s:", targetIP)
+	}
+
+	updatedConfig = strings.ReplaceAll(updatedConfig, oldPattern, newPattern)
+
+	log.Debug().
+		Str("target_ip", targetIP).
+		Bool("config_changed", updatedConfig != kubeconfigYAML).
+		Msg("Processed kubeconfig for external IP")
+
+	return updatedConfig, nil
 }
 
 // HandleDeleteDeployment cancels all ThreeFold Grid contracts and removes a deployment.
