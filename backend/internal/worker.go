@@ -154,19 +154,49 @@ func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *D
 		return result
 	}
 
-	res, err := kubedeployer.DeployCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey)
-	if err != nil {
-		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
-		result.Status = TaskStatusFailed
-		result.Error = "Deployment failed"
-		result.Message = "Failed to deploy cluster"
-		result.CompletedAt = time.Now()
-		return result
-	}
+	var res kubedeployer.Cluster
+	existingCluster, err := w.db.GetClusterByName(task.UserID, task.Payload.Name)
+	if err == nil {
+		log.Info().Str("task_id", task.TaskID).Str("project_name", task.Payload.Name).Msg("Cluster already exists, updating deployment")
 
-	// log.Info().Str("task_id", task.TaskID).Msg("Starting deployment (simulated)")
-	// time.Sleep(5 * time.Second)
-	// result.Result = workloads.K8sCluster{}
+		// Get the existing cluster result from the database
+		existingClusterResult, err := existingCluster.GetClusterResult()
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to get existing cluster result from database")
+			result.Status = TaskStatusFailed
+			return result
+		}
+
+		// get the leader IP from the existing cluster
+		leaderIP, err := existingCluster.GetLeaderIP()
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to get leader IP from existing cluster")
+			result.Status = TaskStatusFailed
+			return result
+		}
+
+		// Pass the existing cluster state from database to AddNodesToCluster
+		res, err = kubedeployer.AddNodesToCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey, leaderIP, &existingClusterResult)
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
+			result.Status = TaskStatusFailed
+			result.Error = "Deployment failed"
+			result.Message = "Failed to update cluster"
+			result.CompletedAt = time.Now()
+			return result
+		}
+	} else {
+		log.Info().Str("task_id", task.TaskID).Str("project_name", task.Payload.Name).Msg("Cluster does not exist, creating new deployment")
+		res, err = kubedeployer.DeployCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey)
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
+			result.Status = TaskStatusFailed
+			result.Error = "Deployment failed"
+			result.Message = "Failed to deploy cluster"
+			result.CompletedAt = time.Now()
+			return result
+		}
+	}
 
 	result.Result = res
 	result.Status = TaskStatusCompleted

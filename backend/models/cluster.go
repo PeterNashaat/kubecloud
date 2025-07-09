@@ -32,3 +32,17 @@ func (c *Cluster) SetClusterResult(cluster kubedeployer.Cluster) error {
 	c.Result = string(data)
 	return nil
 }
+
+func (c *Cluster) GetLeaderIP() (string, error) {
+	cluster, err := c.GetClusterResult()
+	if err != nil {
+		return "", err
+	}
+
+	for _, node := range cluster.Nodes {
+		if node.Type == kubedeployer.NodeTypeLeader {
+			return node.IP, nil
+		}
+	}
+	return "", nil
+}
