@@ -76,7 +76,7 @@ func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluste
 
 		depl := workloads.NewDeployment(
 			cluster.Name+node.Name,
-			node.NodeID, "", nil,
+			node.NodeID, cluster.Name, nil,
 			net.Name,
 			[]workloads.Disk{disk}, nil,
 			[]workloads.VM{vm}, nil, nil, nil,
@@ -99,6 +99,7 @@ func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluste
 		cluster.Nodes[idx].IP = result.Vms[0].IP
 		cluster.Nodes[idx].PlanetaryIP = result.Vms[0].PlanetaryIP
 		cluster.Nodes[idx].ContractID = result.ContractID
+		cluster.Network = networkName
 
 		seed := cluster.Nodes[idx].EnvVars["NET_SEED"]
 		if seed == "" {

@@ -558,7 +558,8 @@ func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
 		return
 	}
 
-	if err := gridClient.BatchCancelContract(contracts); err != nil {
+	if err := gridClient.CancelByProjectName(cl.Name); err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to cancel deployment contracts by project name")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel deployment contracts"})
 		return
 	}
