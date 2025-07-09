@@ -71,9 +71,9 @@ const navigationItems = [
 ]
 </script>
 
-export default {
-  name: 'DashboardSidebar'
-}
+<script lang="ts">
+export default {}
+</script>
 
 <style scoped>
 .sidebar-card {

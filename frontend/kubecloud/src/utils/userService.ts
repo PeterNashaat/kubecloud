@@ -79,7 +79,7 @@ export interface UserInvoice {
 }
 
 export interface SshKey {
-  id: number
+  ID: number
   name: string
   public_key: string
   created_at: string
@@ -167,11 +167,12 @@ export class UserService {
 
   // Fetch the user's current balance
   async fetchBalance(): Promise<number> {
-    const response = await api.get<{ data: { balance_usd: number } }>(
+    const response = await api.get<{ data: { balance_usd: number, debt_usd: number } }>(
       '/v1/user/balance',
       { requiresAuth: true, showNotifications: false }
     )
-    return response.data.data.balance_usd
+    const { balance_usd, debt_usd } = response.data.data
+    return (balance_usd || 0) - (debt_usd || 0)
   }
 
   // List all SSH keys for the current user

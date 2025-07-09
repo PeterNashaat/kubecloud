@@ -11,13 +11,27 @@ import OverviewCard from '../components/dashboard/OverviewCard.vue'
 import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
+import { useClusterStore } from '../stores/clusters'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
 
 // Initialize selected section from localStorage or default to 'overview'
 const selected = ref('overview')
-const balance = ref(0)
+
+const clusterStore = useClusterStore()
+const clusters = computed(() => clusterStore.clusters)
+const clustersArray = computed(() =>
+  Array.isArray(clusters.value)
+    ? clusters.value.map((c, idx) => ({
+        id: c.id ?? idx,
+        name: c.cluster.name,
+        status: c.cluster.status ?? '',
+        nodes: typeof c.cluster.nodes === 'number' ? c.cluster.nodes : 0,
+        region: c.cluster.region ?? ''
+      }))
+    : []
+)
 
 onMounted(async () => {
   const savedSection = localStorage.getItem('dashboard-section')
@@ -32,16 +46,9 @@ onMounted(async () => {
     description: `Invoice #${inv.id}`,
     amount: inv.total
   }))
-  // Fetch user balance from /balance endpoint
-  const fetchedBalance = await userService.fetchBalance()
-  balance.value = fetchedBalance || 0
+  // Fetch user net balance
+  await userStore.updateNetBalance()
 })
-
-const clusters = ref([
-  { id: 1, name: 'Production Cluster', status: 'running', nodes: 3, region: 'US East' },
-  { id: 2, name: 'Staging Cluster', status: 'stopped', nodes: 2, region: 'US West' },
-  { id: 3, name: 'Development Cluster', status: 'running', nodes: 1, region: 'EU West' }
-])
 
 interface Bill {
   id: string | number
@@ -106,10 +113,10 @@ function redeemVoucher(voucher: any) {
             <div class="dashboard-cards">
               <OverviewCard
                 v-if="selected === 'overview'"
-                :clusters="clusters"
+                :clusters="clustersArray"
                 :sshKeys="sshKeys"
                 :totalSpent="totalSpent"
-                :balance="balance"
+                :balance="userStore.netBalance"
                 @navigate="handleNavigate"
               />
               <ClustersCard v-if="selected === 'clusters'" :clusters="clusters" />

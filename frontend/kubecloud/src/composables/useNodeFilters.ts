@@ -53,7 +53,7 @@ export function useNodeFilters(nodes: () => NormalizedNode[], initialPriceRange:
     return nodes().filter(node => {
       if (node.cpu < filters.value.cpu[0] || node.cpu > filters.value.cpu[1]) return false;
       if (Math.round(node.ram) < filters.value.ram[0] || Math.round(node.ram) > filters.value.ram[1]) return false;
-      if (filters.value.gpu && node.gpu === 'none') return false;
+      if (filters.value.gpu && node.gpu === false) return false;
       if (typeof node.price_usd === 'number' && (node.price_usd < filters.value.priceRange[0] || node.price_usd > filters.value.priceRange[1])) return false;
       if (filters.value.location && node.locationString !== filters.value.location) return false;
       const storageOk = node.storage >= filters.value.storage[0] && node.storage <= filters.value.storage[1]

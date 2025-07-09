@@ -59,11 +59,11 @@
               v-else-if="step === 3"
               :allVMs="allVMs"
               :getNodeInfo="getNodeInfo"
-              :onDeployCluster="onDeployCluster"
-              :prevStep="prevStep"
               :deploying="deploying"
               :nodeResourceErrors="nodeResourceErrors"
               :getSshKeyName="getSshKeyName"
+              @onDeployCluster="onDeployCluster"
+              @prevStep="prevStep"
             />
           </div>
         </div>
@@ -84,6 +84,7 @@ import Step1DefineVMs from '../components/deploy/Step1DefineVMs.vue';
 import Step2AssignNodes from '../components/deploy/Step2AssignNodes.vue';
 import Step3Review from '../components/deploy/Step3Review.vue';
 import { api } from '../utils/api';
+import type { ApiResponse } from '../utils/api';
 import { useNotificationStore } from '../stores/notifications';
 import { UserService } from '../utils/userService';
 import { useNodeManagement } from '../composables/useNodeManagement';
@@ -92,6 +93,7 @@ import { useNodes } from '../composables/useNodes';
 import { useNormalizedNodes } from '../composables/useNormalizedNodes';
 import { useRouter } from 'vue-router';
 import { normalizeNode } from '../utils/nodeNormalizer';
+import type { Cluster, ClusterNode } from '../types/cluster';
 
 const notificationStore = useNotificationStore();
 const userService = new UserService();
@@ -194,12 +196,11 @@ const clusterNetworkName = ref('');
 const defaultFlist = ref('https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist');
 const defaultEntrypoint = ref('/sbin/zinit init');
 
-// Cluster name generator
 function generateClusterName() {
   const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
   const randomNumber = Math.floor(Math.random() * 999) + 1;
-  clusterName.value = `${randomAdjective}-${randomNoun}-${randomNumber}`;
+  clusterName.value = `${randomAdjective}_${randomNoun}_${randomNumber}`;
 }
 
 // Navigate to SSH keys management
@@ -209,7 +210,7 @@ function navigateToSshKeys() {
 
 // Get SSH key name by ID
 function getSshKeyName(keyId: number) {
-  const key = availableSshKeys.value.find(k => k.id === keyId);
+  const key = availableSshKeys.value.find(k => k.ID === keyId);
   return key ? key.name : 'Unknown';
 }
 
@@ -242,70 +243,55 @@ function prevStep() {
   if (step.value > 1) step.value--;
 }
 
-const clusters = useClusterStore();
-
-const clusterPayload = computed(() => {
+const clusterPayload = computed<Cluster>(() => {
   const networkName = clusterNetworkName.value || `${clusterName.value}_network`;
   const token = clusterToken.value;
-  const flist = 'https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist';
-  const entrypoint = '/sbin/zinit init';
-  const sshKeyObj = availableSshKeys.value.find(k => k.id === selectedSshKeys.value[0]);
-  const sshKey = sshKeyObj ? sshKeyObj.public_key : '';
-  function buildVM(vm: VM) {
+
+  function buildNode(vm: VM, type: 'master' | 'worker'): ClusterNode {
+    const vmSshKeyObj = availableSshKeys.value.find(k => k.ID === vm.sshKeyIds[0]);
     return {
-      Name: vm.name,
-      NodeID: vm.node,
-      CPU: vm.vcpu,
-      MemoryMB: vm.ram * 1024,
-      NetworkName: networkName,
-      Flist: flist,
-      Entrypoint: entrypoint,
-      EnvVars: {
-        SSH_KEY: sshKey,
+      name: vm.name,
+      type: type === 'master' ? 'master' : 'worker',
+      node_id: vm.node as number, // node is number | null, but must be number here
+      cpu: vm.vcpu,
+      memory: vm.ram * 1024, // GB to MB
+      root_size: vm.rootfs * 1024, // GB to MB
+      disk_size: vm.disk * 1024, // GB to MB
+      env_vars: {
+        SSH_KEY: vmSshKeyObj ? vmSshKeyObj.public_key : '',
         K3S_TOKEN: token,
-        K3S_DATA_DIR: '/mnt/data',
-        K3S_FLANNEL_IFACE: 'eth0',
-        K3S_NODE_NAME: vm.name,
-        K3S_URL: '',
       },
-      RootfsSizeMB: (vm.rootfs || 10) * 1024,
-      PublicIP: vm.publicIp,
-      Planetary: vm.planetary,
-      QEMUArgs: [],
     };
   }
-  const masterNode = masters.value[0];
-  const master = masterNode ? {
-    VM: buildVM(masterNode),
-    DiskSizeGB: masterNode.rootfs || 10,
-  } : null;
-  const workersArr = workers.value.map(worker => ({
-    VM: buildVM(worker),
-    DiskSizeGB: worker.rootfs || 10,
-  }));
+
+  const nodes: ClusterNode[] = [
+    ...masters.value.map(vm => buildNode(vm, 'master')),
+    ...workers.value.map(vm => buildNode(vm, 'worker')),
+  ];
+
   return {
-    Master: master,
-    Workers: workersArr,
-    Token: token,
-    NetworkName: networkName,
-    SSHKey: sshKey,
-    Flist: flist,
-    SolutionType: `kubernetes/user/${clusterName.value}`,
+    name: clusterName.value,
+    network: networkName,
+    token: token,
+    nodes: nodes,
   };
 });
 
 async function onDeployCluster() {
   deploying.value = true;
   try {
-    await api.post('/v1/deploy', clusterPayload.value, {
-      showNotifications: true,
+    // Debug log for outgoing payload
+    // eslint-disable-next-line no-console
+    console.log('Deploy payload:', JSON.stringify(clusterPayload.value, null, 2));
+    const response = await api.post<ApiResponse<{ task_id: string }>>('/v1/deployments', clusterPayload.value, {
+      showNotifications: false,
       loadingMessage: 'Deploying cluster...',
-      successMessage: 'Cluster deployed successfully!',
       errorMessage: 'Failed to deploy cluster',
       requiresAuth: true
     });
-    router.push('/dashboard/clusters');
-  } catch (err: any) {
+    notificationStore.info('Deployment started', 'Your cluster is being deployed in the background. You will be notified when it is ready.');
+  } catch (err) {
+    // Optionally handle error
   } finally {
     deploying.value = false;
   }
@@ -344,9 +330,9 @@ function closeEditNodeModal() {
 function saveEditNode(updatedNode: VM) {
   if (!editNodeModal.value.node) return;
   if (editNodeModal.value.type === 'master') {
-    masters.value[editNodeModal.value.idx] = { ...updatedNode };
+    masters.value.splice(editNodeModal.value.idx, 1, { ...updatedNode });
   } else if (editNodeModal.value.type === 'worker') {
-    workers.value[editNodeModal.value.idx] = { ...updatedNode };
+    workers.value.splice(editNodeModal.value.idx, 1, { ...updatedNode });
   }
   closeEditNodeModal();
 }

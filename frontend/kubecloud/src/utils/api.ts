@@ -1,4 +1,6 @@
 import { useNotificationStore } from '../stores/notifications'
+import { useUserStore } from '../stores/user'
+import { useRouter } from 'vue-router'
 
 export interface ApiResponse<T = any> {
   data: T
@@ -60,6 +62,8 @@ class ApiClient {
     } = options
 
     const notificationStore = useNotificationStore()
+    const userStore = useUserStore()
+    const router = useRouter()
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
@@ -76,13 +80,13 @@ class ApiClient {
       }
 
       // Add auth headers if required
-      const requestHeaders = {
+      const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(requiresAuth ? this.getAuthHeaders() : {}),
         ...headers
       }
 
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
+      let response = await fetch(`${this.baseURL}${endpoint}`, {
         method,
         headers: requestHeaders,
         body: body ? JSON.stringify(body) : undefined,
@@ -91,9 +95,44 @@ class ApiClient {
 
       clearTimeout(timeoutId)
 
+      // Handle 401/403 for token refresh
+      if ((response.status === 401 || response.status === 403) && requiresAuth) {
+        try {
+          await userStore.refreshToken()
+          // Retry the original request with the new token
+          requestHeaders['Authorization'] = `Bearer ${localStorage.getItem('token')}`
+          response = await fetch(`${this.baseURL}${endpoint}`, {
+            method,
+            headers: requestHeaders,
+            body: body ? JSON.stringify(body) : undefined,
+            signal: controller.signal
+          })
+          if (!response.ok) throw new Error('Retry after refresh failed')
+        } catch (refreshError) {
+          userStore.logout()
+          router.push('/sign-in')
+          throw new Error('Session expired. Please log in again.')
+        }
+      }
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // Handle 204 No Content
+      if (response.status === 204) {
+        if (loadingNotificationId) {
+          notificationStore.removeNotification(loadingNotificationId)
+        }
+        if (showNotifications && successMessage) {
+          notificationStore.success('Success', successMessage)
+        }
+        return {
+          data: {} as T,
+          status: response.status,
+          message: 'No Content'
+        }
       }
 
       const data = await response.json()

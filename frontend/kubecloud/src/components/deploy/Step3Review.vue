@@ -63,8 +63,6 @@ import { defineProps, defineEmits } from 'vue';
 const props = defineProps<{
   allVMs: VM[];
   getNodeInfo: (id: number) => string;
-  onDeployCluster: () => void;
-  prevStep: () => void;
   deploying: boolean;
   nodeResourceErrors: Record<number, string[]>;
   getSshKeyName: (id: number) => string;

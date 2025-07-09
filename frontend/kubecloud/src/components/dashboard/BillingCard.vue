@@ -48,6 +48,10 @@ const headers = [
 ]
 </script>
 
+<script lang="ts">
+export default {}
+</script>
+
 <style scoped>
 .billing-table-container {
   margin-bottom: var(--space-6);
@@ -76,7 +80,3 @@ const headers = [
   color: var(--color-primary) !important;
 }
 </style>
-
-export default {
-  name: 'BillingCard'
-}

@@ -84,6 +84,12 @@ const router = createRouter({
       component: () => import('../views/ForgotPasswordView.vue'),
       meta: { requiresGuest: true }
     },
+    {
+      path: '/dashboard/clusters',
+      name: 'clusters-list',
+      component: () => import('../views/ClustersListView.vue'),
+      meta: { requiresAuth: true }
+    },
   ],
   scrollBehavior(to, from, savedPosition) {
     // Always scroll to top on route change

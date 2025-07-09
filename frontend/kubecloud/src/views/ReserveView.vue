@@ -93,7 +93,7 @@
                 <p class="loading-text">Loading available nodes...</p>
               </div>
               <template v-else>
-                <div v-if="filteredNodes.length === 0" class="no-results">
+                <div v-if="paginatedNodes.filter(n => !reservedNodeIds.has(n.nodeId)).length === 0" class="no-results">
                   <v-icon size="64" color="primary" class="mb-4">mdi-magnify-close</v-icon>
                   <h3>No nodes match your filters</h3>
                   <p>Try adjusting your filter criteria to see more options.</p>
@@ -108,7 +108,7 @@
                 <div v-else>
                   <v-row dense align="stretch">
                     <v-col
-                      v-for="node in paginatedNodes"
+                      v-for="node in paginatedNodes.filter(n => !reservedNodeIds.has(n.nodeId))"
                       :key="node.nodeId"
                       cols="12" sm="6" md="4" lg="3"
                     >
@@ -172,6 +172,7 @@ const {
 } = useNodeFilters(() => normalizedNodes.value)
 
 const reservingNodeId = ref<number | null>(null)
+const reservedNodeIds = ref(new Set<number>())
 
 onMounted(() => {
   fetchNodes()
@@ -200,8 +201,13 @@ const reserveNode = async (nodeId: number) => {
   reservingNodeId.value = nodeId
   try {
     await userService.reserveNode(nodeId)
+    reservedNodeIds.value.add(nodeId) // Optimistically remove from UI
     notificationStore.success('Success', 'Node reserved successfully.')
+    setTimeout(() => {
+      fetchNodes()
+    }, 4000)
   } catch (err) {
+    reservedNodeIds.value.delete(nodeId)
     notificationStore.error('Error', 'Failed to reserve node. Please try again.')
   } finally {
     reservingNodeId.value = null

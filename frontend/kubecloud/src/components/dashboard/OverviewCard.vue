@@ -66,6 +66,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../../stores/user'
 
 interface Cluster {
   id: number
@@ -99,6 +100,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const router = useRouter()
+const userStore = useUserStore()
 
 const uptimeHours = computed(() => {
   return props.clusters
@@ -115,7 +117,7 @@ const statsData = computed(() => [
   },
   {
     icon: 'mdi-currency-usd',
-    value: `$${props.balance.toFixed(2)}`,
+    value: `$${userStore.netBalance.toFixed(2)}`,
     label: 'Balance'
   },
   {
@@ -185,9 +187,9 @@ const systemStatus = [
 const emit = defineEmits(['navigate'])
 </script>
 
-export default {
-  name: 'OverviewCard'
-}
+<script lang="ts">
+export default {}
+</script>
 
 <style scoped>
 .dashboard-card-header {

@@ -70,7 +70,7 @@ async function onRedeem() {
     // Fetch updated balance
     const res = await api.get<ApiResponse<{ balance_usd: number; debt_usd: number }>>('/v1/user/balance', { requiresAuth: true })
     if (userStore.user) {
-      userStore.user.credit_card_balance = res.data.data.balance_usd
+      userStore.user.balance_usd = res.data.data.balance_usd
     }
   } catch (err: any) {
     errorMessage.value = err?.response?.data?.message || 'Failed to redeem voucher.'
@@ -88,9 +88,7 @@ function isExpired(expiryDate: string) {
 </script>
 
 <script lang="ts">
-export default {
-  name: 'VouchersCard'
-}
+export default {}
 </script>
 
 <style scoped>

@@ -29,7 +29,7 @@
       <div class="spec-item" style="margin-top: 0.7em;">
         <span class="spec-label">SSH Keys:</span>
         <span v-for="id in vm.sshKeyIds" :key="id" class="ssh-key-chip">
-          {{ availableSshKeys.find(k => k.id === id)?.name || id }}
+          {{ availableSshKeys.find(k => k.ID === id)?.name }}
         </span>
       </div>
     </div>

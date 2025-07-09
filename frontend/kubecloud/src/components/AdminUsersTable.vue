@@ -60,8 +60,15 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  // Add other fields as needed
+}
+
 const props = defineProps({
-  users: Array,
+  users: Array as () => User[],
   searchQuery: String,
   currentPage: Number,
   pageSize: Number,
