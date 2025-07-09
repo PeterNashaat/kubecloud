@@ -29,14 +29,6 @@ export interface ClusterMetrics {
   activeConnections: number
 }
 
-export interface CreateClusterRequest {
-  name: string
-  region: string
-  nodes: number
-  nodeType: string
-  tags?: string[]
-}
-
 export const useClusterStore = defineStore('clusters', () => {
   // State
   const clusters = ref<Cluster[]>([])
@@ -77,14 +69,6 @@ export const useClusterStore = defineStore('clusters', () => {
     }
   }
 
-  const createCluster = async (clusterData: CreateClusterRequest) => {
-    // Implementation of createCluster function
-    // This is a placeholder and should be replaced with the actual implementation
-    // For example, you might use a third-party service or a custom implementation
-    // to create a cluster and return a task ID and status
-    return { task_id: 'someTaskId', status: 'deploying' }
-  }
-
   const deleteCluster = async (name: string) => {
     isLoading.value = true
     error.value = null
@@ -104,24 +88,6 @@ export const useClusterStore = defineStore('clusters', () => {
     }
   }
 
-  const updateCluster = async (clusterName: string, updates: Partial<Cluster>) => {
-    const cluster = clusters.value.find(c => c.project_name === clusterName)
-    if (!cluster) throw new Error('Cluster not found')
-
-    try {
-      // Real API call
-      await api.put(`/clusters/${clusterName}`, updates)
-      Object.assign(cluster, updates, { updated_at: new Date().toISOString() })
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to update cluster'
-      throw err
-    }
-  }
-
-  const selectCluster = (cluster: Cluster | null) => {
-    selectedCluster.value = cluster
-  }
-
   const getClusterMetrics = async (clusterId: string): Promise<ClusterMetrics> => {
     try {
       // Real API call (replace with actual endpoint if available)
@@ -130,43 +96,6 @@ export const useClusterStore = defineStore('clusters', () => {
     } catch (err) {
       throw new Error('Failed to fetch cluster metrics')
     }
-  }
-
-  const initializeClusters = () => {
-    // No mock data initialization
-  }
-
-  const deployCluster = async (payload: any) => {
-    // Implementation of deployCluster function
-    // This is a placeholder and should be replaced with the actual implementation
-    // For example, you might use a third-party service or a custom implementation
-    // to deploy a cluster and return a task ID and status
-    return { task_id: 'someTaskId', status: 'deploying' }
-  }
-
-  const listenToEvents = async (taskId: string, callback: (data: any) => void) => {
-    // Implementation of listenToEvents function
-    // This is a placeholder and should be replaced with the actual implementation
-    // For example, you might use a third-party service or a custom implementation
-    // to listen to deployment events and call the callback with event data
-  }
-
-  const deploy = async (payload: any) => {
-    const res = await deployCluster(payload)
-    deploymentTaskId.value = res.task_id
-    deploymentStatus.value = res.status
-    deploymentEvents.value = []
-    await listenToEvents(res.task_id, (data) => {
-      deploymentEvents.value.push(data)
-      // Optionally update deploymentStatus based on event data
-    })
-  }
-
-  const listenToDeploymentEvents = async (taskId: string) => {
-    await listenToEvents(taskId, (data) => {
-      deploymentEvents.value.push(data)
-      // Optionally update deploymentStatus based on event data
-    })
   }
 
   const getClusterByName = async (name: string): Promise<Cluster | null> => {
@@ -181,6 +110,26 @@ export const useClusterStore = defineStore('clusters', () => {
     } finally {
       isLoading.value = false
     }
+  }
+
+  /**
+   * Add nodes to a cluster (replaces the cluster's node list)
+   * @param clusterName The name of the cluster
+   * @param clusterObject The full cluster object with the updated nodes array
+   * @returns Promise<ApiResponse<any>>
+   */
+  const addNodesToCluster = async (clusterName: string, clusterObject: any) => {
+    return api.post(`/v1/deployments/${clusterName}/nodes`, clusterObject, { requiresAuth: true })
+  }
+
+  /**
+   * Remove a node from a cluster
+   * @param clusterName The name of the cluster
+   * @param nodeName The name of the node to remove
+   * @returns Promise<ApiResponse<any>>
+   */
+  const removeNodeFromCluster = async (clusterName: string, nodeName: string) => {
+    return api.delete(`/v1/deployments/${clusterName}/nodes/${nodeName}`, { requiresAuth: true })
   }
 
   return {
@@ -198,14 +147,9 @@ export const useClusterStore = defineStore('clusters', () => {
 
     // Actions
     fetchClusters,
-    createCluster,
     deleteCluster,
-    updateCluster,
-    selectCluster,
     getClusterMetrics,
-    initializeClusters,
-    deploy,
-    listenToDeploymentEvents,
-    getClusterByName,
+    addNodesToCluster,
+    removeNodeFromCluster,
   }
 }) 

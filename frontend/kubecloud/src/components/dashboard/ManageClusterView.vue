@@ -667,4 +667,21 @@ async function fetchMetrics() {
   white-space: nowrap;
   vertical-align: bottom;
 }
+.v-dialog .v-card-text pre {
+  color: #b4befe;
+  font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 1rem;
+  line-height: 1.6;
+  padding: 1.5rem;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 60vh;
+  box-sizing: border-box;
+}
+.v-dialog .v-card-text {
+  padding: 0;
+}
 </style>
