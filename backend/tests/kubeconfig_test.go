@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -8,44 +9,17 @@ import (
 func TestKubeconfig(t *testing.T) {
 	client := NewClient()
 
-	err := client.Login("testuser@example.com", "testpassword123")
+	err := client.Login("alaamahmoud.1223@gmail.com", "Password@22")
+
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 	t.Logf("Login successful")
 
-	// List deployments to find an available cluster
-	deployments, err := client.ListDeployments()
-	if err != nil {
-		t.Fatalf("Failed to list deployments: %v", err)
-	}
-
-	if len(deployments) == 0 {
-		t.Skip("No deployments found to test kubeconfig retrieval")
-		return
-	}
-
-	// Get the first deployment's project name
-	var projectName string
-	if deploymentMap, ok := deployments[0].(map[string]interface{}); ok {
-		if name, exists := deploymentMap["project_name"]; exists {
-			if nameStr, ok := name.(string); ok {
-				projectName = nameStr
-			}
-		}
-	}
-
-	if projectName == "" {
-		t.Skip("Could not extract project name from deployment")
-		return
-	}
-
-	t.Logf("Testing kubeconfig retrieval for deployment: %s", projectName)
-
 	// Get kubeconfig
-	kubeconfig, err := client.GetKubeconfig("test2")
+	kubeconfig, err := client.GetKubeconfig("test4")
 	if err != nil {
-		t.Fatalf("Failed to get kubeconfig for '%s': %v", projectName, err)
+		t.Fatalf("Failed to get kubeconfig for '%s': %v", "test3", err)
 	}
 
 	// Validate kubeconfig content
@@ -64,14 +38,15 @@ func TestKubeconfig(t *testing.T) {
 	t.Logf("Successfully retrieved kubeconfig (size: %d bytes)", len(kubeconfig))
 
 	// Log first 5 lines for verification (don't log sensitive data)
-	lines := getFirstLines(kubeconfig, 5)
-	for i, line := range lines {
-		if len(line) > 100 {
-			t.Logf("Line %d: %s...", i+1, line[:100])
-		} else {
-			t.Logf("Line %d: %s", i+1, line)
-		}
-	}
+	// lines := getFirstLines(kubeconfig, 10)
+	// for i, line := range lines {
+	// 	if len(line) > 100 {
+	// 		t.Logf("Line %d: %s...", i+1, line[:100])
+	// 	} else {
+	// 		t.Logf("Line %d: %s", i+1, line)
+	// 	}
+	// }
+	fmt.Println(kubeconfig)
 }
 
 func contains(text, substr string) bool {

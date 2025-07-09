@@ -366,3 +366,45 @@ func (c *Client) DeleteDeployment(name string) error {
 
 	return nil
 }
+
+func (c *Client) AddNode(deploymentName string, node kubedeployer.Node) (string, error) {
+	cluster := kubedeployer.Cluster{
+		Name:  deploymentName,
+		Nodes: []kubedeployer.Node{node},
+	}
+
+	resp, err := c.makeRequest("POST", "/deployments/"+deploymentName+"/nodes", cluster, true)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("add node request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var addNodeResp struct {
+		TaskID string `json:"task_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&addNodeResp); err != nil {
+		return "", err
+	}
+
+	return addNodeResp.TaskID, nil
+}
+
+func (c *Client) RemoveNode(deploymentName, nodeName string) error {
+	resp, err := c.makeRequest("DELETE", "/deployments/"+deploymentName+"/nodes/"+nodeName, nil, true)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("remove node request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
