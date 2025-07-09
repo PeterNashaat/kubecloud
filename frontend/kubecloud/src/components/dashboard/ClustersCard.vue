@@ -16,7 +16,12 @@
       <!-- Recent Clusters -->
       <div class="recent-clusters">
         <h3 class="section-title">Recent Clusters</h3>
-        <div class="cluster-list">
+        <div v-if="recentClusters.length === 0" class="empty-state restyled-empty-state">
+          <v-icon icon="mdi-server-off" size="56" color="primary" class="mb-3"></v-icon>
+          <div class="empty-title">No clusters found</div>
+          <div class="empty-desc">Deploy your first cluster to get started!</div>
+        </div>
+        <div v-else class="cluster-list">
           <div
             v-for="cluster in recentClusters"
             :key="cluster.id"
@@ -48,7 +53,7 @@
                 variant="outlined"
                 size="small"
                 class="btn btn-outline btn-sm"
-                @click.stop="deleteCluster(cluster.project_name)"
+                @click.stop="openDeleteModal(cluster.project_name)"
               >
                 <v-icon icon="mdi-delete" size="16"></v-icon>
               </v-btn>
@@ -68,16 +73,31 @@
         </v-btn>
       </div>
     </div>
+    <v-dialog v-model="showDeleteModal" max-width="400">
+      <v-card>
+        <v-card-title>Confirm Delete</v-card-title>
+        <v-card-text>Are you sure you want to delete this cluster? This action cannot be undone.</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="primary" @click="showDeleteModal = false">Cancel</v-btn>
+          <v-btn color="error" @click="confirmDelete" :loading="deleting">Delete</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 
 const router = useRouter()
 const clusterStore = useClusterStore()
+
+const showDeleteModal = ref(false)
+const deleting = ref(false)
+const clusterToDelete = ref<string | null>(null)
 
 onMounted(() => {
   clusterStore.fetchClusters()
@@ -98,32 +118,50 @@ const viewCluster = (projectName: string) => {
   router.push(`/clusters/${projectName}`)
 }
 
-async function deleteCluster(projectName: string) {
-  if (confirm('Are you sure you want to delete this cluster? This action cannot be undone.')) {
-    await clusterStore.deleteCluster(projectName)
-    await clusterStore.fetchClusters()
-  }
+function openDeleteModal(projectName: string) {
+  clusterToDelete.value = projectName
+  showDeleteModal.value = true
+}
+
+const goToDeployCluster = () => {
+  router.push('/deploy')
 }
 
 const viewAllClusters = () => {
   router.push('/dashboard/clusters')
 }
 
-const goToDeployCluster = () => {
-  router.push('/deploy')
+async function confirmDelete() {
+  if (!clusterToDelete.value) return
+  deleting.value = true
+  await clusterStore.deleteCluster(clusterToDelete.value)
+  await clusterStore.fetchClusters()
+  showDeleteModal.value = false
+  deleting.value = false
+  clusterToDelete.value = null
 }
-</script>
-
-<script lang="ts">
-export default {}
 </script>
 
 <style scoped>
-.card-content {
-  gap: var(--space-8);
-  padding: unset !important;
+.restyled-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0 2rem 0;
+  color: var(--color-text-muted);
 }
-
+.empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+}
+.empty-desc {
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
 .recent-clusters {
   margin-top: var(--space-4);
 }
