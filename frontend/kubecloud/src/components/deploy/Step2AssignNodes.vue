@@ -7,87 +7,89 @@
       </h3>
       <p class="section-subtitle">Select which reserved nodes will host your cluster VMs</p>
     </div>
-    <div class="vm-assignment-grid">
-      <div v-for="(vm, index) in allVMs" :key="index" class="vm-assignment-card">
-        <div class="vm-assignment-header">
-          <div class="vm-avatar" :class="vm.name.includes('Master') ? 'master' : 'worker'">
-            <v-icon :icon="vm.name.includes('Master') ? 'mdi-server' : 'mdi-desktop-tower'" color="white"></v-icon>
-          </div>
-          <div class="vm-info">
-            <h4 class="vm-title">{{ vm.name }}</h4>
-            <div class="vm-specs">
-              <span class="spec-chip">{{ vm.vcpu }} vCPU</span>
-              <span class="spec-chip">{{ vm.ram }}GB RAM</span>
+    <!-- Replace custom grid with Vuetify grid -->
+    <v-row>
+      <v-col cols="12" v-for="(vm, index) in allVMs" :key="index">
+        <div class="vm-assignment-card">
+          <div class="vm-assignment-header">
+            <div class="vm-avatar" :class="vm.name.includes('Master') ? 'master' : 'worker'">
+              <v-icon :icon="vm.name.includes('Master') ? 'mdi-server' : 'mdi-desktop-tower'" color="white"></v-icon>
             </div>
-          </div>
-        </div>
-        <v-select
-          v-model="vm.node"
-          :items="availableNodes"
-          :item-title="nodeLabel"
-          item-value="nodeId"
-          label="Select Reserved Node"
-          clearable
-          class="node-select"
-          @update:modelValue="val => props.onAssignNode(index, val)"
-        >
-          <template #item="{ item, index, props: itemProps }">
-            <div>
-              <div v-bind="itemProps" class="node-option-row">
-                <div class="node-id">Node {{ item.raw.nodeId }}</div>
-                <div class="chip-row">
-                  <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                    <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                    {{ item.raw.cpu }} vCPU
-                  </v-chip>
-                  <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                    <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                    {{ item.raw.ram }} GB RAM
-                  </v-chip>
-                  <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                    <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                    {{ item.raw.storage }} GB Disk
-                  </v-chip>
-                  <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                    <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
-                    GPU
-                  </v-chip>
-                  <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                    {{ item.raw.country }}
-                  </v-chip>
-                </div>
+            <div class="vm-info">
+              <h4 class="vm-title">{{ vm.name }}</h4>
+              <div class="vm-specs">
+                <span class="spec-chip">{{ vm.vcpu }} vCPU</span>
+                <span class="spec-chip">{{ vm.ram }}GB RAM</span>
               </div>
-              <v-divider v-if="index < availableNodes.length - 1" />
             </div>
-          </template>
-          <template #selection="{ item }">
-            <div class="node-id">Node {{ item.raw.nodeId }}</div>
-
-            <div class="chip-row">
-              <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                {{ item.raw.cpu }} vCPU
-              </v-chip>
-              <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                {{ item.raw.ram }} GB RAM
-              </v-chip>
-              <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                {{ item.raw.storage }} GB Disk
-              </v-chip>
-              <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
-                GPU
-              </v-chip>
-              <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                {{ item.raw.country }}
-              </v-chip>
-            </div>
-          </template>
-        </v-select>
-      </div>
-    </div>
+          </div>
+          <v-select
+            v-model="vm.node"
+            :items="availableNodes"
+            :item-title="nodeLabel"
+            item-value="nodeId"
+            label="Select Reserved Node"
+            clearable
+            class="node-select"
+            @update:modelValue="val => props.onAssignNode(index, val)"
+          >
+            <template #item="{ item, index, props: itemProps }">
+              <div>
+                <div v-bind="itemProps" class="node-option-row">
+                  <div class="node-id">Node {{ item.raw.nodeId }}</div>
+                  <div class="chip-row">
+                    <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                      {{ item.raw.cpu }} vCPU
+                    </v-chip>
+                    <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                      {{ item.raw.ram }} GB RAM
+                    </v-chip>
+                    <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                      {{ item.raw.storage }} GB Disk
+                    </v-chip>
+                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                      GPU
+                    </v-chip>
+                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      {{ item.raw.country }}
+                    </v-chip>
+                  </div>
+                </div>
+                <v-divider v-if="index < availableNodes.length - 1" />
+              </div>
+            </template>
+            <template #selection="{ item }">
+              <div class="node-id">Node {{ item.raw.nodeId }}</div>
+              <div class="chip-row">
+                <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                  {{ item.raw.cpu }} vCPU
+                </v-chip>
+                <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                  {{ item.raw.ram }} GB RAM
+                </v-chip>
+                <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                  {{ item.raw.storage }} GB Disk
+                </v-chip>
+                <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                  GPU
+                </v-chip>
+                <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                  {{ item.raw.country }}
+                </v-chip>
+              </div>
+            </template>
+          </v-select>
+        </div>
+      </v-col>
+    </v-row>
     <div class="step-actions">
       <v-btn variant="outlined" @click="$emit('prevStep')">
         <v-icon start icon="mdi-arrow-left"></v-icon>
@@ -143,7 +145,7 @@ export default {
 </script>
 <style scoped>
 .section-header {
-  margin-bottom: 2rem;
+  margin-bottom: 4rem;
 }
 .section-title {
   font-size: 1.2rem;
@@ -157,15 +159,9 @@ export default {
   font-size: 1rem;
   margin-top: 0.25rem;
 }
-.vm-assignment-grid {
-  display: flex;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
 .vm-assignment-card {
   background: var(--color-surface-1, #18192b);
   border-radius: 12px;
-  padding: 1.5rem;
   margin-bottom: 2rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   flex: 1 1 320px;
@@ -235,7 +231,6 @@ export default {
   }
 }
 .node-option-row {
-  padding: .5rem;
   margin: .5rem;
   cursor: pointer;
 }

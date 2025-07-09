@@ -12,8 +12,8 @@
         <h4 class="review-title">Node Assignment</h4>
         <div class="node-assignments">
           <div v-for="(vm, index) in allVMs" :key="index" class="node-assignment">
-            <div class="assignment-icon">
-              <v-icon :icon="vm.name.includes('Master') ? 'mdi-server' : 'mdi-desktop-tower'" :color="vm.name.includes('Master') ? 'var(--color-primary)' : 'var(--color-success)'" />
+            <div class="assignment-icon" :class="vm.name.includes('Master') ? 'master' : 'worker'">
+              <v-icon :icon="vm.name.includes('Master') ? 'mdi-server' : 'mdi-desktop-tower'" color="white" />
             </div>
             <div class="assignment-details">
               <div class="assignment-name">{{ vm.name }}</div>
@@ -129,6 +129,9 @@ export default {
   align-items: center;
   justify-content: center;
   background: var(--color-primary, #6366f1);
+}
+.assignment-icon.worker {
+  background: var(--color-success, #22d3ee);
 }
 .assignment-details {
   display: flex;

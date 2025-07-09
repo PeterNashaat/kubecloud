@@ -187,8 +187,8 @@ export function useNodeManagement() {
   async function unreserveNode(contractId: string) {
     try {
       const response = await userService.unreserveNode(contractId)
-      // Refresh the rented nodes list after successful unreservation
-      await fetchRentedNodes()
+      // Optimistically remove the node from the list
+      rentedNodes.value = rentedNodes.value.filter(node => node.rentContractId?.toString() !== contractId)
       return response
     } catch (err: any) {
       console.error('Failed to unreserve node:', err)
