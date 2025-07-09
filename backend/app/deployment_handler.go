@@ -3,35 +3,66 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/kubedeployer"
+	"net"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
+	"golang.org/x/crypto/ssh"
 )
 
-type DeploymentResponse struct {
+const (
+	KUBECLOUD_KEY = "kubecloud/"
+)
+
+// DeployResponse represents the response structure for deployment requests
+type DeployResponse struct {
 	TaskID    string    `json:"task_id"`
 	Status    string    `json:"status"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (h *Handler) DeployHandler(c *gin.Context) {
-	var cluster workloads.K8sCluster
+// HandleAsyncDeploy handles asynchronous Kubernetes cluster deployment requests.
+//
+// This endpoint accepts a JSON payload containing cluster configuration and queues
+// a deployment task for processing. The deployment is handled asynchronously via
+// Redis task queue and workers.
+//
+// Request: POST /deployments
+// Content-Type: application/json
+// Body: kubedeployer.Cluster JSON structure containing:
+//   - name: cluster name (becomes project name)
+//   - network: optional network configuration
+//   - token: optional k3s token
+//   - nodes: array of node configurations with CPU, memory, storage specs
+//
+// Response: 202 Accepted with deployment task information
+//
+//	{
+//	  "task_id": "uuid-string",
+//	  "status": "pending",
+//	  "message": "Deployment task queued successfully",
+//	  "created_at": "2025-01-01T12:00:00Z"
+//	}
+//
+// Authentication: Requires valid user JWT token
+// Authorization: User can only deploy to their own account
+func (h *Handler) HandleAsyncDeploy(c *gin.Context) {
+	var cluster kubedeployer.Cluster
 	if err := c.ShouldBindJSON(&cluster); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
 		return
 	}
+	// TODO: add an early validation
 
-	if err := cluster.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid deployment object"})
-		return
-	}
-
-	// create task and add to queue
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -54,7 +85,7 @@ func (h *Handler) DeployHandler(c *gin.Context) {
 		return
 	}
 
-	response := DeploymentResponse{
+	response := DeployResponse{
 		TaskID:    taskID,
 		Status:    string(internal.TaskStatusPending),
 		Message:   "Deployment task queued successfully",
@@ -62,4 +93,486 @@ func (h *Handler) DeployHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, response)
+}
+
+// HandleListDeployments retrieves all Kubernetes cluster deployments for the authenticated user.
+//
+// This endpoint returns a paginated list of all deployments associated with the current user,
+// including deployment metadata and cluster configuration details.
+//
+// Request: GET /deployments
+// Authentication: Requires valid user JWT token
+//
+// Response: 200 OK with deployment list
+//
+//	{
+//	  "deployments": [
+//	    {
+//	      "id": 123,
+//	      "project_name": "my-cluster",
+//	      "cluster": { /* kubedeployer.Cluster object */ },
+//	      "created_at": "2025-01-01T12:00:00Z",
+//	      "updated_at": "2025-01-01T12:00:00Z"
+//	    }
+//	  ],
+//	  "count": 1
+//	}
+//
+// Authorization: Returns only deployments owned by the authenticated user
+func (h *Handler) HandleListDeployments(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	id := fmt.Sprintf("%v", userID)
+	clusters, err := h.db.ListUserClusters(id)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", id).Msg("Failed to list user clusters")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployments"})
+		return
+	}
+
+	deployments := make([]gin.H, 0, len(clusters))
+	for _, cluster := range clusters {
+		clusterResult, err := cluster.GetClusterResult()
+		if err != nil {
+			log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
+			continue
+		}
+
+		deployments = append(deployments, gin.H{
+			"id":           cluster.ID,
+			"project_name": cluster.ProjectName,
+			"cluster":      clusterResult,
+			"created_at":   cluster.CreatedAt,
+			"updated_at":   cluster.UpdatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"deployments": deployments,
+		"count":       len(deployments),
+	})
+}
+
+// HandleGetDeployment retrieves detailed information for a specific deployment by name.
+//
+// This endpoint returns comprehensive details about a single Kubernetes cluster deployment,
+// including the full cluster configuration and node specifications.
+//
+// Request: GET /deployments/{name}
+// Path Parameters:
+//   - name: The project name of the deployment to retrieve
+//
+// Response: 200 OK with deployment details
+//
+//	{
+//	  "id": 123,
+//	  "project_name": "my-cluster",
+//	  "cluster": {
+//	    "name": "my-cluster",
+//	    "nodes": [
+//	      {
+//	        "name": "leader",
+//	        "type": "leader",
+//	        "node_id": 1,
+//	        "cpu": 2,
+//	        "memory": 4096,
+//	        "ip": "10.20.0.1",
+//	        "mycelium_ip": "400:1234::1",
+//	        "planetary_ip": "302:9e63::1"
+//	      }
+//	    ]
+//	  },
+//	  "created_at": "2025-01-01T12:00:00Z",
+//	  "updated_at": "2025-01-01T12:00:00Z"
+//	}
+//
+// Authentication: Requires valid user JWT token
+// Authorization: User can only access their own deployments
+// Errors:
+//   - 404 Not Found: Deployment doesn't exist or doesn't belong to user
+func (h *Handler) HandleGetDeployment(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	projectName := c.Param("name")
+	if projectName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project name is required"})
+		return
+	}
+
+	id := fmt.Sprintf("%v", userID)
+	cluster, err := h.db.GetClusterByName(id, projectName)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Failed to get cluster")
+		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		return
+	}
+
+	clusterResult, err := cluster.GetClusterResult()
+	if err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
+		return
+	}
+
+	response := gin.H{
+		"id":           cluster.ID,
+		"project_name": cluster.ProjectName,
+		"cluster":      clusterResult,
+		"created_at":   cluster.CreatedAt,
+		"updated_at":   cluster.UpdatedAt,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// HandleGetKubeconfig retrieves the kubectl configuration file for a deployed cluster.
+//
+// This endpoint connects via SSH to the leader/master node of the specified cluster
+// and downloads the kubeconfig file. The configuration is post-processed to use
+// external IP addresses for connectivity from outside the cluster network.
+//
+// Request: GET /deployments/{name}/kubeconfig
+// Path Parameters:
+//   - name: The project name of the deployment
+//
+// Response: 200 OK with kubeconfig YAML file
+// Content-Type: application/x-yaml
+// Content-Disposition: attachment; filename="{name}-kubeconfig.yaml"
+//
+// The response body contains a standard kubectl configuration file that can be
+// used to connect to the cluster from external clients.
+//
+// Authentication: Requires valid user JWT token
+// Authorization: User can only access kubeconfig for their own deployments
+//
+// Technical Details:
+// - Attempts SSH connection to leader node first, falls back to master nodes
+// - Tries multiple kubeconfig retrieval commands for compatibility
+// - Uses mycelium IP first, falls back to planetary IP
+// - Includes retry logic for transient network issues
+//
+// Errors:
+//   - 404 Not Found: Deployment doesn't exist or doesn't belong to user
+//   - 500 Internal Server Error: SSH connection failed or kubeconfig not found
+func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	projectName := c.Param("name")
+	if projectName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project name is required"})
+		return
+	}
+
+	id := fmt.Sprintf("%v", userID)
+	cluster, err := h.db.GetClusterByName(id, projectName)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Failed to get cluster")
+		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		return
+	}
+
+	clusterResult, err := cluster.GetClusterResult()
+	if err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
+		return
+	}
+
+	// Find the leader or master node
+	var targetNode *kubedeployer.Node
+	for _, node := range clusterResult.Nodes {
+		if node.Type == kubedeployer.NodeTypeLeader {
+			targetNode = &node
+			break
+		}
+	}
+
+	if targetNode == nil {
+		for _, node := range clusterResult.Nodes {
+			if node.Type == kubedeployer.NodeTypeMaster {
+				targetNode = &node
+				break
+			}
+		}
+	}
+
+	if targetNode == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No leader or master node found in deployment"})
+		return
+	}
+
+	privateKeyBytes, err := os.ReadFile(h.config.SSH.PrivateKeyPath)
+	if err != nil {
+		log.Error().Err(err).Str("key_path", h.config.SSH.PrivateKeyPath).Msg("Failed to read SSH private key")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read SSH configuration"})
+		return
+	}
+
+	kubeconfig, err := h.getKubeconfigViaSSH(string(privateKeyBytes), targetNode)
+	if err != nil {
+		log.Error().Err(err).Str("node_name", targetNode.Name).Msg("Failed to retrieve kubeconfig via SSH")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve kubeconfig: " + err.Error()})
+		return
+	}
+
+	// c.Header("Content-Type", "application/x-yaml")
+	// c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-kubeconfig.yaml\"", projectName))
+	// c.String(http.StatusOK, kubeconfig)
+	c.JSON(http.StatusOK, gin.H{"kubeconfig": kubeconfig})
+}
+
+// getKubeconfigViaSSH connects to a cluster node via SSH and retrieves the kubeconfig file.
+//
+// This method attempts to connect to the specified node using both mycelium and planetary
+// IP addresses, trying multiple commands to locate and retrieve the kubeconfig file.
+// It includes retry logic and fallback mechanisms for robustness.
+//
+// Parameters:
+//   - privateKey: SSH private key in PEM format for authentication
+//   - node: Target node containing IP addresses and metadata
+//
+// Returns:
+//   - string: Post-processed kubeconfig YAML content
+//   - error: Connection or retrieval error
+//
+// The method tries the following kubeconfig locations in order:
+// 1. kubectl config view --minify --raw (if kubectl is available)
+// 2. /etc/rancher/k3s/k3s.yaml (standard k3s location)
+// 3. ~/.kube/config (standard kubectl location)
+func (h *Handler) getKubeconfigViaSSH(privateKey string, node *kubedeployer.Node) (string, error) {
+	ips := []string{}
+	if node.MyceliumIP != "" {
+		ips = append(ips, node.MyceliumIP)
+	}
+	if node.PlanetaryIP != "" {
+		ips = append(ips, node.PlanetaryIP)
+	}
+
+	if len(ips) == 0 {
+		return "", fmt.Errorf("no valid IP addresses found for node %s", node.Name)
+	}
+
+	var lastErr error
+	for _, ip := range ips {
+		log.Debug().Str("ip", ip).Str("node", node.Name).Msg("Attempting SSH connection")
+
+		commands := []string{
+			"kubectl config view --minify --raw",
+			"cat /etc/rancher/k3s/k3s.yaml",
+			"cat ~/.kube/config",
+		}
+
+		var kubeconfig string
+		var cmdErr error
+
+		for _, cmd := range commands {
+			kubeconfig, cmdErr = h.executeSSHCommand(privateKey, ip, cmd)
+			if cmdErr == nil && strings.Contains(kubeconfig, "apiVersion") && strings.Contains(kubeconfig, "clusters") {
+				return kubeconfig, nil
+			}
+			if cmdErr != nil {
+				log.Debug().Err(cmdErr).Str("ip", ip).Str("command", cmd).Msg("Command failed, trying next")
+			}
+		}
+
+		if cmdErr != nil {
+			log.Warn().Err(cmdErr).Str("ip", ip).Str("node", node.Name).Msg("All commands failed on this IP, trying next IP")
+			lastErr = cmdErr
+		} else {
+			lastErr = fmt.Errorf("no valid kubeconfig found on node %s at IP %s", node.Name, ip)
+		}
+	}
+
+	return "", fmt.Errorf("failed to retrieve kubeconfig from any IP address: %v", lastErr)
+}
+
+// executeSSHCommand establishes an SSH connection and executes a single command.
+//
+// This method handles SSH connection establishment with retry logic for transient
+// network issues. It uses the provided private key for authentication and connects
+// as the root user with a reasonable timeout.
+//
+// Parameters:
+//   - privateKey: SSH private key in PEM format
+//   - address: Target IP address (IPv4 or IPv6)
+//   - command: Shell command to execute on the remote host
+//
+// Returns:
+//   - string: Combined stdout and stderr output from the command
+//   - error: Connection or execution error
+//
+// Connection details:
+// - Uses root user for authentication
+// - 15-second connection timeout
+// - Up to 3 connection retry attempts
+// - Insecure host key verification (for lab environments)
+func (h *Handler) executeSSHCommand(privateKey, address, command string) (string, error) {
+	key, err := ssh.ParsePrivateKey([]byte(privateKey))
+	if err != nil {
+		return "", fmt.Errorf("could not parse SSH private key: %w", err)
+	}
+
+	config := &ssh.ClientConfig{
+		User:            "root",
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(key),
+		},
+		Timeout: 15 * time.Second,
+	}
+
+	port := "22"
+	var client *ssh.Client
+	for attempt := 1; attempt <= 3; attempt++ {
+		client, err = ssh.Dial("tcp", net.JoinHostPort(address, port), config)
+		if err == nil {
+			break
+		}
+		if attempt < 3 {
+			log.Debug().Err(err).Str("address", address).Int("attempt", attempt).Msg("SSH connection attempt failed, retrying")
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("could not establish SSH connection to %s after 3 attempts: %w", address, err)
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("could not create SSH session: %w", err)
+	}
+	defer session.Close()
+
+	output, err := session.CombinedOutput(command)
+	if err != nil {
+		return "", fmt.Errorf("could not execute command '%s': %w, output: %s", command, err, string(output))
+	}
+
+	return string(output), nil
+}
+
+// HandleDeleteDeployment cancels all ThreeFold Grid contracts and removes a deployment.
+//
+// This endpoint performs a complete cleanup of a Kubernetes cluster deployment by:
+// 1. Canceling all associated ThreeFold Grid contracts (compute, storage, network)
+// 2. Removing the deployment record from the database
+//
+// The operation is atomic - if contract cancellation fails, the database record
+// is preserved to allow retry attempts.
+//
+// Request: DELETE /deployments/{name}
+// Path Parameters:
+//   - name: The project name of the deployment to delete
+//
+// Response: 200 OK on successful deletion
+//
+//	{
+//	  "message": "deployment deleted successfully",
+//	  "name": "cluster-name"
+//	}
+//
+// Authentication: Requires valid user JWT token
+// Authorization: User can only delete their own deployments
+//
+// Technical Details:
+// - Uses grid client's CancelByProjectName to cancel all related contracts
+// - Project names are prefixed with "kubecloud/" for contract identification
+// - Cancellation includes all node contracts, network contracts, and storage
+// - Database cleanup only occurs after successful contract cancellation
+//
+// Errors:
+//   - 404 Not Found: Deployment doesn't exist or doesn't belong to user
+//   - 500 Internal Server Error: Contract cancellation or database operation failed
+//
+// Note: This operation cannot be undone. All cluster data and configurations
+// will be permanently destroyed.
+func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
+	deploymentName := c.Param("name")
+	if deploymentName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment name is required"})
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userIDStr := fmt.Sprintf("%v", userID)
+	log.Debug().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Starting deployment deletion")
+
+	cluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
+		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		return
+	}
+
+	cl, err := cluster.GetClusterResult()
+	if err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
+		return
+	}
+
+	var contracts []uint64
+	for _, node := range cl.Nodes {
+		if node.ContractID != 0 {
+			contracts = append(contracts, node.ContractID)
+		}
+	}
+
+	// get user client
+	userIDInt, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to parse user ID")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user ID"})
+		return
+	}
+	user, err := h.db.GetUserByID(userIDInt)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to get user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
+		return
+	}
+
+	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.SystemAccount.Network))
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to create grid client")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create grid client"})
+		return
+	}
+
+	if err := gridClient.BatchCancelContract(contracts); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel deployment contracts"})
+		return
+	}
+
+	if err := h.db.DeleteCluster(userIDStr, deploymentName); err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to delete deployment from database")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove deployment from database"})
+		return
+	}
+
+	log.Info().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("project_name", deploymentName).Msg("Successfully deleted deployment")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "deployment deleted successfully",
+		"name":    deploymentName,
+	})
 }

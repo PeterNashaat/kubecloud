@@ -31,6 +31,7 @@ type Handler struct {
 	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
+	gridNet         string // Network name for the grid
 }
 
 // NewHandler create new handler
@@ -38,7 +39,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager) *Handler {
+	redis *internal.RedisClient, sseManager *internal.SSEManager,
+	gridNet string) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -50,6 +52,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
+		gridNet:         gridNet,
 	}
 }
 
@@ -634,7 +637,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -766,7 +769,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
