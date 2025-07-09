@@ -430,7 +430,7 @@ func (h *Handler) executeSSHCommand(privateKey, address, command string) (string
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(key),
 		},
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	port := "22"
@@ -575,5 +575,232 @@ func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "deployment deleted successfully",
 		"name":    deploymentName,
+	})
+}
+
+// HandleAddNodeToDeployment adds a new node to an existing Kubernetes cluster deployment.
+//
+// This endpoint accepts a JSON payload containing node configuration and queues
+// a deployment task for processing. The new node deployment is handled asynchronously via
+// Redis task queue and workers, similar to the main deployment process.
+//
+// Request: POST /deployments/{name}/nodes
+// Content-Type: application/json
+// Body: kubedeployer.Cluster JSON structure containing:
+//   - name: cluster name (should match the deployment name)
+//   - nodes: array with the new node configuration (CPU, memory, storage specs)
+//
+// Response: 202 Accepted with deployment task information
+//
+//	{
+//	  "task_id": "uuid-string",
+//	  "status": "pending",
+//	  "message": "Node addition task queued successfully",
+//	  "created_at": "2025-01-01T12:00:00Z"
+//	}
+//
+// Authentication: Requires valid user JWT token
+// Authorization: User can only modify their own deployments
+func (h *Handler) HandleAddNodeToDeployment(c *gin.Context) {
+	deploymentName := c.Param("name")
+	if deploymentName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment name is required"})
+		return
+	}
+
+	var cluster kubedeployer.Cluster
+	if err := c.ShouldBindJSON(&cluster); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userIDStr := fmt.Sprintf("%v", userID)
+
+	// Verify the deployment exists and belongs to the user
+	existingCluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
+		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		return
+	}
+
+	// Ensure cluster name matches deployment name
+	cluster.Name = deploymentName
+
+	taskID := uuid.New().String()
+	task := &internal.DeploymentTask{
+		TaskID:    taskID,
+		UserID:    userIDStr,
+		Status:    internal.TaskStatusPending,
+		CreatedAt: time.Now(),
+		Payload:   cluster,
+	}
+
+	if err := h.redis.AddTask(c.Request.Context(), task); err != nil {
+		log.Error().Err(err).Str("task_id", taskID).Msg("Failed to add node addition task to Task queue")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue node addition task"})
+		return
+	}
+
+	log.Info().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("task_id", taskID).Int("cluster_id", existingCluster.ID).Msg("Queued node addition task")
+
+	response := DeployResponse{
+		TaskID:    taskID,
+		Status:    string(internal.TaskStatusPending),
+		Message:   "Node addition task queued successfully",
+		CreatedAt: task.CreatedAt,
+	}
+
+	c.JSON(http.StatusAccepted, response)
+}
+
+// HandleRemoveNodeFromDeployment removes a node from an existing Kubernetes cluster deployment.
+//
+// This endpoint removes a specific node from the cluster by canceling its contract
+// and updating the deployment configuration. The operation is performed synchronously
+// since it primarily involves contract cancellation.
+//
+// Request: DELETE /deployments/{name}/nodes/{node_name}
+// Path Parameters:
+//   - name: The project name of the deployment
+//   - node_name: The name of the node to remove from the cluster
+//
+// Response: 200 OK with removal confirmation
+//
+//	{
+//	  "message": "Node removed successfully",
+//	  "deployment_name": "my-cluster",
+//	  "node_name": "worker-1"
+//	}
+//
+// Authentication: Requires valid user JWT token
+// Authorization: User can only modify their own deployments
+// Errors:
+//   - 404 Not Found: Deployment or node doesn't exist or doesn't belong to user
+//   - 400 Bad Request: Cannot remove the last remaining node or master/leader node
+func (h *Handler) HandleRemoveNodeFromDeployment(c *gin.Context) {
+	deploymentName := c.Param("name")
+	nodeName := c.Param("node_name")
+
+	if deploymentName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment name is required"})
+		return
+	}
+
+	if nodeName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node name is required"})
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userIDStr := fmt.Sprintf("%v", userID)
+	log.Debug().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("node_name", nodeName).Msg("Starting node removal")
+
+	cluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
+		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		return
+	}
+
+	cl, err := cluster.GetClusterResult()
+	if err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
+		return
+	}
+
+	// Find the node to remove
+	var nodeToRemove *kubedeployer.Node
+	var nodeIndex int
+	for i, node := range cl.Nodes {
+		if node.Name == nodeName {
+			nodeToRemove = &node
+			nodeIndex = i
+			break
+		}
+	}
+
+	if nodeToRemove == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found in deployment"})
+		return
+	}
+
+	if nodeToRemove.Type == kubedeployer.NodeTypeLeader {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot remove leader nodes"})
+		return
+	}
+
+	// TODO: latest master nodes should not be removed
+	if len(cl.Nodes) <= 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot remove the last remaining node"})
+		return
+	}
+
+	userIDInt, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to parse user ID")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user ID"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(userIDInt)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to get user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
+		return
+	}
+
+	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.SystemAccount.Network))
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to create grid client")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create grid client"})
+		return
+	}
+
+	// TODO: get network contracts and cancel them, maybe saving it in db at deployment creation
+	if nodeToRemove.ContractID != 0 {
+		contracts := []uint64{nodeToRemove.ContractID}
+		if err := gridClient.BatchCancelContract(contracts); err != nil {
+			log.Error().Err(err).Uint64("contract_id", nodeToRemove.ContractID).Msg("Failed to cancel node contract")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel node contract"})
+			return
+		}
+	}
+
+	updatedNodes := make([]kubedeployer.Node, 0, len(cl.Nodes)-1)
+	updatedNodes = append(updatedNodes, cl.Nodes[:nodeIndex]...)
+	updatedNodes = append(updatedNodes, cl.Nodes[nodeIndex+1:]...)
+	cl.Nodes = updatedNodes
+
+	if err := cluster.SetClusterResult(cl); err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to serialize updated cluster result")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update deployment configuration"})
+		return
+	}
+
+	if err := h.db.UpdateCluster(&cluster); err != nil {
+		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to update cluster in database")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update deployment in database"})
+		return
+	}
+
+	log.Info().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("node_name", nodeName).Uint64("contract_id", nodeToRemove.ContractID).Msg("Successfully removed node from deployment")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "Node removed successfully",
+		"deployment_name": deploymentName,
+		"node_name":       nodeName,
 	})
 }
