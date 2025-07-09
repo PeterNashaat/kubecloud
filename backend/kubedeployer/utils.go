@@ -16,10 +16,10 @@ import (
 const (
 	MYC_NET_SEED_LEN = 32
 	MYC_IP_SEED_LEN  = 6
-	K3S_FLIST        = "https://hub.threefold.me/hanafy.3bot/ahmedhanafy725-k3s-ha.flist"
+	K3S_FLIST        = "https://hub.threefold.me/hanafy.3bot/ahmedhanafy725-k3s-full.flist"
 	K3S_ENTRYPOINT   = "/sbin/zinit init"
 	K3S_DATA_DIR     = "/mydisk"
-	K3S_IFACE        = "eth0"
+	K3S_IFACE        = "mycelium-br"
 	K3S_TOKEN        = "randomely_generated_token"
 )
 
