@@ -139,7 +139,7 @@ data:
           "cniVersion": "0.1.0",
           "name": "mycelium-cni-network",
           "type": "mycelium-cni"
-        }
+        },
           {
           "name":"cbr0",
           "cniVersion":"1.0.0",
