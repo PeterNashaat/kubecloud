@@ -42,34 +42,70 @@
         </div>
         <div v-else-if="editTab === 'add'">
           <div class="add-form-wrapper">
-            <v-select
-              v-model="addFormNodeId"
-              :items="availableNodes"
-              item-title="name"
-              item-value="nodeId"
-              label="Select Node"
-              :disabled="loading"
-              :return-object="false"
-              :item-props="nodeDropdownProps"
-              class="polished-input"
-              :menu-props="{ maxHeight: '300px' }"
-            >
-              <template #item="{ item }">
-                <div class="node-dropdown-item">
-                  <div class="chip-row">
-                    <span class="spec-chip">vCPU: {{ getAvailableCPU(item.raw) }}</span>
-                    <span class="spec-chip">RAM: {{ getAvailableRAM(item.raw) }} MB</span>
-                    <span class="spec-chip">Storage: {{ getAvailableStorage(item.raw) }} MB</span>
-                    <span v-if="item.raw.gpu" class="spec-chip">GPU: {{ item.raw.gpu }}</span>
-                    <span v-if="item.raw.country" class="spec-chip">{{ item.raw.country }}</span>
-                  </div>
-                  <span class="node-id">ID: {{ item.raw.nodeId }}</span>
-                </div>
-              </template>
-            </v-select>
             <v-text-field v-model.number="addFormVcpu" label="vCPU" type="number" min="1" class="polished-input" />
             <v-text-field v-model.number="addFormRam" label="RAM (MB)" type="number" min="1" class="polished-input" />
             <v-text-field v-model.number="addFormStorage" label="Storage (MB)" type="number" min="1" class="polished-input" />
+            <v-select
+              v-model="addFormNodeId"
+              :items="availableNodesWithName"
+              item-title="name"
+              item-value="nodeId"
+              label="Select Node"
+              class="polished-input"
+            >
+              <template #item="{ item, props }">
+                <div class="node-option-row" v-bind="props">
+                  <div class="node-id">Node {{ item.raw.nodeId }}</div>
+                  <div class="chip-row">
+                    <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                      {{ getAvailableCPU(item.raw) }} vCPU
+                    </v-chip>
+                    <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                      {{ getAvailableRAM(item.raw) }} MB RAM
+                    </v-chip>
+                    <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                      {{ getAvailableStorage(item.raw) }} MB Disk
+                    </v-chip>
+                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                      GPU
+                    </v-chip>
+                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      {{ item.raw.country }}
+                    </v-chip>
+                  </div>
+                </div>
+              </template>
+              <template #selection="{ item }">
+                <div class="node-option-row">
+                  <div class="node-id">Node {{ item.raw.nodeId }}</div>
+                  <div class="chip-row">
+                    <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
+                      {{ getAvailableCPU(item.raw) }} vCPU
+                    </v-chip>
+                    <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
+                      {{ getAvailableRAM(item.raw) }} MB RAM
+                    </v-chip>
+                    <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
+                      {{ getAvailableStorage(item.raw) }} MB Disk
+                    </v-chip>
+                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
+                      GPU
+                    </v-chip>
+                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                      {{ item.raw.country }}
+                    </v-chip>
+                  </div>
+                </div>
+              </template>
+            </v-select>
             <v-select v-model="addFormRole" :items="['master', 'worker']" label="Role" class="polished-input" />
             <div v-if="addFormError" class="polished-error">{{ addFormError }}</div>
           </div>
@@ -77,7 +113,7 @@
       </template>
       <template #actions>
         <div v-if="editTab === 'add'" class="add-form-actions">
-          <v-btn color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading" @click="confirmAddForm">Add Node</v-btn>
+          <v-btn color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading" @click="confirmAddForm" class="add-node-btn">Add Node</v-btn>
           <v-btn variant="text" @click="editTab = 'list'">Cancel</v-btn>
         </div>
       </template>
@@ -166,12 +202,13 @@ function confirmAddForm() {
   });
   editTab.value = 'list';
 }
-function nodeDropdownProps(node: any) {
-  return {
-    title: node.name,
-    subtitle: `vCPU: ${getAvailableCPU(node)}, RAM: ${getAvailableRAM(node)} MB, Storage: ${getAvailableStorage(node)} MB`,
-  };
-}
+// Ensure every node has a 'name' property for v-select display
+const availableNodesWithName = computed(() =>
+  (props.availableNodes || []).map(n => ({
+    ...n,
+    name: (n as any).name || `Node ${n.nodeId}`
+  }) as RentedNode & { name: string })
+);
 </script>
 
 <style scoped>
@@ -184,8 +221,14 @@ function nodeDropdownProps(node: any) {
   border-radius: 14px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   min-width: 350px;
-  max-width: 500px;
+  max-width: 40rem;
   margin: 0 auto;
+}
+.add-node-btn {
+  font-weight: 600;
+  font-size: 1.1rem;
+  min-width: 120px;
+  margin-right: 1rem;
 }
 .chip-row {
   display: flex;
@@ -209,6 +252,15 @@ function nodeDropdownProps(node: any) {
   flex-direction: column;
   gap: 0.1rem;
   padding: 0.2rem 0.5rem;
+}
+.node-option-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 .polished-input {
   width: 100%;

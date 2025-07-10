@@ -73,7 +73,6 @@ const router = useRouter()
 const publicLinks = [
   { label: 'Home', to: '/' },
   { label: 'Features', to: '/features' },
-  { label: 'Pricing', to: '/pricing' },
   { label: 'Docs', to: '/docs' },
   { label: 'Use Cases', to: '/use-cases' },
 ]
