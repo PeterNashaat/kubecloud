@@ -135,6 +135,11 @@ data:
         "portMappings": true
       },
       "delegates": [
+        {
+          "cniVersion": "0.1.0",
+          "name": "mycelium-cni-network",
+          "type": "mycelium-cni"
+        },
           {
           "name":"cbr0",
           "cniVersion":"1.0.0",
@@ -163,8 +168,8 @@ data:
         },
         {
           "cniVersion": "0.1.0",
-          "name": "mycelium-cni-network",
-          "type": "mycelium-cni"
+          "name": "cleanup-cni",
+          "type": "cleanup-cni"
         }
       ],
       "kubeconfig": "/mnt/data/agent/etc/cni/net.d/multus.d/multus.kubeconfig"
