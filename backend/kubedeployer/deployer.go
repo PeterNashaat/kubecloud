@@ -11,7 +11,7 @@ import (
 )
 
 func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluster, sshKey string) (Cluster, error) {
-	tfplugin, err := deployer.NewTFPluginClient(mnemonic, deployer.WithNetwork(gridNet))
+	tfplugin, err := deployer.NewTFPluginClient(mnemonic, deployer.WithNetwork(gridNet), deployer.WithLogs())
 	if err != nil {
 		return Cluster{}, fmt.Errorf("failed to create TFPluginClient: %v", err)
 	}
@@ -29,17 +29,26 @@ func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluste
 		return Cluster{}, err
 	}
 
-	return loadNewClusterState(ctx, tfplugin, cluster, networkName)
+	// Load the complete cluster state including the full network workload
+	cluster, err = loadNewClusterState(ctx, tfplugin, cluster, networkName)
+	if err != nil {
+		return Cluster{}, fmt.Errorf("failed to load new cluster state: %v", err)
+	}
+
+	return cluster, nil
 }
 
 func AddNodesToCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluster, sshKey string, leaderIP string, existingCluster *Cluster) (Cluster, error) {
-	tfplugin, err := deployer.NewTFPluginClient(mnemonic, deployer.WithNetwork(gridNet))
+	tfplugin, err := deployer.NewTFPluginClient(mnemonic, deployer.WithNetwork(gridNet), deployer.WithLogs())
 	if err != nil {
 		return Cluster{}, fmt.Errorf("failed to create TFPluginClient: %v", err)
 	}
 	defer tfplugin.Close()
 
 	networkName := getNetworkName(cluster)
+
+	cluster.NetworkWorkload = existingCluster.NetworkWorkload
+	cluster.Network = existingCluster.Network
 
 	if err := deployNetwork(ctx, tfplugin, cluster, networkName); err != nil {
 		return Cluster{}, err
@@ -71,9 +80,47 @@ func deployNetwork(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 		nodeIDs[i] = node.NodeID
 	}
 
-	net, err := workloadNetwork(networkName, cluster.Name, nodeIDs)
-	if err != nil {
-		return fmt.Errorf("failed to create network workload: %v", err)
+	var net workloads.ZNet
+	var err error
+
+	if len(cluster.NetworkWorkload.NodeDeploymentID) > 0 {
+		log.Info().Msgf("Using existing network workload for network: %s", networkName)
+		net = cluster.NetworkWorkload
+
+		for _, nodeID := range nodeIDs {
+			found := false
+			for _, existingNodeID := range net.Nodes {
+				if existingNodeID == nodeID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				net.Nodes = append(net.Nodes, nodeID)
+			}
+		}
+
+		if net.MyceliumKeys == nil {
+			net.MyceliumKeys = make(map[uint32][]byte)
+		}
+		for _, nodeID := range nodeIDs {
+			if _, exists := net.MyceliumKeys[nodeID]; !exists {
+				key, err := workloads.RandomMyceliumKey()
+				if err != nil {
+					return fmt.Errorf("failed to generate mycelium key for node %d: %v", nodeID, err)
+				}
+				net.MyceliumKeys[nodeID] = key
+			}
+		}
+
+		log.Info().Msgf("Appending nodes %v to existing network %s. Total nodes: %v", nodeIDs, networkName, net.Nodes)
+	} else {
+		// Create new network workload
+		log.Info().Msgf("Creating new network workload for network: %s", networkName)
+		net, err = workloadNetwork(networkName, cluster.Name, nodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to create network workload: %v", err)
+		}
 	}
 
 	log.Debug().Msgf("Deploying network %s with nodes %v", net.Name, net.Nodes)
@@ -180,15 +227,45 @@ func loadNewClusterState(ctx context.Context, tfplugin deployer.TFPluginClient, 
 		cluster.Nodes[idx].ContractID = result.ContractID
 	}
 
+	netWorkload, err := tfplugin.State.LoadNetworkFromGrid(ctx, networkName)
+	if err != nil {
+		return Cluster{}, fmt.Errorf("failed to load complete network workload from grid: %v", err)
+	}
+
 	cluster.Network = networkName
+	cluster.NetworkWorkload = netWorkload
 	return cluster, nil
 }
 
 // mergeClusterStates merges the existing cluster state with new nodes
 func mergeClusterStates(existingCluster, newNodesCluster Cluster) Cluster {
+	// Merge nodes
+	mergedNodes := make([]Node, len(existingCluster.Nodes))
+	copy(mergedNodes, existingCluster.Nodes)
+
+	for _, newNode := range newNodesCluster.Nodes {
+		found := false
+		for _, existingNode := range existingCluster.Nodes {
+			if existingNode.NodeID == newNode.NodeID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			mergedNodes = append(mergedNodes, newNode)
+		}
+	}
+
+	networkWorkload := newNodesCluster.NetworkWorkload
+	if len(networkWorkload.NodeDeploymentID) == 0 {
+		networkWorkload = existingCluster.NetworkWorkload
+	}
+
 	return Cluster{
-		Nodes:   append(existingCluster.Nodes, newNodesCluster.Nodes...),
-		Network: existingCluster.Network,
-		Token:   existingCluster.Token,
+		Name:            existingCluster.Name,
+		Token:           existingCluster.Token,
+		Nodes:           mergedNodes,
+		Network:         existingCluster.Network,
+		NetworkWorkload: networkWorkload,
 	}
 }
