@@ -1,20 +1,22 @@
 version: "3"
 services:
-  redis:
-    image: redis
+  redis-db:
+    image: redis:alpine
+    command: redis-server --requirepass pass
     ports:
-      - "6379:6379"
+      - 6379:6379
+    container_name: redis-db
+
   backend:
     build: ./backend
     ports:
       - "8080:8080"
     depends_on:
-      - redis
-    environment:
-      REDIS_HOST: redis
+      - redis-db
     volumes:
-      - ./backend/config.json:/app/config.json
-    command: ["/kubecloud", "--config", "/app/config.json"]
+       - ./backend/config.json:/app/configs.json
+       - /root/.ssh:/root/.ssh:ro
+    command: ["/kubecloud", "--config", "/app/configs.json"]
 
   frontend:
     environment:
@@ -25,4 +27,3 @@ services:
       dockerfile: Dockerfile
     ports:
        - "8000:80"
-  
