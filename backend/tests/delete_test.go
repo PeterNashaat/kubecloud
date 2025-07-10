@@ -14,7 +14,7 @@ func TestDeleteDeployment(t *testing.T) {
 		t.Fatalf("Failed to login: %v", err)
 	}
 
-	err := client.DeleteDeployment("test2")
+	err := client.DeleteDeployment(clusterName)
 	if err != nil {
 		t.Fatalf("Failed to delete deployment: %v", err)
 	}

@@ -71,10 +71,6 @@ const navigationItems = [
 ]
 </script>
 
-<script lang="ts">
-export default {}
-</script>
-
 <style scoped>
 .sidebar-card {
   background: rgba(10, 25, 47, 0.85);

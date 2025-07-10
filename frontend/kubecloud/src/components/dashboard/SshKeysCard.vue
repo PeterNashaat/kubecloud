@@ -170,10 +170,6 @@ function truncateKey(key: string) {
 onMounted(fetchSshKeys)
 </script>
 
-<script lang="ts">
-export default {}
-</script>
-
 <style scoped>
 .row-between {
   display: flex;

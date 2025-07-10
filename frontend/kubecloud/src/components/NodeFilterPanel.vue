@@ -154,7 +154,3 @@ function formatStorage(val: number) {
   margin-top: 0.25rem;
 }
 </style>
-
-<script lang="ts">
-export default {};
-</script> 

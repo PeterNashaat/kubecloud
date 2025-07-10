@@ -48,7 +48,7 @@
               v-else-if="step === 2"
               :allVMs="allVMs"
               :availableNodes="availableNodes"
-              :getNodeInfo="getNodeInfo"
+              :getNodeInfo="(id) => getNodeInfo(id, availableNodes)"
               :onAssignNode="onAssignNode"
               :isStep2Valid="isStep2Valid"
               :nodeResourceErrors="nodeResourceErrors"
@@ -58,10 +58,10 @@
             <Step3Review
               v-else-if="step === 3"
               :allVMs="allVMs"
-              :getNodeInfo="getNodeInfo"
+              :getNodeInfo="(id) => getNodeInfo(id, availableNodes)"
               :deploying="deploying"
               :nodeResourceErrors="nodeResourceErrors"
-              :getSshKeyName="getSshKeyName"
+              :getSshKeyName="(id) => getSshKeyName(id, availableSshKeys)"
               @onDeployCluster="onDeployCluster"
               @prevStep="prevStep"
             />
@@ -75,11 +75,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useClusterStore } from '../stores/clusters';
-import DeployVMCard from '../components/deploy/DeployVMCard.vue';
 import EditNodeModal from '../components/EditNodeModal.vue';
 import { useDeployCluster } from '../composables/useDeployCluster';
-import type { VM, SshKey } from '../composables/useDeployCluster';
+import type { VM } from '../composables/useDeployCluster';
 import Step1DefineVMs from '../components/deploy/Step1DefineVMs.vue';
 import Step2AssignNodes from '../components/deploy/Step2AssignNodes.vue';
 import Step3Review from '../components/deploy/Step3Review.vue';
@@ -89,6 +87,7 @@ import { useNotificationStore } from '../stores/notifications';
 import { UserService } from '../utils/userService';
 import { useNodeManagement } from '../composables/useNodeManagement';
 import type { NormalizedNode } from '../types/normalizedNode';
+import { generateClusterName, getNodeInfo, getSshKeyName } from '../utils/clusterUtils';
 import { useNodes } from '../composables/useNodes';
 import { useNormalizedNodes } from '../composables/useNormalizedNodes';
 import { useRouter } from 'vue-router';
@@ -182,13 +181,7 @@ const isStep2Valid = computed(() => allVMsAssigned.value && Object.keys(nodeReso
 // --- Step 3 Validation ---
 const isStep3Valid = computed(() => isStep2Valid.value && isStep1Valid.value && !!clusterName.value.trim());
 
-// Helper function to get node info
-function getNodeInfo(nodeId: number | null) {
-  if (nodeId == null) return '';
-  const node = availableNodes.value.find(n => n.nodeId === nodeId);
-  if (!node) return '';
-  return `${node.cpu} vCPU, ${node.ram}GB RAM${node.gpu ? ', GPU Available' : ''}`;
-}
+
 
 // --- Deploy Logic ---
 const clusterToken = ref('securetoken');
@@ -196,11 +189,8 @@ const clusterNetworkName = ref('');
 const defaultFlist = ref('https://hub.grid.tf/tf-official-apps/threefolddev-k3s-v1.31.0.flist');
 const defaultEntrypoint = ref('/sbin/zinit init');
 
-function generateClusterName() {
-  const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-  const randomNumber = Math.floor(Math.random() * 999) + 1;
-  clusterName.value = `${randomAdjective}_${randomNoun}_${randomNumber}`;
+function generateClusterNameLocal() {
+  clusterName.value = generateClusterName();
 }
 
 // Navigate to SSH keys management
@@ -208,11 +198,7 @@ function navigateToSshKeys() {
   router.push('/dashboard?section=ssh');
 }
 
-// Get SSH key name by ID
-function getSshKeyName(keyId: number) {
-  const key = availableSshKeys.value.find(k => k.ID === keyId);
-  return key ? key.name : 'Unknown';
-}
+
 
 // Get validation message for form errors
 function getValidationMessage() {
@@ -280,10 +266,7 @@ const clusterPayload = computed<Cluster>(() => {
 async function onDeployCluster() {
   deploying.value = true;
   try {
-    // Debug log for outgoing payload
-    // eslint-disable-next-line no-console
-    console.log('Deploy payload:', JSON.stringify(clusterPayload.value, null, 2));
-    const response = await api.post<ApiResponse<{ task_id: string }>>('/v1/deployments', clusterPayload.value, {
+    await api.post<ApiResponse<{ task_id: string }>>('/v1/deployments', clusterPayload.value, {
       showNotifications: false,
       loadingMessage: 'Deploying cluster...',
       errorMessage: 'Failed to deploy cluster',
@@ -314,7 +297,7 @@ async function fetchSshKeys() {
 // Initialize component
 onMounted(() => {
   // Auto-generate cluster name on component mount
-  generateClusterName();
+  generateClusterNameLocal();
   fetchAvailableNodes();
   fetchSshKeys();
 });
@@ -362,7 +345,7 @@ function onAssignNode(vmIdx: number, nodeId: number) {
   }
 }
 function getNodeInfoString(id: string) {
-  return getNodeInfo(Number(id));
+  return getNodeInfo(Number(id), availableNodes.value);
 }
 </script>
 

@@ -1,1 +1,3 @@
 exec: /scripts/entrypoint.sh
+after:
+  - integrate_eth0_into_mycelium_br

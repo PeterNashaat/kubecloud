@@ -3,7 +3,6 @@
     <div v-if="!props.sshKeysLoading && !availableSshKeys.length" class="ssh-key-warning">
       <v-alert type="warning" border="start" prominent>
         <div>No SSH keys found. <v-btn color="primary" variant="text" @click="$emit('navigateToSshKeys')">Add SSH Key</v-btn></div>
-        <!-- TODO: Implement real navigation to SSH key management page -->
       </v-alert>
     </div>
     <div v-else-if="props.sshKeysLoading" class="ssh-key-loading">
@@ -71,40 +70,7 @@ const props = withDefaults(defineProps<{
 });
 const emit = defineEmits(['navigateToSshKeys', 'nextStep']);
 </script>
-<script lang="ts">
-export default {
-  name: 'Step1DefineVMs'
-};
-</script>
 <style scoped>
-.ssh-key-section {
-  margin-bottom: 2rem;
-}
-.section-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.v-chip {
-  background: var(--color-surface-2, #23243a);
-  color: var(--color-text, #cfd2fa);
-  margin-right: 0.5rem;
-  margin-bottom: 0.5rem;
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-  border-radius: 16px;
-}
-.v-chip.selected-chip {
-  background: var(--color-primary, #6366f1);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(99,102,241,0.15);
-}
-.v-chip:hover, .v-chip:focus {
-  background: var(--color-primary, #6366f1);
-  color: #fff;
-  cursor: pointer;
-}
 .vm-config-grid {
   display: flex;
   gap: 2rem;

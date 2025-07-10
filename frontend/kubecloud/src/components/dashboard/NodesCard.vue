@@ -172,7 +172,7 @@
       <v-card class="pa-3">
         <v-card-title>Confirm Unreservation</v-card-title>
         <v-card-text>
-          Are you sure you want to unreserve this node? This action cannot be undone and will cancel your rental contract.
+          Are you sure you want to unreserve this node? This action cannot be undone if there is an active cluster on the node.
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -294,10 +294,6 @@ function formatStorage(val: number) {
   }
   return Math.round(val).toLocaleString() + ' GB';
 }
-</script>
-
-<script lang="ts">
-export default {}
 </script>
 
 <style scoped>

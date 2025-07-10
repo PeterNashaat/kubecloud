@@ -67,6 +67,7 @@ const presets = [5, 10, 20, 50]
 const amount: Ref<number | 'custom'> = ref(5)
 const customAmount = ref<number | null>(null)
 const loading = ref(false)
+const cardComplete = ref(false)
 
 // Stripe Elements
 const stripe = ref<any>(null)
@@ -85,13 +86,16 @@ onMounted(async () => {
       hidePostalCode: true
     })
     cardElement.value.mount('#stripe-card-element')
+    cardElement.value.on('change', (event: any) => {
+      cardComplete.value = !!event.complete
+    })
     stripeLoaded.value = true
   }
 })
 
 const isFormValid = computed(() => {
   const selectedAmount = getSelectedAmount()
-  return selectedAmount && selectedAmount > 0 && stripeLoaded.value
+  return selectedAmount && selectedAmount > 0 && stripeLoaded.value && cardComplete.value
 })
 
 function selectAmount(val: number | 'custom') {
@@ -133,10 +137,6 @@ function getSelectedAmount() {
   }
   return null
 }
-</script>
-
-<script lang="ts">
-export default {}
 </script>
 
 <style scoped>
