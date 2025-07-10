@@ -17,6 +17,7 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
+	"log"
 	"net"
 	"os"
 
@@ -131,7 +132,29 @@ func cmdAdd(args *skel.CmdArgs) error {
 		if err != nil {
 			return fmt.Errorf("error parsing route destination: %v\n", err)
 		}
+		// find ipv6 default route and remove it to make all outside requests through ipv4
+		// Parse the default route destination (IPv6 ::/0)
+		_, routeDst, err := net.ParseCIDR("::/0")
+		if err != nil {
+			log.Fatalf("Failed to parse CIDR: %v", err)
+		}
 
+		// Get all routes
+		routes, err := netlink.RouteList(nil, netlink.FAMILY_V6)
+		if err != nil {
+			log.Fatalf("Failed to list routes: %v", err)
+		}
+
+		for _, r := range routes {
+			if r.Dst != nil && r.Dst.String() == routeDst.String() {
+				log.Printf("Deleting default IPv6 route via %s dev %d", r.Gw, r.LinkIndex)
+				if err := netlink.RouteDel(&r); err != nil {
+					log.Printf("❌ Failed to delete route: %v", err)
+				} else {
+					log.Printf("✅ Deleted: %v", r)
+				}
+			}
+		}
 		// Create the route
 		route := &netlink.Route{
 			Dst: dst,

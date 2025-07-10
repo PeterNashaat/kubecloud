@@ -1,0 +1,82 @@
+# ==========================
+# General
+# ==========================
+.git
+.gitignore
+Dockerfile*
+.dockerignore
+.env
+.env.* 
+*.log
+*.swp
+*.swo
+*.bak
+*.tmp
+*.cache
+*.DS_Store
+
+# IDEs / Editors
+.vscode
+.idea
+*.code-workspace
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+node_modules/
+dist/
+coverage/
+npm-debug.log*
+yarn-error.log
+
+# ==========================
+# Node / Vue
+# ==========================
+node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+package-lock.json
+.vite
+.vuepress
+.storybook
+public/
+build/
+dist/
+.eslintrc.*
+babel.config.*
+tsconfig*.json
+
+# ==========================
+# Go (Golang)
+# ==========================
+# Go build artifacts
+*.exe
+*.test
+*.out
+
+# Binaries
+/app
+main
+*.a
+*.o
+
+# Vendor (optional — include if you `go mod vendor`)
+vendor/
+
+# Cache
+__debug_bin
+debug/
+*.prof
+*.pb.go
+
+# Test files
+*.coverprofile
+testdata/
+
+# IDE/Tooling
+*.idea/
+*.vscode/
+.golangci.yml
+.golangci.toml
