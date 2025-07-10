@@ -530,13 +530,6 @@ func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
 		return
 	}
 
-	var contracts []uint64
-	for _, node := range cl.Nodes {
-		if node.ContractID != 0 {
-			contracts = append(contracts, node.ContractID)
-		}
-	}
-
 	// get user client
 	userIDInt, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -704,7 +697,7 @@ func (h *Handler) HandleRemoveNodeFromDeployment(c *gin.Context) {
 		return
 	}
 
-	userIDStr := fmt.Sprintf("%v", userID)
+	userIDStr := fmt.Sprint(userID)
 	log.Debug().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("node_name", nodeName).Msg("Starting node removal")
 
 	cluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
