@@ -256,12 +256,17 @@ func CreatePaymentIntentStep(currency string) ewf.StepFn {
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		amount, ok := amountVal.(int)
-		if !ok {
-			return fmt.Errorf("'code' in state is not a int")
+		var amountInt int
+		switch v := amountVal.(type) {
+		case int:
+			amountInt = v
+		case float64:
+			amountInt = int(v)
+		default:
+			return fmt.Errorf("'amount' in state is not a number")
 		}
 
-		intent, err := internal.CreatePaymentIntent(customerID, paymentMethodID, currency, uint64(amount))
+		intent, err := internal.CreatePaymentIntent(customerID, paymentMethodID, currency, uint64(amountInt))
 		if err != nil {
 			return fmt.Errorf("error creating payment intent: %w", err)
 		}
@@ -285,9 +290,14 @@ func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		amount, ok := amountVal.(float64)
-		if !ok {
-			return fmt.Errorf("'code' in state is not a float64")
+		var amount float64
+		switch v := amountVal.(type) {
+		case float64:
+			amount = v
+		case int:
+			amount = float64(v)
+		default:
+			return fmt.Errorf("'amount' in state is not a float64 or int")
 		}
 
 		user, err := db.GetUserByID(userID)
@@ -310,9 +320,14 @@ func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		amount, ok := amountVal.(float64)
-		if !ok {
-			return fmt.Errorf("'code' in state is not a float64")
+		var amount float64
+		switch v := amountVal.(type) {
+		case float64:
+			amount = v
+		case int:
+			amount = float64(v)
+		default:
+			return fmt.Errorf("'amount' in state is not a float64 or int")
 		}
 
 		mnemonicVal, ok := state["mnemonic"]
