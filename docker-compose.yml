@@ -15,3 +15,14 @@ services:
     volumes:
       - ./backend/config.json:/app/config.json
     command: ["/kubecloud", "--config", "/app/config.json"]
+
+  frontend:
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080/api
+      - VITE_STRIPE_PUBLISHABLE_KEY=""
+    build:
+      context: frontend/kubecloud/.
+      dockerfile: Dockerfile
+    ports:
+       - "8000:80"
+  
