@@ -17,10 +17,13 @@ const (
 )
 
 type Cluster struct {
-	Name    string `json:"name"` // the projectname in metadata, to get/list all related deployments
-	Network string `json:"network"`
-	Token   string `json:"token"`
-	Nodes   []Node `json:"nodes"`
+	Name  string `json:"name"` // the projectname in metadata, to get/list all related deployments
+	Token string `json:"token"`
+	Nodes []Node `json:"nodes"`
+
+	// Computed
+	Network         string         `json:"network"`
+	NetworkWorkload workloads.ZNet `json:"network_workload"` // the network workload created for this cluster
 }
 
 type Node struct {
