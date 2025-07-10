@@ -153,10 +153,6 @@ async function changePassword() {
 }
 </script>
 
-<script lang="ts">
-export default {}
-</script>
-
 <style scoped>
 .dashboard-card.profile-card.compact {
   padding: 1.5rem;

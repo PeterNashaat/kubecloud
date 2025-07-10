@@ -138,11 +138,6 @@ function nodeLabel(node: any) {
   return `Node ${node.nodeId}`;
 }
 </script>
-<script lang="ts">
-export default {
-  name: 'Step2AssignNodes'
-};
-</script>
 <style scoped>
 .section-header {
   margin-bottom: 4rem;
@@ -213,23 +208,6 @@ export default {
   gap: 1rem;
   margin-top: 2rem;
 }
-.btn-outline {
-  border: 1px solid var(--color-primary, #6366f1);
-  color: var(--color-primary, #6366f1);
-}
-.btn-primary {
-  background: var(--color-primary, #6366f1);
-  color: #fff;
-}
-@media (max-width: 900px) {
-  .vm-assignment-grid {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .vm-assignment-card {
-    min-width: unset;
-  }
-}
 .node-option-row {
   margin: .5rem;
   cursor: pointer;
@@ -243,14 +221,5 @@ export default {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-.chip {
-  display: inline-block;
-  background: #23243a;
-  color: #b4befe;
-  border-radius: 8px;
-  padding: 2px 8px;
-  margin-right: 4px;
-  font-size: 0.85em;
 }
 </style> 

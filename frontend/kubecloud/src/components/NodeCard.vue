@@ -158,6 +158,3 @@ function formatStorage(val: number) {
   color: #1d4ed8;
 }
 </style>
-
-// Add explicit default export for linter compatibility
-export default {};

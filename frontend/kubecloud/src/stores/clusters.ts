@@ -35,9 +35,6 @@ export const useClusterStore = defineStore('clusters', () => {
   const selectedCluster = ref<Cluster | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const deploymentTaskId = ref<string | null>(null)
-  const deploymentStatus = ref<string | null>(null)
-  const deploymentEvents = ref<any[]>([])
 
   // Computed properties
   const clustersByRegion = computed(() => {
@@ -112,22 +109,11 @@ export const useClusterStore = defineStore('clusters', () => {
     }
   }
 
-  /**
-   * Add nodes to a cluster (replaces the cluster's node list)
-   * @param clusterName The name of the cluster
-   * @param clusterObject The full cluster object with the updated nodes array
-   * @returns Promise<ApiResponse<any>>
-   */
   const addNodesToCluster = async (clusterName: string, clusterObject: any) => {
     return api.post(`/v1/deployments/${clusterName}/nodes`, clusterObject, { requiresAuth: true })
   }
 
-  /**
-   * Remove a node from a cluster
-   * @param clusterName The name of the cluster
-   * @param nodeName The name of the node to remove
-   * @returns Promise<ApiResponse<any>>
-   */
+
   const removeNodeFromCluster = async (clusterName: string, nodeName: string) => {
     return api.delete(`/v1/deployments/${clusterName}/nodes/${nodeName}`, { requiresAuth: true })
   }
@@ -138,13 +124,9 @@ export const useClusterStore = defineStore('clusters', () => {
     selectedCluster: computed(() => selectedCluster.value),
     isLoading: computed(() => isLoading.value),
     error: computed(() => error.value),
-    deploymentTaskId: computed(() => deploymentTaskId.value),
-    deploymentStatus: computed(() => deploymentStatus.value),
-    deploymentEvents: computed(() => deploymentEvents.value),
-
     // Computed
     clustersByRegion,
-
+    getClusterByName,
     // Actions
     fetchClusters,
     deleteCluster,

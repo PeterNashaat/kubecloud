@@ -1,0 +1,47 @@
+/**
+ * Generate a random cluster name using adjectives and nouns
+ * @returns Random cluster name
+ */
+export function generateClusterName(): string {
+  const adjectives = [
+    'swift', 'bright', 'cosmic', 'quantum', 'stellar', 'azure', 'crimson', 'golden',
+    'silver', 'emerald', 'sapphire', 'crystal', 'thunder', 'lightning', 'storm',
+    'ocean', 'mountain', 'forest', 'desert', 'arctic', 'tropical', 'mystic'
+  ]
+
+  const nouns = [
+    'cluster', 'cloud', 'node', 'server', 'engine', 'core', 'hub', 'nexus',
+    'forge', 'vault', 'tower', 'citadel', 'fortress', 'sanctuary', 'haven',
+    'realm', 'domain', 'sphere', 'matrix', 'grid', 'network', 'system'
+  ]
+
+  const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)]
+  const randomNoun = nouns[Math.floor(Math.random() * nouns.length)]
+  const randomNumber = Math.floor(Math.random() * 999) + 1
+  
+  return `${randomAdjective}_${randomNoun}_${randomNumber}`
+}
+
+/**
+ * Get node information string for display
+ * @param nodeId - Node ID
+ * @param availableNodes - Array of available nodes
+ * @returns Formatted node info string
+ */
+export function getNodeInfo(nodeId: number | null, availableNodes: any[]): string {
+  if (nodeId == null) return ''
+  const node = availableNodes.find(n => n.nodeId === nodeId)
+  if (!node) return ''
+  return `${node.cpu} vCPU, ${node.ram}GB RAM${node.gpu ? ', GPU Available' : ''}`
+}
+
+/**
+ * Get SSH key name by ID
+ * @param keyId - SSH key ID
+ * @param availableSshKeys - Array of available SSH keys
+ * @returns SSH key name or 'Unknown'
+ */
+export function getSshKeyName(keyId: number, availableSshKeys: any[]): string {
+  const key = availableSshKeys.find(k => k.ID === keyId)
+  return key ? key.name : 'Unknown'
+} 
