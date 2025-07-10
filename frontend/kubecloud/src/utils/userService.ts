@@ -127,7 +127,7 @@ export class UserService {
 
   // Charge balance
   async chargeBalance(data: ChargeBalanceRequest) {
-    return api.post('/v1/user/charge_balance', data, { requiresAuth: true, showNotifications: true })
+    return api.post('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
   }
 
   // Create a PaymentIntent (to be implemented)
