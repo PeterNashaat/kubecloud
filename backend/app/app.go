@@ -106,13 +106,13 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 
 	// create storage for workflows
-	workflowDB, err := ewf.NewSQLiteStore(config.WorkflowDBFile)
+	ewfStore, err := ewf.NewSQLiteStore(config.WorkflowDBFile)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init EWF store")
 		return nil, fmt.Errorf("failed to init workflow store: %w", err)
 	}
-	// initialize workflow engine
-	engine, err := ewf.NewEngine(workflowDB)
+	// initialize workflow ewfEngine
+	ewfEngine, err := ewf.NewEngine(ewfStore)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init EWF engine")
 		return nil, fmt.Errorf("failed to init workflow engine: %w", err)
@@ -123,7 +123,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager, engine)
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager, ewfEngine)
 
 	app := &App{
 		router:        router,
@@ -138,7 +138,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 
 	activities.RegisterEWFWorkflows(
-		engine,
+		ewfEngine,
 		app.config,
 		app.db,
 		app.handlers.mailService,
@@ -244,7 +244,7 @@ func (app *App) Run() error {
 	addr := fmt.Sprintf("%s:%s", app.config.Server.Host, app.config.Server.Port)
 
 	app.StartBackgroundWorkers()
-	app.handlers.workflowEngine.ResumeRunningWorkflows()
+	app.handlers.ewfEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{
 		Addr:    addr,
 		Handler: app.router,

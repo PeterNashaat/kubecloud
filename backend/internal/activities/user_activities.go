@@ -283,7 +283,7 @@ func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
 		}
 		userID, ok := userIDVal.(int)
 		if !ok {
-			return fmt.Errorf("'code' in state is not a int")
+			return fmt.Errorf("'userID' in state is not a int")
 		}
 
 		amountVal, ok := state["amount"]
