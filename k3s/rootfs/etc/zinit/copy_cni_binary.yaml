@@ -1,4 +1,4 @@
-exec: bash -c "sleep 60 && cp /scripts/{mycelium-cni,cleaup-cni} /mnt/data/data/cni/"
+exec: bash -c "sleep 60 && cp /scripts/{mycelium-cni,cleanup-cni} /mnt/data/data/cni/"
 oneshot: true
 after:
   - k3s
