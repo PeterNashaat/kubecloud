@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -8,14 +9,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/paymentmethod"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
+	"github.com/xmonader/ewf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"gorm.io/gorm"
 )
 
@@ -31,6 +33,7 @@ type Handler struct {
 	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
+	workflowEngine  *ewf.Engine
 }
 
 // NewHandler create new handler
@@ -38,7 +41,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager) *Handler {
+	redis *internal.RedisClient, sseManager *internal.SSEManager, workflowEngine *ewf.Engine,
+) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -50,6 +54,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
+		workflowEngine:  workflowEngine,
 	}
 }
 
@@ -164,76 +169,27 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	code := internal.GenerateRandomCode()
-	subject, body := h.mailService.SignUpMailContent(code, h.config.MailSender.Timeout, request.Name, h.config.Server.Host)
-
-	err := h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
+	wf, err := h.workflowEngine.NewWorkflow("user-registration")
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send verification code")
+		log.Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
 		return
 	}
 
-	// hash password
-	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
-	if err != nil {
-		log.Error().Err(err).Msg("error hashing password")
-		InternalServerError(c)
-		return
+	wf.State = ewf.State{
+		"name":     request.Name,
+		"email":    request.Email,
+		"password": request.Password,
 	}
 
-	isAdmin := internal.Contains(h.config.Admins, request.Email)
+	h.workflowEngine.RunAsync(context.Background(), wf)
 
-	user := models.User{
-		Username: request.Name,
-		Email:    request.Email,
-		Password: hashedPassword,
-		Code:     code,
-		Verified: existingUser.Verified,
-		Admin:    isAdmin,
-	}
+	// send notification that user registered
+	// same as balance funding
 
-	if getErr != gorm.ErrRecordNotFound {
-		if !user.Verified {
-			user.ID = existingUser.ID
-			err = h.db.UpdateUserByID(&user)
-			if err != nil {
-				log.Error().Err(err).Send()
-				InternalServerError(c)
-				return
-			}
-		}
-	}
-
-	// create user model in db
-	if getErr != nil {
-		mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to setup user on TFChain")
-			InternalServerError(c)
-			return
-		}
-		customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-
-		user.Mnemonic = mnemonic
-		user.StripeCustomerID = customer.ID
-
-		err = h.db.RegisterUser(&user)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-	}
-
-	Success(c, http.StatusCreated, "Verification code sent successfully", RegisterResponse{
-		Email:   request.Email,
-		Timeout: fmt.Sprintf("%d seconds", h.config.MailSender.Timeout),
+	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow_id.", gin.H{
+		"workflow_id": wf.UUID,
+		"email":       request.Email,
 	})
 
 }
@@ -265,7 +221,6 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		log.Error().Err(err).Msg("failed to get user by email")
 		Error(c, http.StatusBadRequest, "verification failed", "email or password is incorrect")
 		return
-
 	}
 
 	if user.Verified {
@@ -283,30 +238,25 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	err = h.db.UpdateUserVerification(user.ID, true)
+	wf, err := h.workflowEngine.NewWorkflow("user-verification")
 	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-
-	}
-
-	subject, body := h.mailService.WelcomeMailContent(user.Username, h.config.Server.Host)
-	err = h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
-	if err != nil {
-		log.Error().Err(err).Send()
+		log.Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
 		return
 	}
 
-	// create token pairs
-	tokenPair, err := h.tokenManager.CreateTokenPair(user.ID, user.Username, user.Admin)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to generate token pair")
-		InternalServerError(c)
-		return
+	// Start the user-verification workflow
+	wf.State = ewf.State{
+		"email": user.Email,
+		"name":  user.Username,
 	}
-	Success(c, http.StatusCreated, "token pair generated", tokenPair)
+
+	h.workflowEngine.RunAsync(context.Background(), wf)
+
+	Success(c, http.StatusCreated, "verification in progress", map[string]interface{}{
+		"workflow_id": wf.UUID,
+		"email":       user.Email,
+	})
 }
 
 // @Summary Login user
@@ -618,34 +568,26 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	intent, err := internal.CreatePaymentIntent(user.StripeCustomerID, paymentMethod.ID, h.config.Currency, request.Amount)
-	if err != nil {
-		log.Error().Err(err).Msg("error creating payment intent")
-		InternalServerError(c)
-		return
-	}
-
-	user.CreditCardBalance += float64(request.Amount)
-
-	err = h.db.UpdateUserByID(&user)
-	if err != nil {
-		log.Error().Err(err).Msg("error updating user data")
-		InternalServerError(c)
-		return
-	}
-
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	wf, err := h.workflowEngine.NewWorkflow("charge-balance")
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
+
 	}
 
-	Success(c, http.StatusCreated, "Balance is charged successfully", ChargeBalanceResponse{
-		PaymentIntentID: intent.ID,
-		NewBalance:      user.CreditCardBalance,
-	})
+	wf.State = ewf.State{
+		"user_id":            userID,
+		"stripe_customer_id": user.StripeCustomerID,
+		"amount":             float64(request.Amount),
+	}
 
+	h.workflowEngine.RunAsync(context.Background(), wf)
+
+	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow_id.", map[string]interface{}{
+		"workflow_id": wf.UUID,
+		"email":       user.Email,
+	})
 }
 
 // @Summary Get user details
@@ -748,7 +690,6 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	if voucher.ExpiresAt.Before(time.Now()) {
 		Error(c, http.StatusBadRequest, "Voucher is already expired", "")
 		return
-
 	}
 
 	err = h.db.RedeemVoucher(voucher.Code)
@@ -766,14 +707,24 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonics)
+	wf, err := h.workflowEngine.NewWorkflow("redeem-voucher")
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
+	wf.State = map[string]interface{}{
+		"amount":   voucher.Value,
+		"mnemonic": user.Mnemonic,
+	}
+	h.workflowEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
+	Success(c, http.StatusOK, "Voucher is redeemed successfully. TFT transfer in progress.", map[string]interface{}{
+		"workflow_id":  wf.UUID,
+		"voucher_code": voucher.Code,
+		"amount":       voucher.Value,
+		"email":        user.Email,
+	})
 }
 
 // @Summary List user SSH keys
@@ -901,4 +852,34 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 	}
 
 	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
+}
+
+// @Summary Get workflow status
+// @Description Returns the status of a workflow by its ID
+// @Tags workflow
+// @ID get-workflow-status
+// @Accept json
+// @Produce json
+// @Param workflow_id path string true "Workflow ID"
+// @Success 200 {object} string "Workflow status returned successfully"
+// @Failure 400 {object} APIResponse "Invalid request or missing workflow ID"
+// @Failure 404 {object} APIResponse "Workflow not found"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @Router /workflow/{workflow_id} [get]
+func (h *Handler) GetWorkflowStatus(c *gin.Context) {
+
+	workflowID := c.Param("workflow_id")
+	if workflowID == "" {
+		Error(c, http.StatusBadRequest, "Invalid request", "Workflow ID is required")
+		return
+	}
+
+	workflow, err := h.workflowEngine.Store().LoadWorkflow(c, workflowID)
+	if err != nil {
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
+
 }

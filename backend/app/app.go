@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/middlewares"
 	"kubecloud/models/sqlite"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
+	"github.com/xmonader/ewf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -103,12 +105,25 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
+	// create storage for workflows
+	workflowDB, err := ewf.NewSQLiteStore(config.WorkflowDBFile)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to init EWF store")
+		return nil, fmt.Errorf("failed to init workflow store: %w", err)
+	}
+	// initialize workflow engine
+	engine, err := ewf.NewEngine(workflowDB)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to init EWF engine")
+		return nil, fmt.Errorf("failed to init workflow engine: %w", err)
+	}
+
 	// Create an app-level context for coordinating shutdown
 	_, appCancel := context.WithCancel(context.Background())
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, gridClient)
 
-	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager)
+	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy, substrateClient, graphqlClient, firesquidClient, redisClient, sseManager, engine)
 
 	app := &App{
 		router:        router,
@@ -121,6 +136,14 @@ func NewApp(config internal.Configuration) (*App, error) {
 		gridClient:    gridClient,
 		appCancel:     appCancel,
 	}
+
+	activities.RegisterEWFWorkflows(
+		engine,
+		app.config,
+		app.db,
+		app.handlers.mailService,
+		app.handlers.substrateClient,
+	)
 
 	app.registerHandlers()
 
@@ -136,6 +159,7 @@ func (app *App) registerHandlers() {
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
+		v1.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
 
 		adminGroup := v1.Group("")
 		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
@@ -220,6 +244,7 @@ func (app *App) Run() error {
 	addr := fmt.Sprintf("%s:%s", app.config.Server.Host, app.config.Server.Port)
 
 	app.StartBackgroundWorkers()
+	app.handlers.workflowEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{
 		Addr:    addr,
 		Handler: app.router,

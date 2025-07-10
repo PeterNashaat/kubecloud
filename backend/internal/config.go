@@ -29,6 +29,7 @@ type Configuration struct {
 	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
 	Invoice              InvoiceCompanyData `json:"invoice"`
+	WorkflowDBFile       string             `json:"workflow_db_file" validate:"required"`
 }
 
 type GridConfig struct {
