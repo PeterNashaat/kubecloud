@@ -769,20 +769,80 @@ func (h *Handler) HandleRemoveNodeFromDeployment(c *gin.Context) {
 		return
 	}
 
-	// TODO: get network contracts and cancel them, maybe saving it in db at deployment creation
+	var contractsToCancel []uint64
 	if nodeToRemove.ContractID != 0 {
-		contracts := []uint64{nodeToRemove.ContractID}
-		if err := gridClient.BatchCancelContract(contracts); err != nil {
-			log.Error().Err(err).Uint64("contract_id", nodeToRemove.ContractID).Msg("Failed to cancel node contract")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel node contract"})
+		contractsToCancel = append(contractsToCancel, nodeToRemove.ContractID)
+	}
+
+	networkWorkload := cl.NetworkWorkload
+	if networkContractID, exists := networkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists && networkContractID != 0 {
+		networkStillInUse := false
+		for _, otherNode := range cl.Nodes {
+			if otherNode.NodeID == nodeToRemove.NodeID {
+				continue
+			}
+			if otherNetworkContractID, otherExists := networkWorkload.NodeDeploymentID[otherNode.NodeID]; otherExists && otherNetworkContractID != 0 {
+				networkStillInUse = true
+				break
+			}
+		}
+
+		if !networkStillInUse {
+			contractsToCancel = append(contractsToCancel, networkContractID)
+		}
+	}
+
+	if len(contractsToCancel) > 0 {
+		if err := gridClient.BatchCancelContract(contractsToCancel); err != nil {
+			log.Error().Err(err).Uints64("contract_ids", contractsToCancel).Msg("Failed to cancel contracts")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel node and/or network contracts"})
 			return
 		}
 	}
 
+	// Update cluster state - remove the node from the cluster
 	updatedNodes := make([]kubedeployer.Node, 0, len(cl.Nodes)-1)
 	updatedNodes = append(updatedNodes, cl.Nodes[:nodeIndex]...)
 	updatedNodes = append(updatedNodes, cl.Nodes[nodeIndex+1:]...)
 	cl.Nodes = updatedNodes
+
+	// Update network workload - remove the node from network if it was canceled
+	if networkContractID, exists := cl.NetworkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists {
+		networkWasCanceled := false
+		for _, contractID := range contractsToCancel {
+			if contractID == networkContractID {
+				networkWasCanceled = true
+				break
+			}
+		}
+
+		delete(cl.NetworkWorkload.NodeDeploymentID, nodeToRemove.NodeID)
+
+		var updatedNetworkNodes []uint32
+		for _, nodeID := range cl.NetworkWorkload.Nodes {
+			if nodeID != nodeToRemove.NodeID {
+				updatedNetworkNodes = append(updatedNetworkNodes, nodeID)
+			}
+		}
+		cl.NetworkWorkload.Nodes = updatedNetworkNodes
+
+		if cl.NetworkWorkload.NodesIPRange != nil {
+			delete(cl.NetworkWorkload.NodesIPRange, nodeToRemove.NodeID)
+		}
+		if cl.NetworkWorkload.MyceliumKeys != nil {
+			delete(cl.NetworkWorkload.MyceliumKeys, nodeToRemove.NodeID)
+		}
+		if cl.NetworkWorkload.Keys != nil {
+			delete(cl.NetworkWorkload.Keys, nodeToRemove.NodeID)
+		}
+		if cl.NetworkWorkload.WGPort != nil {
+			delete(cl.NetworkWorkload.WGPort, nodeToRemove.NodeID)
+		}
+
+		if networkWasCanceled {
+			log.Info().Uint32("node_id", nodeToRemove.NodeID).Msg("Cleaned up network workload data for canceled network contract")
+		}
+	}
 
 	if err := cluster.SetClusterResult(cl); err != nil {
 		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to serialize updated cluster result")

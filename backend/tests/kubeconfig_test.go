@@ -17,9 +17,9 @@ func TestKubeconfig(t *testing.T) {
 	t.Logf("Login successful")
 
 	// Get kubeconfig
-	kubeconfig, err := client.GetKubeconfig("test4")
+	kubeconfig, err := client.GetKubeconfig(clusterName)
 	if err != nil {
-		t.Fatalf("Failed to get kubeconfig for '%s': %v", "test3", err)
+		t.Fatalf("Failed to get kubeconfig for '%s': %v", clusterName, err)
 	}
 
 	// Validate kubeconfig content
