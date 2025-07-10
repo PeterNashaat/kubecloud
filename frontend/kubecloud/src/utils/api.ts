@@ -31,7 +31,7 @@ class ApiClient {
   private defaultTimeout: number
 
   constructor(baseURL?: string, timeout: number = 10000) {
-    this.baseURL = baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+    this.baseURL = baseURL || (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_API_BASE_URL) || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
     this.defaultTimeout = timeout
   }
 
