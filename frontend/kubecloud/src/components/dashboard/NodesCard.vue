@@ -296,10 +296,6 @@ function formatStorage(val: number) {
 }
 </script>
 
-<script lang="ts">
-export default {}
-</script>
-
 <style scoped>
 .nodes-card {
   background: rgba(10, 25, 47, 0.85);

@@ -42,12 +42,6 @@ const props = defineProps<{ vm: VM; type: 'master' | 'worker'; availableSshKeys:
 const emit = defineEmits(['edit', 'delete']);
 </script>
 
-<script lang="ts">
-export default {
-  name: 'DeployVMCard'
-};
-</script>
-
 <style scoped>
 .card.vm-card {
   background: var(--color-surface-1, #18192b);
@@ -85,6 +79,10 @@ export default {
   font-size: 1em;
   color: var(--color-text, #cfd2fa);
   min-width: 110px;
+}
+.spec-label {
+  color: var(--color-text-muted, #7c7fa5);
+  margin-right: 0.5em;
 }
 .ssh-key-chip {
   background: var(--color-surface-2, #23243a);

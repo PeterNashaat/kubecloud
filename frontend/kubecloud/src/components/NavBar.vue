@@ -194,13 +194,6 @@ const handleLogout = async () => {
 .user-menu-btn:hover {
   color: #60a5fa !important;
 }
-.more-btn {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #e0e7ef;
-  min-width: 0;
-  padding: 0.2rem 0.8rem;
-}
 @media (max-width: 900px) {
   .navbar-content {
     padding: 1rem 1.2rem;
@@ -212,14 +205,6 @@ const handleLogout = async () => {
   .navbar-logo {
     font-size: 1.4rem;
   }
-}
-.brand-title {
-  color: #60a5fa;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  margin-left: 0.5rem;
-  font-size: 1.2rem;
-  transition: color 0.2s;
 }
 .user-name {
   font-weight: 500;

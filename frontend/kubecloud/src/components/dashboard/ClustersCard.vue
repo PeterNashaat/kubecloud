@@ -108,11 +108,6 @@ const recentClusters = computed(() => {
   return [...clusterStore.clusters].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 3)
 })
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 
 const viewCluster = (projectName: string) => {
   router.push(`/clusters/${projectName}`)

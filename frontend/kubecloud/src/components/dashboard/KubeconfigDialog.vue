@@ -38,16 +38,7 @@ const dialog = computed({
 function closeDialog() { emit('update:modelValue', false); }
 </script>
 
-<script lang="ts">
-export default {};
-</script>
-
 <style scoped>
-.kubeconfig-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
 pre {
   color: #b4befe;
   font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', 'Consolas', monospace;

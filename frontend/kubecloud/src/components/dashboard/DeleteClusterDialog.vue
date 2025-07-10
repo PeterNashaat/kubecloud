@@ -30,10 +30,6 @@ const dialog = computed({
 function closeDialog() { emit('update:modelValue', false); }
 </script>
 
-<script lang="ts">
-export default {};
-</script>
-
 <style scoped>
 .delete-message {
   color: #ff6b6b;

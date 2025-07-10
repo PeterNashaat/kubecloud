@@ -89,7 +89,6 @@
 import { ref, computed, watch } from 'vue';
 import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
 import type { RentedNode } from '../../composables/useNodeManagement';
-import { getClusterUsedResources } from './clusterUtils';
 import BaseDialogCard from './BaseDialogCard.vue';
 
 const props = defineProps<{
@@ -173,10 +172,6 @@ function nodeDropdownProps(node: any) {
     subtitle: `vCPU: ${getAvailableCPU(node)}, RAM: ${getAvailableRAM(node)} MB, Storage: ${getAvailableStorage(node)} MB`,
   };
 }
-</script>
-
-<script lang="ts">
-export default {};
 </script>
 
 <style scoped>

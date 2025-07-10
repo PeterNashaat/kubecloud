@@ -279,6 +279,7 @@ import { api } from '../../utils/api'
 import { useNotificationStore } from '../../stores/notifications'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
 import { getTotalCPU, getAvailableCPU, getTotalRAM, getAvailableRAM, getTotalStorage, getUsedStorage, getAvailableStorage } from '../../utils/nodeNormalizer';
+import { formatDate } from '../../utils/dateUtils';
 // Import dialogs
 import EditClusterNodesDialog from './EditClusterNodesDialog.vue';
 import KubeconfigDialog from './KubeconfigDialog.vue';
@@ -345,8 +346,6 @@ async function showKubeconfig() {
   try {
     const response = await api.get(`/v1/deployments/${projectName.value}/kubeconfig`, { requiresAuth: true, showNotifications: false })
     const data = response.data as { kubeconfig?: string }
-    console.log({data});
-    
     kubeconfigContent.value = data.kubeconfig || ''
   } catch (err: any) {
     kubeconfigError.value = err?.message || 'Failed to fetch kubeconfig'
@@ -424,10 +423,6 @@ const goBack = () => {
   router.push('/dashboard')
 }
 
-function formatDate(dateStr: string) {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 // Actions
 const metrics = ref<any>(null)
 const metricsLoading = ref(false)
@@ -493,8 +488,6 @@ async function removeNode(nodeName: string) {
 }
 const addNodeLoading = ref(false)
 const availableNodes = computed<RentedNode[]>(() => {
-console.log("entedNodes.value", rentedNodes.value);
-
   return rentedNodes.value.filter((node: RentedNode) => {
     const clusterUsed = getClusterUsedResources(node.nodeId);
     const availCPU = getAvailableCPU(node) - clusterUsed.vcpu;

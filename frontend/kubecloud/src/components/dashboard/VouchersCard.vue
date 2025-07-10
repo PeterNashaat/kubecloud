@@ -87,10 +87,6 @@ function isExpired(expiryDate: string) {
 }
 </script>
 
-<script lang="ts">
-export default {}
-</script>
-
 <style scoped>
 .dashboard-card.vouchers-card.spacious {
   background: #181f35;

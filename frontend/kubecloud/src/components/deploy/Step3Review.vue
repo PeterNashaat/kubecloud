@@ -69,11 +69,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(['onDeployCluster', 'prevStep']);
 </script>
-<script lang="ts">
-export default {
-  name: 'Step3Review'
-};
-</script>
 <style scoped>
 .section-header {
   margin-bottom: 2rem;
@@ -162,22 +157,5 @@ export default {
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
-}
-.btn-outline {
-  border: 1px solid var(--color-primary, #6366f1);
-  color: var(--color-primary, #6366f1);
-}
-.btn-primary {
-  background: var(--color-primary, #6366f1);
-  color: #fff;
-}
-@media (max-width: 900px) {
-  .review-grid {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .review-card {
-    min-width: unset;
-  }
 }
 </style> 

@@ -97,11 +97,6 @@ function onSave() {
   }
 }
 </script>
-<script lang="ts">
-export default {
-  name: 'EditNodeModal'
-};
-</script>
 <style scoped>
 .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
 .edit-node-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #232946; color: #fff; border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25); padding: 2rem 2.5rem; z-index: 1001; min-width: 320px; max-width: 90vw; }
@@ -120,9 +115,6 @@ export default {
   margin-bottom: 0.5rem;
   display: block;
 }
-.v-chip.selected-chip { /* REMOVE THIS CLASS */ }
-.v-chip { /* REMOVE custom background, color, border for selection */ }
-.v-chip:not(.selected-chip) { /* REMOVE this as well */ }
 .ssh-alert {
   color: #ff5252;
   background: #2d1a1a;
@@ -131,11 +123,6 @@ export default {
   margin-top: 0.7em;
   display: flex;
   align-items: center;
-  font-size: 1em;
-}
-.ssh-selected-name {
-  color: #a5f3a1;
-  margin-top: 0.7em;
   font-size: 1em;
 }
 </style> 

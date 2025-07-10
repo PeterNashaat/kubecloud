@@ -86,13 +86,7 @@ function handleNavigate(section: string) {
   localStorage.setItem('dashboard-section', section)
 }
 
-function handleLogout() {
-  // Handle logout logic here
-  console.log('Logout clicked')
-}
-
 function redeemVoucher(voucher: any) {
-  // TODO: Implement redeem logic (API call, update UI, etc.)
   alert(`Redeem voucher: ${voucher.name}`)
 }
 </script>
@@ -107,7 +101,7 @@ function redeemVoucher(voucher: any) {
       <div class="dashboard-content-wrapper">
         <div class="dashboard-layout">
           <div class="dashboard-sidebar">
-            <DashboardSidebar :selected="selected" @update:selected="handleSidebarSelect" @logout="handleLogout" />
+            <DashboardSidebar :selected="selected" @update:selected="handleSidebarSelect" />
           </div>
           <div class="dashboard-main">
             <div class="dashboard-cards">
@@ -302,103 +296,7 @@ function redeemVoucher(voucher: any) {
   opacity: 0.9;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
 
-.stat-card {
-  background: var(--kubecloud-surface-light);
-  border: 1px solid var(--kubecloud-border);
-  border-radius: var(--kubecloud-radius-md);
-  padding: 1.2rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  transition: border-color 0.2s;
-}
-
-.stat-card:hover {
-  border-color: var(--kubecloud-primary);
-}
-
-.stat-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--kubecloud-radius-sm);
-  background: var(--kubecloud-surface);
-  border: 1px solid var(--kubecloud-border);
-}
-
-.stat-number {
-  font-size: 1.3rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--kubecloud-text);
-  margin-bottom: 0.15rem;
-}
-
-.stat-label {
-  font-size: 0.9rem;
-  color: var(--kubecloud-text-muted);
-  font-weight: var(--font-weight-normal);
-}
-
-.quick-actions-section {
-  margin-bottom: 2rem;
-}
-
-.section-title {
-  font-size: 1.2rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--kubecloud-text);
-  margin-bottom: 1rem;
-}
-
-.actions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.action-btn {
-  background: var(--kubecloud-surface-light) !important;
-  border: 1px solid var(--kubecloud-primary) !important;
-  color: var(--kubecloud-primary) !important;
-  font-weight: var(--font-weight-bold);
-  border-radius: var(--kubecloud-radius-md) !important;
-  transition: background 0.2s, color 0.2s;
-  font-size: 1rem;
-  padding: 0.7rem 1.5rem;
-}
-
-.action-btn:hover {
-  background: var(--kubecloud-primary) !important;
-  color: #fff !important;
-}
-
-/* Floating Action Button for Add Cluster on mobile */
-@media (max-width: 600px) {
-  .fab-add-cluster {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    z-index: 1000;
-    background: var(--kubecloud-primary) !important;
-    color: #fff !important;
-    border-radius: 50%;
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-  }
-}
 </style>
 
 
