@@ -113,16 +113,11 @@ export function useNodeManagement() {
       if (responseData.data?.nodes) {
         // Map the grid proxy node structure to our frontend structure
         rentedNodes.value = responseData.data.nodes.map((node: any) => ({
-          id: node.nodeId || node.id,
           nodeId: node.nodeId,
           farmId: node.farmId,
           farmName: node.farmName,
           twinId: node.twinId,
-          name: node.name || `Node #${node.nodeId || node.id}`,
-          location: node.location || node.city || node.country || 'Unknown',
           country: node.country,
-          city: node.city,
-          gridVersion: node.gridVersion,
           uptime: node.uptime,
           created: node.created,
           updatedAt: node.updatedAt,
@@ -136,20 +131,12 @@ export function useNodeManagement() {
             hru: node.total_resources?.hru,
             mru: node.total_resources?.mru,
           },
-          gpu: node.gpu,
           gpus: node.gpus,
           num_gpu: node.num_gpu,
           price_usd: node.price_usd,
           status: node.status,
           healthy: node.healthy,
-          rentable: node.rentable,
-          rented: node.rented,
           rentContractId: node.rentContractId,
-          rentedByTwinId: node.rentedByTwinId,
-          certificationType: node.certificationType,
-          dedicated: node.dedicated,
-          inDedicatedFarm: node.inDedicatedFarm,
-          features: node.features,
         }))
         total.value = responseData.data.total || 0
       } else {

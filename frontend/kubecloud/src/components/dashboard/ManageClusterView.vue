@@ -23,6 +23,10 @@
                   <v-icon icon="mdi-eye" class="mr-2"></v-icon>
                   Show Kubeconfig
                 </v-btn>
+                <v-btn variant="outlined" class="btn btn-outline" @click="openEditClusterNodesDialog">
+                  <v-icon icon="mdi-pencil" class="mr-2"></v-icon>
+                  Edit Cluster
+                </v-btn>
                 <v-btn variant="outlined" class="btn btn-outline" color="error" @click="openDeleteModal">
                   <v-icon icon="mdi-delete" class="mr-2"></v-icon>
                   Delete
@@ -233,33 +237,37 @@
     </div>
 
     <!-- Kubeconfig Modal -->
-    <v-dialog v-model="kubeconfigDialog" max-width="600">
-      <v-card>
-        <v-card-title>Kubeconfig</v-card-title>
-        <v-card-text>
-          <v-alert v-if="kubeconfigError" type="error" class="mb-4">{{ kubeconfigError }}</v-alert>
-          <v-progress-linear v-if="kubeconfigLoading" indeterminate color="primary" class="mb-4" />
-          <pre v-if="kubeconfigContent">{{ kubeconfigContent }}</pre>
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" @click="copyKubeconfig">Copy</v-btn>
-          <v-btn color="primary" @click="downloadKubeconfigFile">Download</v-btn>
-          <v-btn color="primary" @click="kubeconfigDialog = false">Close</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <KubeconfigDialog
+      v-model="kubeconfigDialog"
+      :projectName="projectName"
+      :loading="kubeconfigLoading"
+      :error="kubeconfigError"
+      :content="kubeconfigContent"
+      @copy="copyKubeconfig"
+      @download="downloadKubeconfigFile"
+    />
 
     <!-- Delete Confirmation Modal -->
-    <v-dialog v-model="showDeleteModal" max-width="400">
-      <v-card>
-        <v-card-title>Confirm Delete</v-card-title>
-        <v-card-text>Are you sure you want to delete this cluster?</v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" @click="showDeleteModal = false" :disabled="deletingCluster">Cancel</v-btn>
-          <v-btn color="primary" @click="confirmDelete" :loading="deletingCluster" :disabled="deletingCluster">Delete</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DeleteClusterDialog
+      v-model="showDeleteModal"
+      :loading="deletingCluster"
+      @confirm="confirmDelete"
+    />
+
+    <!-- Edit Cluster Nodes Modal -->
+    <EditClusterNodesDialog
+      v-model="editClusterNodesDialog"
+      :cluster="cluster"
+      :nodes="filteredNodes"
+      :loading="nodesLoading"
+      :available-nodes="availableNodes"
+      :add-form-error="addFormError"
+      :add-form-node="addFormNode"
+      :can-assign-to-node="canAssignToNode"
+      :add-node-loading="addNodeLoading"
+      @add-node="addNode"
+      @nodes-updated="editNodes = $event"
+    />
   </div>
 </template>
 
@@ -269,6 +277,23 @@ import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
 import { useNotificationStore } from '../../stores/notifications'
+import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
+import { getTotalCPU, getAvailableCPU, getTotalRAM, getAvailableRAM, getTotalStorage, getUsedStorage, getAvailableStorage } from '../../utils/nodeNormalizer';
+// Import dialogs
+import EditClusterNodesDialog from './EditClusterNodesDialog.vue';
+import KubeconfigDialog from './KubeconfigDialog.vue';
+import DeleteClusterDialog from './DeleteClusterDialog.vue';
+
+function getClusterUsedResources(nodeId: number) {
+  // Sums up vcpu, ram, storage for all editNodes with this nodeId
+  // editNodes may contain extended node objects with vcpu/ram/storage or cpu/memory/storage
+  return (editNodes.value || []).filter((n: RentedNode) => n.nodeId === nodeId).reduce((acc: { vcpu: number, ram: number, storage: number }, n: RentedNode) => {
+    acc.vcpu += ('vcpu' in n ? (n as any).vcpu : (n as any).cpu) || 0;
+    acc.ram += ('ram' in n ? (n as any).ram : (n as any).memory) || 0;
+    acc.storage += (n as any).storage || 0;
+    return acc;
+  }, { vcpu: 0, ram: 0, storage: 0 });
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -426,6 +451,139 @@ async function fetchMetrics() {
   }
 }
 
+const editClusterNodesDialog = ref(false)
+
+// Dummy state for masters/workers (replace with real cluster data)
+const editNodes = ref<any[]>([])
+
+const tableHeaders = [
+  { title: 'Name', key: 'name' },
+  { title: 'Type', key: 'type' },
+  { title: 'CPU', key: 'cpu' },
+  { title: 'RAM', key: 'memory' },
+  { title: 'Storage', key: 'storage' },
+  { title: 'IP', key: 'ip' },
+  { title: 'Contract ID', key: 'contract_id' },
+  { title: 'Actions', key: 'actions', sortable: false }
+]
+
+const editNodesWithStorage = computed(() =>
+  (editNodes.value || []).map(node => ({
+    ...node,
+    storage: (node.root_size || 0) + (node.disk_size || 0)
+  }))
+)
+
+const editTab = ref('list');
+
+async function openEditClusterNodesDialog() {
+  const nodesRaw = cluster.value?.cluster?.nodes;
+  const nodes = Array.isArray(nodesRaw) ? nodesRaw : [];
+  editNodes.value = nodes.map(n => ({ ...n }));
+  editTab.value = 'list';
+  editClusterNodesDialog.value = true;
+  await fetchRentedNodes();
+}
+
+async function removeNode(nodeName: string) {
+  if (!cluster.value || !cluster.value.cluster) return;
+  await clusterStore.removeNodeFromCluster(cluster.value.cluster.name, nodeName)
+  editNodes.value = editNodes.value.filter(n => n.name !== nodeName)
+  await clusterStore.fetchClusters()
+}
+const addNodeLoading = ref(false)
+const availableNodes = computed<RentedNode[]>(() => {
+console.log("entedNodes.value", rentedNodes.value);
+
+  return rentedNodes.value.filter((node: RentedNode) => {
+    const clusterUsed = getClusterUsedResources(node.nodeId);
+    const availCPU = getAvailableCPU(node) - clusterUsed.vcpu;
+    const availRAM = getAvailableRAM(node) - clusterUsed.ram;
+    const availStorage = getAvailableStorage(node) - clusterUsed.storage;
+    return availCPU > 0 && availRAM > 0 && availStorage > 0;
+  });
+});
+
+const { rentedNodes, loading: nodesLoading, fetchRentedNodes } = useNodeManagement()
+
+const addFormNodeId = ref(null);
+const addFormRole = ref('master');
+const addFormVcpu = ref(1);
+const addFormRam = ref(1);
+const addFormStorage = ref(1);
+const addFormError = ref('');
+
+const addFormNode = computed<RentedNode | undefined>(() => availableNodes.value.find((n: RentedNode) => n.nodeId === addFormNodeId.value));
+
+const canAssignToNode = computed(() => {
+  const node = addFormNode.value;
+  if (!node) return false;
+  return (
+    addFormVcpu.value > 0 &&
+    addFormRam.value > 0 &&
+    addFormStorage.value > 0 &&
+    addFormVcpu.value <= getAvailableCPU(node) &&
+    addFormRam.value <= getAvailableRAM(node) &&
+    addFormStorage.value <= getAvailableStorage(node)
+  );
+});
+
+watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
+  const node = addFormNode.value;
+  if (!node) {
+    addFormError.value = '';
+    return;
+  }
+  if (
+    addFormVcpu.value > getAvailableCPU(node) ||
+    addFormRam.value > getAvailableRAM(node) ||
+    addFormStorage.value > getAvailableStorage(node)
+  ) {
+    addFormError.value = 'Requested resources exceed available for the selected node.';
+  } else {
+    addFormError.value = '';
+  }
+});
+
+async function addNode(payload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
+  const node = availableNodes.value.find(n => n.nodeId === payload.nodeId);
+  if (!node) return;
+  if (payload.vcpu <= 0 || payload.ram <= 0 || payload.storage <= 0) {
+    addFormError.value = 'All resources must be greater than 0.';
+    return;
+  }
+  if (payload.vcpu > getAvailableCPU(node) || payload.ram > getAvailableRAM(node) || payload.storage > getAvailableStorage(node)) {
+    addFormError.value = 'Requested resources exceed available.';
+    return;
+  }
+  addNodeLoading.value = true;
+  addFormError.value = '';
+  try {
+    if (!cluster.value?.cluster?.name) throw new Error('Cluster name missing');
+    await clusterStore.addNodesToCluster(cluster.value.cluster.name, {
+      nodes: [{
+        nodeId: node.nodeId,
+        role: payload.role,
+        vcpu: payload.vcpu,
+        ram: payload.ram,
+        storage: payload.storage
+      }]
+    });
+    await clusterStore.fetchClusters();
+    editNodes.value.push({ ...node, role: payload.role, vcpu: payload.vcpu, ram: payload.ram, storage: payload.storage });
+    // Reset add form state
+    addFormNodeId.value = null;
+    addFormRole.value = 'master';
+    addFormVcpu.value = 1;
+    addFormRam.value = 1;
+    addFormStorage.value = 1;
+  } catch (e: any) {
+    addFormError.value = e?.message || 'Failed to add node';
+  } finally {
+    addNodeLoading.value = false;
+  }
+}
+
 </script>
 
 <style scoped>
@@ -435,137 +593,70 @@ async function fetchMetrics() {
   background: var(--color-bg);
   padding: 0;
 }
-
 .manage-header {
   margin-bottom: var(--space-8);
 }
-
 .manage-navigation {
   display: flex;
   align-items: center;
   margin-bottom: var(--space-4);
 }
-
 .back-btn {
   color: var(--color-text-secondary) !important;
 }
-
 .back-btn:hover {
   color: var(--color-primary) !important;
   background: var(--color-primary-subtle) !important;
 }
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.breadcrumb-item {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-
-.breadcrumb-item.active {
-  color: var(--color-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.breadcrumb-separator {
-  color: var(--color-text-muted) !important;
-  font-size: var(--font-size-sm) !important;
-}
-
 .manage-title {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text);
   margin: 0 0 var(--space-2) 0;
 }
-
 .manage-subtitle {
   font-size: var(--font-size-lg);
   color: var(--color-text-secondary);
   margin: 0;
 }
-
-.status-bar {
-  margin-bottom: var(--space-6);
-}
-
-.status-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.status-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.status-dot.running {
-  background: var(--color-success);
-}
-
-.status-dot.stopped {
-  background: var(--color-error);
-}
-
 .status-text {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
   color: var(--color-text);
 }
-
 .status-actions {
   display: flex;
   gap: var(--space-3);
 }
-
 .status-actions.align-end {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
-
 .main-content-card {
   padding: unset !important;
   overflow: hidden;
 }
-
 .tab-content {
   padding: var(--space-10) var(--space-8) var(--space-8) var(--space-8);
 }
-
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: var(--space-8);
 }
-
 .overview-card {
   height: 100%;
 }
-
 .details-card {
   grid-column: 1 / -1;
 }
-
 .resource-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
-
 .resource-item {
   display: flex;
   justify-content: space-between;
@@ -573,64 +664,53 @@ async function fetchMetrics() {
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border);
 }
-
 .resource-item:last-child {
   border-bottom: none;
 }
-
 .resource-label {
   color: var(--color-text-muted);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
 }
-
 .resource-value {
   color: var(--color-text);
   font-weight: var(--font-weight-semibold);
   font-family: 'Inter', monospace;
   font-size: var(--font-size-base);
 }
-
 .usage-metrics {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
-
 .usage-item {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
-
 .usage-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-
 .usage-label {
   color: var(--color-text-muted);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
 }
-
 .usage-value {
   color: var(--color-primary);
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-base);
 }
-
 .usage-bar {
   border-radius: var(--radius-sm);
 }
-
 .details-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-4);
 }
-
 .detail-item {
   display: flex;
   flex-direction: column;
@@ -640,24 +720,20 @@ async function fetchMetrics() {
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-md);
 }
-
 .detail-label {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
-
 .detail-value {
   color: var(--color-text);
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-base);
 }
-
 .font-mono {
   font-family: 'Inter', monospace;
   font-size: var(--font-size-sm);
 }
-
 .truncate-cell {
   display: inline-flex;
   align-items: center;
