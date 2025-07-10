@@ -41,8 +41,8 @@ class StripeService {
   async initialize(): Promise<void> {
     if (this.isInitialized) return
 
-    const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-    if (!stripePublishableKey) {
+		const stripePublishableKey = (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_STRIPE_PUBLISHABLE_KEY) || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+		if (!stripePublishableKey) {
       throw new Error('Stripe publishable key not found in environment variables')
     }
 
