@@ -102,9 +102,9 @@ export class UserService {
         }
       })
     }
-    
+
     const endpoint = `/v1/nodes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-    return api.get<NodesResponse>(endpoint, { 
+    return api.get<NodesResponse>(endpoint, {
       requiresAuth: true,
       showNotifications: false // Don't show notifications for node listing
     })
@@ -204,6 +204,15 @@ export class UserService {
       errorMessage: 'Failed to delete SSH key'
     })
   }
+  // Add node to deployment
+  async addNodeToDeployment(deploymentName: string, nodePayload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
+    return api.post(`/v1/deployments/${deploymentName}/nodes`, nodePayload, { requiresAuth: true, showNotifications: true })
+  }
+
+  // Remove node from deployment
+  async removeNodeFromDeployment(deploymentName: string, nodeName: string) {
+    return api.delete(`/v1/deployments/${deploymentName}/nodes/${nodeName}`, { requiresAuth: true, showNotifications: true })
+  }
 }
 
-export const userService = new UserService() 
+export const userService = new UserService()

@@ -142,7 +142,7 @@
       :can-assign-to-node="canAssignToNode"
       :add-node-loading="addNodeLoading"
       @add-node="addNode"
-      @nodes-updated="editNodes = $event"
+      @remove-node="handleRemoveNode"
     />
   </div>
 </template>
@@ -154,7 +154,9 @@ import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
 import { useNotificationStore } from '../../stores/notifications'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
+
 import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
+
 import { formatDate } from '../../utils/dateUtils';
 // Import dialogs
 import EditClusterNodesDialog from './EditClusterNodesDialog.vue';
@@ -321,7 +323,7 @@ const availableNodes = computed<RentedNode[]>(() => {
   });
 });
 
-const { rentedNodes, loading: nodesLoading, fetchRentedNodes } = useNodeManagement()
+const { rentedNodes, loading: nodesLoading, fetchRentedNodes, addNodeToDeployment, removeNodeFromDeployment } = useNodeManagement()
 
 const addFormNodeId = ref(null);
 const addFormRole = ref('master');
@@ -377,17 +379,18 @@ async function addNode(payload: { nodeId: number, role: string, vcpu: number, ra
   addFormError.value = '';
   try {
     if (!cluster.value?.cluster?.name) throw new Error('Cluster name missing');
-    await clusterStore.addNodesToCluster(cluster.value.cluster.name, {
-      nodes: [{
-        nodeId: node.nodeId,
-        role: payload.role,
-        vcpu: payload.vcpu,
-        ram: payload.ram,
-        storage: payload.storage
-      }]
+    await addNodeToDeployment(cluster.value.cluster.name, {
+      nodeId: node.nodeId,
+      role: payload.role,
+      vcpu: payload.vcpu,
+      ram: payload.ram,
+      storage: payload.storage
     });
+    await fetchRentedNodes();
     await clusterStore.fetchClusters();
-    editNodes.value.push({ ...node, role: payload.role, vcpu: payload.vcpu, ram: payload.ram, storage: payload.storage });
+    // Update editNodes with the latest nodes from the refreshed cluster
+    const updatedCluster = clusterStore.clusters.find(c => c.project_name === cluster.value?.project_name);
+    editNodes.value = updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes) ? updatedCluster.cluster.nodes.map((n: any) => ({ ...n })) : [];
     // Reset add form state
     addFormNodeId.value = null;
     addFormRole.value = 'master';
@@ -398,6 +401,20 @@ async function addNode(payload: { nodeId: number, role: string, vcpu: number, ra
     addFormError.value = e?.message || 'Failed to add node';
   } finally {
     addNodeLoading.value = false;
+  }
+}
+
+async function handleRemoveNode(nodeName: string) {
+  if (!cluster.value?.cluster?.name) return;
+  try {
+    await removeNodeFromDeployment(cluster.value.cluster.name, nodeName);
+    await fetchRentedNodes();
+    await clusterStore.fetchClusters();
+    // Update editNodes with the latest nodes from the refreshed cluster
+    const updatedCluster = clusterStore.clusters.find(c => c.project_name === cluster.value?.project_name);
+    editNodes.value = updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes) ? updatedCluster.cluster.nodes.map((n: any) => ({ ...n })) : [];
+  } catch (e: any) {
+    // Optionally show notification
   }
 }
 

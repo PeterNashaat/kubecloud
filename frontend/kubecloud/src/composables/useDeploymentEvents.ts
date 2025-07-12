@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '../stores/notifications'
+import { useUserStore } from '../stores/user'
 
 export function useDeploymentEvents() {
   const eventSource = ref<EventSource | null>(null)
@@ -7,8 +8,20 @@ export function useDeploymentEvents() {
 
   function connect() {
     if (eventSource.value) return
-    eventSource.value = new EventSource('/api/v1/events', { withCredentials: true })
+    // Use backend base URL from environment variable or fallback
+    const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+    const userStore = useUserStore()
+    const token = userStore.token || ''
+    const url = backendBaseUrl + '/api/v1/events?token=' + encodeURIComponent(token)
+    console.log('Connecting to EventSource at', url)
+    eventSource.value = new EventSource(url, { withCredentials: true })
+
+    eventSource.value.onopen = () => {
+      console.log('EventSource connection opened')
+    }
+
     eventSource.value.onmessage = (event) => {
+      console.log('EventSource message received:', event.data)
       try {
         const data = JSON.parse(event.data)
         const type = data.type || 'info'
@@ -24,9 +37,8 @@ export function useDeploymentEvents() {
         notificationStore.info('Deployment', event.data)
       }
     }
-    eventSource.value.onerror = () => {
+    eventSource.value.onerror = (err) => {
       disconnect()
-      setTimeout(connect, 3000)
     }
   }
 
@@ -41,4 +53,4 @@ export function useDeploymentEvents() {
   onUnmounted(disconnect)
 
   return { connect, disconnect }
-} 
+}
