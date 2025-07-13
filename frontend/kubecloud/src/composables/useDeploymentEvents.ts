@@ -5,6 +5,7 @@ import { useUserStore } from '../stores/user'
 export function useDeploymentEvents() {
   const eventSource = ref<EventSource | null>(null)
   const notificationStore = useNotificationStore()
+  const seenTaskIds = new Set<string>()
 
   function connect() {
     if (eventSource.value) return
@@ -25,7 +26,11 @@ export function useDeploymentEvents() {
       try {
         const data = JSON.parse(event.data)
         const type = data.type || 'info'
-        const message = data.message || JSON.stringify(data)
+        if (type === 'connected') return; // Ignore connected notification event
+        const taskId = data.data?.task_id
+        if (taskId && seenTaskIds.has(taskId)) return;
+        if (taskId) seenTaskIds.add(taskId);
+        const message = data.data?.message || JSON.stringify(data)
         if (type === 'success') {
           notificationStore.success('Deployment', message)
         } else if (type === 'error') {
