@@ -50,6 +50,7 @@ func (c *Client) CreateCluster(ctx context.Context, cluster Cluster) (Cluster, e
 	ensureLeaderNode(&cluster)
 
 	if err := deployNodes(ctx, c.gridClient, cluster, deploymentNames, c.masterPubKey, ""); err != nil {
+		c.rollbackCreateCluster(ctx, deploymentNames)
 		return Cluster{}, err
 	}
 
@@ -71,6 +72,7 @@ func (c *Client) AddClusterNode(ctx context.Context, cluster Cluster, leaderIP s
 	}
 
 	if err := deployNodes(ctx, c.gridClient, cluster, deploymentNames, c.masterPubKey, leaderIP); err != nil {
+		c.rollbackAddClusterNode(ctx, cluster, deploymentNames)
 		return Cluster{}, err
 	}
 
@@ -190,4 +192,30 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 	}
 
 	return nil
+}
+
+func (c *Client) rollbackCreateCluster(ctx context.Context, deploymentNames DeploymentNames) {
+	log.Warn().Str("project_name", deploymentNames.ProjectName).Msg("Rolling back cluster creation")
+
+	if err := c.gridClient.CancelByProjectName(deploymentNames.ProjectName); err != nil {
+		log.Error().Err(err).Str("project_name", deploymentNames.ProjectName).Msg("Failed to rollback cluster creation")
+	}
+}
+
+func (c *Client) rollbackAddClusterNode(ctx context.Context, cluster Cluster, deploymentNames DeploymentNames) {
+	log.Warn().Str("project_name", deploymentNames.ProjectName).Msg("Rolling back node addition")
+
+	var contractsToCancel []uint64
+
+	for _, node := range cluster.Nodes {
+		nodeName := deploymentNames.GetNodeName(node.Name)
+		result, err := c.gridClient.State.LoadDeploymentFromGrid(ctx, node.NodeID, nodeName)
+		if err == nil && result.ContractID != 0 {
+			contractsToCancel = append(contractsToCancel, result.ContractID)
+		}
+	}
+
+	if err := c.gridClient.BatchCancelContract(contractsToCancel); err != nil {
+		log.Error().Err(err).Uints64("contract_ids", contractsToCancel).Msg("Failed to rollback node contracts")
+	}
 }
