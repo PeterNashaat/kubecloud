@@ -11,9 +11,13 @@ import (
 )
 
 func deployNetwork(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster, deploymentNames DeploymentNames) error {
-	nodeIDs := make([]uint32, len(cluster.Nodes))
-	for i, node := range cluster.Nodes {
-		nodeIDs[i] = node.NodeID
+	seen := make(map[uint32]bool)
+	nodeIDs := make([]uint32, 0, len(cluster.Nodes))
+	for _, node := range cluster.Nodes {
+		if !seen[node.NodeID] {
+			seen[node.NodeID] = true
+			nodeIDs = append(nodeIDs, node.NodeID)
+		}
 	}
 
 	var net workloads.ZNet
@@ -67,21 +71,26 @@ func deployNetwork(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 }
 
 func deployNodes(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster, deploymentNames DeploymentNames, sshKey, leaderIP string) error {
+	nodeIPs := make(map[string]string)
+	for _, node := range cluster.Nodes {
+		ip, err := getIpForVm(ctx, tfplugin, deploymentNames.NetworkName, node.NodeID)
+		if err != nil {
+			return fmt.Errorf("failed to get IP for node %s (NodeID: %d): %v", node.Name, node.NodeID, err)
+		}
+		nodeIPs[node.Name] = ip
+	}
+
 	if leaderIP == "" {
 		for _, node := range cluster.Nodes {
 			if node.Type == NodeTypeLeader {
-				ip, err := getIpForVm(ctx, tfplugin, deploymentNames.NetworkName, node.NodeID)
-				if err != nil {
-					return fmt.Errorf("failed to get IP for leader node %d: %v", node.NodeID, err)
-				}
-				leaderIP = ip
+				leaderIP = nodeIPs[node.Name]
 				break
 			}
 		}
 	}
 
 	for _, node := range cluster.Nodes {
-		if err := deployNode(ctx, tfplugin, node, cluster, deploymentNames, sshKey, leaderIP); err != nil {
+		if err := deployNode(ctx, tfplugin, node, cluster, deploymentNames, sshKey, leaderIP, nodeIPs[node.Name]); err != nil {
 			return err
 		}
 	}
@@ -89,13 +98,8 @@ func deployNodes(ctx context.Context, tfplugin deployer.TFPluginClient, cluster 
 	return nil
 }
 
-func deployNode(ctx context.Context, tfplugin deployer.TFPluginClient, node Node, cluster Cluster, deploymentNames DeploymentNames, sshKey, leaderIP string) error {
-	ip, err := getIpForVm(ctx, tfplugin, deploymentNames.NetworkName, node.NodeID)
-	if err != nil {
-		return fmt.Errorf("failed to get IP for node %d: %v", node.NodeID, err)
-	}
-
-	vm, disk, err := createWorkloadsFromNode(node, deploymentNames, deploymentNames.NetworkName, cluster.Token, ip, leaderIP, sshKey)
+func deployNode(ctx context.Context, tfplugin deployer.TFPluginClient, node Node, cluster Cluster, deploymentNames DeploymentNames, sshKey, leaderIP, nodeIP string) error {
+	vm, disk, err := createWorkloadsFromNode(node, deploymentNames, deploymentNames.NetworkName, cluster.Token, nodeIP, leaderIP, sshKey)
 	if err != nil {
 		return fmt.Errorf("failed to create workloads for node %s: %v", node.Name, err)
 	}

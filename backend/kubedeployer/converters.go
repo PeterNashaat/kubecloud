@@ -129,7 +129,7 @@ func createWorkloadsFromNode(node Node, deploymentNames DeploymentNames, network
 		},
 	}
 
-	vm.EnvVars["K3S_NODE_NAME"] = node.Name // Keep original name for K3S internal use
+	vm.EnvVars["K3S_NODE_NAME"] = workloadName
 	vm.EnvVars["NET_SEED"] = netSeed
 	vm.EnvVars["DUAL_STACK"] = "true"
 	vm.EnvVars["MASTER"] = "false"

@@ -41,8 +41,6 @@ func (c *Client) Close() {
 
 func (c *Client) CreateCluster(ctx context.Context, cluster Cluster) (Cluster, error) {
 	deploymentNames := NewDeploymentNames(c.userID, cluster.Name)
-
-	// Set the internal project name for the cluster
 	cluster.Name = deploymentNames.ProjectName
 
 	if err := deployNetwork(ctx, c.gridClient, cluster, deploymentNames); err != nil {
@@ -65,8 +63,6 @@ func (c *Client) CreateCluster(ctx context.Context, cluster Cluster) (Cluster, e
 
 func (c *Client) AddClusterNode(ctx context.Context, cluster Cluster, leaderIP string, existingCluster *Cluster) (Cluster, error) {
 	deploymentNames := NewDeploymentNames(c.userID, cluster.Name)
-
-	// Set the internal project name for the cluster
 	cluster.Name = deploymentNames.ProjectName
 	cluster.NetworkWorkload = existingCluster.NetworkWorkload
 

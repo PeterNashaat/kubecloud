@@ -1,3 +1,5 @@
+//go:build example
+
 package kubedeployer
 
 import (
@@ -10,7 +12,7 @@ import (
 func ExampleClient_CreateCluster() {
 	mnemonic := os.Getenv("MNE")
 	gridNet := os.Getenv("NETWORK")
-	sshKey := "ssh-rsa AAAAB3NzaC1yc2E... your-ssh-key-here"
+	sshKey := os.Getenv("SSH_KEY")
 
 	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
 	if err != nil {
@@ -21,7 +23,7 @@ func ExampleClient_CreateCluster() {
 	ctx := context.Background()
 
 	cluster := Cluster{
-		Name:  "jrk8s03",
+		Name:  "jrk8s08",
 		Token: "secure-cluster-token",
 		Nodes: []Node{
 			{
@@ -39,7 +41,7 @@ func ExampleClient_CreateCluster() {
 			{
 				Name:     "workerx1",
 				Type:     NodeTypeWorker,
-				NodeID:   164,
+				NodeID:   150,
 				CPU:      1,
 				Memory:   2 * 1024,
 				RootSize: 10 * 1024,
@@ -58,15 +60,15 @@ func ExampleClient_CreateCluster() {
 
 	// Output: cluster created
 	for _, node := range deployedCluster.Nodes {
-		fmt.Printf("Node %s: IP=%s, MyceliumIP=%s\n",
-			node.Name, node.IP, node.MyceliumIP)
+		fmt.Printf("Node %s: IP=%s, MyceliumIP=%s, PlanetaryIP=%s\n",
+			node.Name, node.IP, node.MyceliumIP, node.PlanetaryIP)
 	}
 }
 
 func ExampleClient_AddClusterNode() {
 	mnemonic := os.Getenv("MNE")
 	gridNet := os.Getenv("NETWORK")
-	sshKey := "ssh-rsa AAAAB3NzaC1yc2E... your-ssh-key-here"
+	sshKey := os.Getenv("SSH_KEY")
 
 	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
 	if err != nil {
@@ -77,14 +79,14 @@ func ExampleClient_AddClusterNode() {
 	ctx := context.Background()
 
 	existingCluster := Cluster{
-		Name: "my-k3s-cluster",
+		Name: "jrk8s04",
 	}
 
 	newNodeCluster := Cluster{
-		Name: "my-k3s-cluster",
+		Name: "jrk8s04",
 		Nodes: []Node{
 			{
-				Name:     "worker-2",
+				Name:     "worker2",
 				Type:     NodeTypeWorker,
 				NodeID:   789,
 				CPU:      1,
@@ -111,13 +113,14 @@ func ExampleClient_AddClusterNode() {
 		log.Fatalf("Failed to add node: %v", err)
 	}
 
+	// Output: Node added successfully! Total nodes: 3
 	fmt.Printf("Node added successfully! Total nodes: %d\n", len(updatedCluster.Nodes))
 }
 
 func ExampleClient_RemoveClusterNode() {
 	mnemonic := os.Getenv("MNE")
 	gridNet := os.Getenv("NETWORK")
-	sshKey := "ssh-rsa AAAAB3NzaC1yc2E... your-ssh-key-here"
+	sshKey := os.Getenv("SSH_KEY")
 
 	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
 	if err != nil {
@@ -128,20 +131,21 @@ func ExampleClient_RemoveClusterNode() {
 	ctx := context.Background()
 
 	cluster := Cluster{
-		Name: "my-k3s-cluster",
+		Name: "jrk8s04",
 		Nodes: []Node{
 			{Name: "leader", Type: NodeTypeLeader},
-			{Name: "worker-1", Type: NodeTypeWorker},
-			{Name: "worker-2", Type: NodeTypeWorker},
+			{Name: "workerx1", Type: NodeTypeWorker},
+			{Name: "worker2", Type: NodeTypeWorker},
 		},
 	}
 
-	nodeNameToRemove := "worker-2"
+	nodeNameToRemove := "worker2"
 	err = client.RemoveClusterNode(ctx, &cluster, nodeNameToRemove)
 	if err != nil {
 		log.Fatalf("Failed to remove node: %v", err)
 	}
 
+	// Output: Node 'worker2' removed successfully! Remaining nodes: 2
 	fmt.Printf("Node '%s' removed successfully! Remaining nodes: %d\n",
 		nodeNameToRemove, len(cluster.Nodes))
 }
@@ -149,7 +153,7 @@ func ExampleClient_RemoveClusterNode() {
 func ExampleClient_DeleteCluster() {
 	mnemonic := os.Getenv("MNE")
 	gridNet := os.Getenv("NETWORK")
-	sshKey := "ssh-rsa AAAAB3NzaC1yc2E... your-ssh-key-here"
+	sshKey := os.Getenv("SSH_KEY")
 
 	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
 	if err != nil {
@@ -159,11 +163,12 @@ func ExampleClient_DeleteCluster() {
 
 	ctx := context.Background()
 
-	projectName := "my-k3s-cluster"
+	projectName := "jrk8s04"
 	err = client.DeleteCluster(ctx, projectName)
 	if err != nil {
 		log.Fatalf("Failed to delete cluster: %v", err)
 	}
 
+	// Output: Cluster deleted successfully!
 	fmt.Printf("Cluster '%s' deleted successfully!\n", projectName)
 }
