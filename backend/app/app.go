@@ -133,7 +133,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager,ewfEngine, config.SystemAccount.Network)
+		sseManager, ewfEngine, config.SystemAccount.Network)
 
 	app := &App{
 		router:        router,

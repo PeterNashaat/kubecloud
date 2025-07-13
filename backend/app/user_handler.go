@@ -33,7 +33,7 @@ type Handler struct {
 	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
-	ewfEngine  *ewf.Engine
+	ewfEngine       *ewf.Engine
 	gridNet         string // Network name for the grid
 }
 
@@ -55,7 +55,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
-		ewfEngine:  ewfEngine,
+		ewfEngine:       ewfEngine,
 		gridNet:         gridNet,
 	}
 }
