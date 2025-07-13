@@ -13,14 +13,9 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
-const (
-	MYC_NET_SEED_LEN = 32
-	MYC_IP_SEED_LEN  = 6
-	K3S_FLIST        = "https://hub.threefold.me/hanafy.3bot/ahmedhanafy725-k3s-full.flist"
-	K3S_ENTRYPOINT   = "/sbin/zinit init"
-	K3S_DATA_DIR     = "/mydisk"
-	K3S_IFACE        = "mycelium-br"
-	K3S_TOKEN        = "randomely_generated_token"
+var (
+	usedIPsTracker = make(map[string]map[uint32][]byte)
+	usedIPsMutex   sync.RWMutex
 )
 
 func getRandomMyceliumNetSeed() (string, error) {
@@ -28,11 +23,6 @@ func getRandomMyceliumNetSeed() (string, error) {
 	_, err := rand.Read(key)
 	return hex.EncodeToString(key), err
 }
-
-var (
-	usedIPsTracker = make(map[string]map[uint32][]byte) // network -> node -> hostIDs
-	usedIPsMutex   sync.RWMutex
-)
 
 func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, networkName string, nodeID uint32) (string, error) {
 	network := tfPluginClient.State.Networks.GetNetwork(networkName)
