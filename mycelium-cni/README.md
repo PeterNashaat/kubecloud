@@ -28,9 +28,7 @@ The plugin performs the following operations when a pod is created:
 
 ### Network Architecture Diagram
 
-<div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px;">
-  <img src="./docs/assets/diagram.svg" alt="Mycelium CNI Network Architecture" style="display: block; margin: 0 auto;">
-</div>
+![Mycelium CNI Network Architecture](./docs/assets/diagram.svg)
 
 This diagram illustrates how the mycelium-cni plugin integrates with Kubernetes and the Mycelium overlay network to provide IPv6 connectivity to pods.
 
