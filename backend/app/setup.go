@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
-func SetUp(t testing.TB, mailService ...internal.MailService) *App {
+func SetUp(t testing.TB) *App {
 	gin.SetMode(gin.TestMode)
 	dir := t.TempDir()
 
@@ -28,10 +29,10 @@ func SetUp(t testing.TB, mailService ...internal.MailService) *App {
   "database": {
     "file": "%s"
   },
-  "token": {
+  "jwt_token": {
     "secret": "secret",
-    "access_token_expiry_minutes": 60,
-    "refresh_token_expiry_hours": 24
+    "access_expiry_minutes": 60,
+    "refresh_expiry_hours": 24
   },
   "admins": [],
   "mailSender": {
@@ -50,7 +51,7 @@ func SetUp(t testing.TB, mailService ...internal.MailService) *App {
   },
   "activation_service_url": "https://activation.dev.grid.tf/activation/activate",
   "system_account": {
-    "mnemonics": "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
+    "mnemonic": "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
     "network": "dev"
   },
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
@@ -71,24 +72,26 @@ func SetUp(t testing.TB, mailService ...internal.MailService) *App {
     "address": "Address",
     "governorate": "Cairo Governorate"
   },
-  "workflow_db_file": "%s"
+  "workflow_db_file": "%s",
+  "ssh": {
+    "private_key_path": "/tmp/test_id_rsa",
+    "public_key_path": "/tmp/test_id_rsa.pub"
+  }
 }
 `, dbPath, workflowPath)
 
 	err := os.WriteFile(configPath, []byte(config), 0644)
 	assert.NoError(t, err)
 
-	configuration, err := internal.ReadConfFile(configPath)
+	viper.SetConfigFile(configPath)
+	err = viper.ReadInConfig()
+	assert.NoError(t, err)
+
+	configuration, err := internal.LoadConfig()
 	assert.NoError(t, err)
 
 	app, err := NewApp(configuration)
 	assert.NoError(t, err)
-
-	if len(mailService) > 0 {
-		app.handlers.mailService = mailService[0]
-	} else {
-		app.handlers.mailService = internal.NewMailService(configuration.MailSender.SendGridKey)
-	}
 
 	return app
 }
