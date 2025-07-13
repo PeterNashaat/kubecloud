@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func SetUp(t testing.TB) *App {
+func SetUp(t testing.TB) (*App, error) {
 	gin.SetMode(gin.TestMode)
 	dir := t.TempDir()
 
@@ -20,10 +21,28 @@ func SetUp(t testing.TB) *App {
 	dbPath := filepath.Join(dir, "testing.db")
 	workflowPath := filepath.Join(dir, "workflow_testing.db")
 
+	privateKeyPath := filepath.Join(dir, "test_id_rsa")
+	publicKeyPath := privateKeyPath + ".pub"
+
+	// Generate SSH key pair
+	cmd := exec.Command("ssh-keygen", "-t", "rsa", "-b", "2048", "-f", privateKeyPath, "-N", "")
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	t.Cleanup(func() {
+		os.Remove(privateKeyPath)
+		os.Remove(publicKeyPath)
+		os.Remove(configPath)
+		os.Remove(dbPath)
+		os.Remove(workflowPath)
+	})
+
 	config := fmt.Sprintf(`
 {
   "server": {
-    "host": "localhost",
+    "host": "0.0.0.0",
     "port": "3000"
   },
   "database": {
@@ -57,9 +76,9 @@ func SetUp(t testing.TB) *App {
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
   "firesquid_url": "https://firesquid.dev.grid.tf/graphql",
   "redis": {
-    "host": "localhost",
+    "host": "redis-db",
     "port": 6379,
-    "password": "",
+    "password": "pass",
     "db": 0
   },
   "grid": {
@@ -74,26 +93,34 @@ func SetUp(t testing.TB) *App {
   },
   "workflow_db_file": "%s",
   "ssh": {
-    "private_key_path": "/tmp/test_id_rsa",
-    "public_key_path": "/tmp/test_id_rsa.pub"
+    "private_key_path": "%s",
+    "public_key_path": "%s"
   }
 }
-`, dbPath, workflowPath)
+`, dbPath, workflowPath, privateKeyPath, publicKeyPath)
 
-	err := os.WriteFile(configPath, []byte(config), 0644)
-	assert.NoError(t, err)
+	err = os.WriteFile(configPath, []byte(config), 0644)
+	if err != nil {
+		return nil, err
+	}
 
 	viper.SetConfigFile(configPath)
 	err = viper.ReadInConfig()
-	assert.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	configuration, err := internal.LoadConfig()
-	assert.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	app, err := NewApp(configuration)
-	assert.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
-	return app
+	return app, nil
 }
 
 func GetAuthToken(t *testing.T, app *App, id int, email, username string, isAdmin bool) string {
