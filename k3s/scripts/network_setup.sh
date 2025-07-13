@@ -1,5 +1,6 @@
 #!/bin/bash
 
+/scripts/wait_for_interface.sh mycelium
 ip link add name mycelium-br type bridge
 BRIDGE_IP=$(ip -6 addr show dev mycelium | awk '/inet6/ && /scope global/ {print $2}' | cut -d/ -f1 | cut -d: -f1-4 | awk '{print $0 "::1/64"}')
 ip addr add $BRIDGE_IP dev mycelium-br 

@@ -1,0 +1,59 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": "8080"
+  },
+  "database": {
+    "file": "./kubecloud.db"
+  },
+  "token": {
+    "secret": "your-jwt-secret-key-here-make-it-long-and-secure-at-least-32-characters",
+    "access_token_expiry_minutes": 15,
+    "refresh_token_expiry_hours": 24
+  },
+  "admins": [
+    "admin@example.com",
+    "admin2@example.com"
+  ],
+  "mailSender": {
+    "email": "noreply@example.com",
+    "sendgrid_key": "SG.your-sendgrid-api-key-here",
+    "timeout": 30
+  },
+  "currency": "USD",
+  "stripe_secret": "sk_test_your_stripe_secret_key_here",
+  "voucher_name_length": 8,
+  "gridproxy_url": "https://gridproxy.grid.tf",
+  "tfchain_url": "wss://tfchain.grid.tf/ws",
+  "terms_and_conditions": {
+    "document_link": "https://example.com/terms-and-conditions",
+    "document_hash": "sha256:your_document_hash_here"
+  },
+  "activation_service_url": "https://activation.grid.tf",
+  "graphql_url": "https://graphql.grid.tf/graphql",
+  "firesquid_url": "https://squid.grid.tf/graphql",
+  "system_account": {
+    "mnemonics": "your system account 12-word mnemonic phrase goes here for blockchain operations",
+    "network": "dev"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": "",
+    "db": 0
+  },
+  "grid": {
+    "mne": "your grid account 12-word mnemonic phrase for threefold grid deployment operations",
+    "net": "dev"
+  },
+  "deployer_workers_num": 3,
+  "invoice": {
+    "name": "Your Company Name Ltd",
+    "address": "123 Business Street, Business District, City 12345",
+    "governorate": "Your State/Province/Governorate"
+  },
+  "ssh": {
+    "private_key_path": "/home/user/.ssh/id_rsa",
+    "public_key_path": "/home/user/.ssh/id_rsa.pub"
+  }
+}

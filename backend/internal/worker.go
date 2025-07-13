@@ -3,10 +3,12 @@ package internal
 import (
 	"context"
 	"fmt"
+	"kubecloud/kubedeployer"
+	"kubecloud/models"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
 // Worker represents a deployment worker
@@ -14,16 +16,20 @@ type Worker struct {
 	ID         string
 	redis      *RedisClient
 	sseManager *SSEManager
-	gridClient deployer.TFPluginClient
+	sshKey     string
+	db         models.DB
+	gridNet    string // Network name for the grid
 }
 
 // NewWorker creates a new worker instance
-func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, gridClient deployer.TFPluginClient) *Worker {
+func NewWorker(id string, redis *RedisClient, sseManager *SSEManager, sshKey string, db models.DB, gridNet string) *Worker {
 	return &Worker{
 		ID:         id,
 		redis:      redis,
 		sseManager: sseManager,
-		gridClient: gridClient,
+		sshKey:     sshKey,
+		db:         db,
+		gridNet:    gridNet,
 	}
 }
 
@@ -56,23 +62,23 @@ func (w *Worker) listenForTasks(ctx context.Context) {
 }
 
 // processTaskCallback is the callback function for processing tasks
-func (w *Worker) processTaskCallback(task *DeploymentTask) {
+func (w *Worker) processTaskCallback(ctx context.Context, task *DeploymentTask) {
 	log.Info().Str("worker_id", w.ID).Str("task_id", task.TaskID).Msg("Processing task")
 
-	if err := w.processTask(task); err != nil {
+	if err := w.processTask(ctx, task); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Str("worker_id", w.ID).Msg("Task processing failed")
 	}
 }
 
 // processTask processes a single deployment task
-func (w *Worker) processTask(task *DeploymentTask) error {
+func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 	task.Status = TaskStatusProcessing
 	now := time.Now()
 	task.StartedAt = &now
 
-	result := w.performDeployment(task)
+	result := w.performDeployment(ctx, task)
 
-	if err := w.redis.AddResult(context.Background(), result); err != nil {
+	if err := w.redis.AddResult(ctx, result); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to add result to stream")
 	}
 
@@ -91,9 +97,36 @@ func (w *Worker) processTask(task *DeploymentTask) error {
 		w.sseManager.Notify(task.UserID, "deployment_update", notificationData, task.TaskID)
 	}
 
-	if err := w.redis.AckTask(context.Background(), task); err != nil {
+	if err := w.redis.AckTask(ctx, task); err != nil {
 		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to acknowledge task")
 		return err
+	}
+
+	if result.Status == TaskStatusCompleted {
+		cluster := &models.Cluster{
+			UserID:      task.UserID,
+			ProjectName: result.Result.Name,
+		}
+
+		if err := cluster.SetClusterResult(result.Result); err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to serialize cluster result")
+		} else {
+			existingCluster, err := w.db.GetClusterByName(task.UserID, result.Result.Name)
+			if err != nil {
+				if err := w.db.CreateCluster(cluster); err != nil {
+					log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to create cluster in database")
+				} else {
+					log.Info().Str("task_id", task.TaskID).Str("project_name", result.Result.Name).Msg("Cluster saved to database")
+				}
+			} else {
+				existingCluster.Result = cluster.Result
+				if err := w.db.UpdateCluster(&existingCluster); err != nil {
+					log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to update cluster in database")
+				} else {
+					log.Info().Str("task_id", task.TaskID).Str("project_name", result.Result.Name).Msg("Cluster updated in database")
+				}
+			}
+		}
 	}
 
 	log.Info().Str("task_id", task.TaskID).Str("status", string(result.Status)).Msg("Task completed")
@@ -101,25 +134,69 @@ func (w *Worker) processTask(task *DeploymentTask) error {
 }
 
 // performDeployment executes the actual deployment
-func (w *Worker) performDeployment(task *DeploymentTask) *DeploymentResult {
+func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *DeploymentResult {
 	result := &DeploymentResult{
 		TaskID: task.TaskID,
 		UserID: task.UserID,
 	}
 
-	res, err := DeployKubernetesCluster(context.Background(), w.gridClient, *task.Payload.Master, task.Payload.Workers, "", "", task.UserID)
+	userID, err := strconv.Atoi(task.UserID)
 	if err != nil {
-		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
+		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to parse user ID")
 		result.Status = TaskStatusFailed
-		result.Error = "Deployment failed"
-		result.Message = "Failed to deploy cluster"
-		result.CompletedAt = time.Now()
 		return result
 	}
 
-	// log.Info().Str("task_id", task.TaskID).Msg("Starting deployment (simulated)")
-	// time.Sleep(5 * time.Second)
-	// result.Result = workloads.K8sCluster{}
+	user, err := w.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to get user")
+		result.Status = TaskStatusFailed
+		return result
+	}
+
+	var res kubedeployer.Cluster
+	existingCluster, err := w.db.GetClusterByName(task.UserID, task.Payload.Name)
+	if err == nil {
+		log.Info().Str("task_id", task.TaskID).Str("project_name", task.Payload.Name).Msg("Cluster already exists, updating deployment")
+
+		// Get the existing cluster result from the database
+		existingClusterResult, err := existingCluster.GetClusterResult()
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to get existing cluster result from database")
+			result.Status = TaskStatusFailed
+			return result
+		}
+
+		// get the leader IP from the existing cluster
+		leaderIP, err := existingCluster.GetLeaderIP()
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to get leader IP from existing cluster")
+			result.Status = TaskStatusFailed
+			return result
+		}
+
+		// Pass the existing cluster state from database to AddNodesToCluster
+		res, err = kubedeployer.AddNodesToCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey, leaderIP, &existingClusterResult)
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
+			result.Status = TaskStatusFailed
+			result.Error = "Deployment failed"
+			result.Message = "Failed to update cluster"
+			result.CompletedAt = time.Now()
+			return result
+		}
+	} else {
+		log.Info().Str("task_id", task.TaskID).Str("project_name", task.Payload.Name).Msg("Cluster does not exist, creating new deployment")
+		res, err = kubedeployer.DeployCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey)
+		if err != nil {
+			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
+			result.Status = TaskStatusFailed
+			result.Error = "Deployment failed"
+			result.Message = "Failed to deploy cluster"
+			result.CompletedAt = time.Now()
+			return result
+		}
+	}
 
 	result.Result = res
 	result.Status = TaskStatusCompleted
@@ -138,7 +215,7 @@ type WorkerManager struct {
 }
 
 // NewWorkerManager creates a new worker manager
-func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, gridClient deployer.TFPluginClient) *WorkerManager {
+func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount int, sshKey string, db models.DB, gridNet string) *WorkerManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	manager := &WorkerManager{
@@ -148,7 +225,7 @@ func NewWorkerManager(redis *RedisClient, sseManager *SSEManager, workerCount in
 
 	for i := 0; i < workerCount; i++ {
 		workerID := fmt.Sprintf("worker-%d", i+1)
-		worker := NewWorker(workerID, redis, sseManager, gridClient)
+		worker := NewWorker(workerID, redis, sseManager, sshKey, db, gridNet)
 		manager.workers = append(manager.workers, worker)
 	}
 

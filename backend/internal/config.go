@@ -1,19 +1,20 @@
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
+	"strings"
 
 	"github.com/go-playground/validator"
+	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/viper"
 )
 
 // Configuration struct holds all configs for the app
 type Configuration struct {
 	Server               Server             `json:"server" validate:"required,dive"`
 	Database             DB                 `json:"database" validate:"required"`
-	JWT                  JwtToken           `json:"token" validate:"required"`
-	Admins               []string           `json:"admins"`
+	JwtToken             JwtToken           `json:"jwt_token" validate:"required"`
+	Admins               []string           `json:"admins" validate:"required"`
 	MailSender           MailSender         `json:"mailSender"`
 	Currency             string             `json:"currency" validate:"required"`
 	StripeSecret         string             `json:"stripe_secret" validate:"required"`
@@ -26,15 +27,15 @@ type Configuration struct {
 	FiresquidURL         string             `json:"firesquid_url" validate:"required"`
 	SystemAccount        GridAccount        `json:"system_account"`
 	Redis                Redis              `json:"redis" validate:"required,dive"`
-	Grid                 GridConfig         `json:"grid" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
 	Invoice              InvoiceCompanyData `json:"invoice"`
 	WorkflowDBFile       string             `json:"workflow_db_file" validate:"required"`
+	SSH                  SSHConfig          `json:"ssh" validate:"required,dive"`
 }
 
-type GridConfig struct {
-	Mnemonic string `json:"mne" validate:"required"`
-	Network  string `json:"net" validate:"required"`
+type SSHConfig struct {
+	PrivateKeyPath string `json:"private_key_path" validate:"required"`
+	PublicKeyPath  string `json:"public_key_path" validate:"required"`
 }
 
 // Server struct holds server's information
@@ -50,9 +51,9 @@ type DB struct {
 
 // JWT Token struct holds info required for JWT Tokens
 type JwtToken struct {
-	Secret                   string `json:"secret" validate:"required"`
-	AccessTokenExpiryMinutes int    `json:"access_token_expiry_minutes" validate:"required,gt=0"` // in minutes
-	RefreshTokenExpiryHours  int    `json:"refresh_token_expiry_hours" validate:"required,gt=0"`  // in hours
+	Secret              string `json:"secret" validate:"required"`
+	AccessExpiryMinutes int    `json:"access_expiry_minutes" validate:"required,gt=0"` // in minutes
+	RefreshExpiryHours  int    `json:"refresh_expiry_hours" validate:"required,gt=0"`  // in hours
 }
 
 // MailSender struct to hold sender's email, password
@@ -70,8 +71,8 @@ type TermsANDConditions struct {
 
 // GridAccount holds data for system's account
 type GridAccount struct {
-	Mnemonics string `json:"mnemonics" validate:"required"`
-	Network   string `json:"network" validate:"required"`
+	Mnemonic string `json:"mnemonic" validate:"required"`
+	Network  string `json:"network" validate:"required"`
 }
 
 // Redis struct holds Redis connection information
@@ -89,18 +90,29 @@ type InvoiceCompanyData struct {
 	Governorate string `json:"governorate" validate:"required"`
 }
 
-// ReadConfFile read configurations of json file
-func ReadConfFile(path string) (Configuration, error) {
-	config := Configuration{}
-	file, err := os.Open(path)
-	if err != nil {
-		return Configuration{}, fmt.Errorf("failed to open config file: %w", err)
-	}
-	defer file.Close()
+// LoadConfig load configurations
+func LoadConfig() (Configuration, error) {
+	var config Configuration
 
-	dec := json.NewDecoder(file)
-	if err := dec.Decode(&config); err != nil {
-		return Configuration{}, fmt.Errorf("failed to load config: %w", err)
+	// Use mapstructure to ensure JSON tags are respected
+	decoderConfig := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  &config,
+	}
+
+	// convert comma-separated string of admins into a slice
+	adminsRaw := viper.GetString("admins")
+	if adminsRaw != "" {
+		viper.Set("admins", strings.Split(adminsRaw, ","))
+	}
+
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return Configuration{}, fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	if err := decoder.Decode(viper.AllSettings()); err != nil {
+		return Configuration{}, fmt.Errorf("unable to decode into struct, %w", err)
 	}
 
 	validate := validator.New()
