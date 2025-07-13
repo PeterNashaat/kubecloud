@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get -qy update && \
-    apt-get -qy install wget ssh iproute2 ntp && \
+    apt-get -qy install wget ssh iproute2 ntp curl jq && \
     wget --progress=bar:force:noscroll -O /sbin/k3s https://github.com/k3s-io/k3s/releases/download/v1.33.1+k3s1/k3s && \
     chmod +x /sbin/k3s && \
     wget --progress=bar:force:noscroll -O /sbin/kubectl https://dl.k8s.io/release/v1.33.1/bin/linux/amd64/kubectl && \

@@ -138,7 +138,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.workflowEngine.NewWorkflow("reserve-node")
+	wf, err := h.ewfEngine.NewWorkflow("reserve-node")
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -151,7 +151,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		"node_id":  nodeID,
 	}
 
-	h.workflowEngine.RunAsync(c, wf)
+	h.ewfEngine.RunAsync(c, wf)
 
 	Success(c, http.StatusAccepted, "Node reservation in progress. You can check its status using the workflow_id.", gin.H{
 		"workflow_id": wf.UUID,
@@ -255,7 +255,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	}
 	contractID := uint32(contractID64)
 
-	wf, err := h.workflowEngine.NewWorkflow("unreserve-node")
+	wf, err := h.ewfEngine.NewWorkflow("unreserve-node")
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -268,7 +268,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 		"contract_id": contractID,
 	}
 
-	h.workflowEngine.RunAsync(c, wf)
+	h.ewfEngine.RunAsync(c, wf)
 
 	Success(c, http.StatusAccepted, "Node unreservation in progress. You can check its status using the workflow_id.", gin.H{
 		"workflow_id": wf.UUID,

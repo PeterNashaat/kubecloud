@@ -33,7 +33,8 @@ type Handler struct {
 	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
-	workflowEngine  *ewf.Engine
+	ewfEngine       *ewf.Engine
+	gridNet         string // Network name for the grid
 }
 
 // NewHandler create new handler
@@ -41,7 +42,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager, workflowEngine *ewf.Engine,
+	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine, gridNet string,
 ) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
@@ -54,7 +55,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
-		workflowEngine:  workflowEngine,
+		ewfEngine:       ewfEngine,
+		gridNet:         gridNet,
 	}
 }
 
@@ -169,7 +171,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	wf, err := h.workflowEngine.NewWorkflow("user-registration")
+	wf, err := h.ewfEngine.NewWorkflow("user-registration")
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
@@ -182,7 +184,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		"password": request.Password,
 	}
 
-	h.workflowEngine.RunAsync(context.Background(), wf)
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
 	// send notification that user registered
 	// same as balance funding
@@ -238,7 +240,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.workflowEngine.NewWorkflow("user-verification")
+	wf, err := h.ewfEngine.NewWorkflow("user-verification")
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
@@ -251,7 +253,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		"name":  user.Username,
 	}
 
-	h.workflowEngine.RunAsync(context.Background(), wf)
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
 	Success(c, http.StatusCreated, "verification in progress", map[string]interface{}{
 		"workflow_id": wf.UUID,
@@ -568,7 +570,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.workflowEngine.NewWorkflow("charge-balance")
+	wf, err := h.ewfEngine.NewWorkflow("charge-balance")
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -579,10 +581,11 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	wf.State = ewf.State{
 		"user_id":            userID,
 		"stripe_customer_id": user.StripeCustomerID,
-		"amount":             float64(request.Amount),
+		"payment_method_id":  paymentMethod.ID,
+		"amount":             int(request.Amount),
 	}
 
-	h.workflowEngine.RunAsync(context.Background(), wf)
+	h.ewfEngine.RunAsync(c, wf)
 
 	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow_id.", map[string]interface{}{
 		"workflow_id": wf.UUID,
@@ -707,7 +710,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.workflowEngine.NewWorkflow("redeem-voucher")
+	wf, err := h.ewfEngine.NewWorkflow("redeem-voucher")
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -717,7 +720,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		"amount":   voucher.Value,
 		"mnemonic": user.Mnemonic,
 	}
-	h.workflowEngine.RunAsync(context.Background(), wf)
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
 	Success(c, http.StatusOK, "Voucher is redeemed successfully. TFT transfer in progress.", map[string]interface{}{
 		"workflow_id":  wf.UUID,
@@ -874,7 +877,7 @@ func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 		return
 	}
 
-	workflow, err := h.workflowEngine.Store().LoadWorkflow(c, workflowID)
+	workflow, err := h.ewfEngine.Store().LoadWorkflow(c, workflowID)
 	if err != nil {
 		InternalServerError(c)
 		return

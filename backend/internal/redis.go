@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"kubecloud/kubedeployer"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
 const (
@@ -83,7 +83,7 @@ type DeploymentTask struct {
 	CreatedAt   time.Time            `json:"created_at"`
 	StartedAt   *time.Time           `json:"started_at,omitempty"`
 	CompletedAt *time.Time           `json:"completed_at,omitempty"`
-	Payload     workloads.K8sCluster `json:"payload"`
+	Payload     kubedeployer.Cluster `json:"payload"`
 	MessageID   string               `json:"-"`
 }
 
@@ -94,7 +94,7 @@ type DeploymentResult struct {
 	Message     string               `json:"message"`
 	Error       string               `json:"error,omitempty"`
 	CompletedAt time.Time            `json:"completed_at"`
-	Result      workloads.K8sCluster `json:"result,omitempty"`
+	Result      kubedeployer.Cluster `json:"result,omitempty"`
 }
 
 // addToStream adds a message to the specified stream
@@ -165,7 +165,7 @@ func (r *RedisClient) AddResult(ctx context.Context, result *DeploymentResult) e
 }
 
 // SubscribeToTasks subscribes to new tasks
-func (r *RedisClient) SubscribeToTasks(ctx context.Context, consumerName string, callback func(*DeploymentTask)) error {
+func (r *RedisClient) SubscribeToTasks(ctx context.Context, consumerName string, callback func(context.Context, *DeploymentTask)) error {
 	return r.subscribeToStream(ctx, TaskStreamKey, ConsumerGroup, consumerName, func(messageID string, data []byte) {
 		var task DeploymentTask
 		if err := json.Unmarshal(data, &task); err != nil {
@@ -173,7 +173,7 @@ func (r *RedisClient) SubscribeToTasks(ctx context.Context, consumerName string,
 			return
 		}
 		task.MessageID = messageID
-		callback(&task)
+		callback(ctx, &task)
 	})
 }
 
@@ -199,7 +199,7 @@ func (r *RedisClient) AckTask(ctx context.Context, task *DeploymentTask) error {
 }
 
 // HandleUnacknowledgedTasks processes messages that are DELIVERED but not ACKNOWLEDGED
-func (r *RedisClient) HandleUnacknowledgedTasks(ctx context.Context, consumerName string, callback func(*DeploymentTask)) error {
+func (r *RedisClient) HandleUnacknowledgedTasks(ctx context.Context, consumerName string, callback func(context.Context, *DeploymentTask)) error {
 	pendingResult := r.client.XPending(ctx, TaskStreamKey, ConsumerGroup)
 	if pendingResult.Err() != nil {
 		if pendingResult.Err() == redis.Nil {
@@ -243,7 +243,7 @@ func (r *RedisClient) HandleUnacknowledgedTasks(ctx context.Context, consumerNam
 					continue
 				}
 				task.MessageID = message.ID
-				callback(&task)
+				callback(ctx, &task)
 			}
 		}
 	}
