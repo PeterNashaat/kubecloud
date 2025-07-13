@@ -204,7 +204,7 @@ func TestVerifyRegisterCode(t *testing.T) {
 
 		var result map[string]interface{}
 		err = json.Unmarshal(resp.Body.Bytes(), &result)
-
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "wrong code")
 
 	})
@@ -238,7 +238,8 @@ func TestVerifyRegisterCode(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "code has expired")
 
 	})
@@ -276,7 +277,8 @@ func TestLoginUserHandler(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, resp.Code)
 
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Equal(t, "token pair generated", result["message"])
 		assert.NotNil(t, result["data"])
 	})
@@ -310,7 +312,8 @@ func TestLoginUserHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "email or password is incorrect")
 	})
 
@@ -342,7 +345,8 @@ func TestLoginUserHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "email or password is incorrect")
 	})
 }
@@ -378,7 +382,8 @@ func TestRefreshTokenHandler(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, resp.Code)
 
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Equal(t, "access token refreshed successfully", result["message"])
 		assert.NotNil(t, result["data"])
 	})
@@ -411,7 +416,8 @@ func TestRefreshTokenHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "Invalid or expired refresh token")
 	})
 }
@@ -442,7 +448,8 @@ func TestForgotPasswordHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusOK, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Equal(t, "Verification code sent", result["message"])
 		assert.NotNil(t, result["data"])
 	})
@@ -473,7 +480,8 @@ func TestForgotPasswordHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusNotFound, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "failed to get user")
 	})
 
@@ -508,7 +516,8 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusCreated, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Equal(t, "Verification successful", result["message"])
 		assert.NotNil(t, result["data"])
 	})
@@ -552,7 +561,8 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["message"], "Invalid code")
 	})
 
@@ -584,7 +594,8 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "code has expired")
 	})
 
@@ -603,7 +614,8 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "record not found")
 	})
 }
@@ -644,7 +656,8 @@ func TestChangePasswordHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusAccepted, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Equal(t, "password is updated successfully", result["message"])
 	})
 
@@ -878,7 +891,8 @@ func TestGetUserBalanceHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusNotFound, resp.Code)
 		var result map[string]interface{}
-		_ = json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["message"], "User is not found")
 	})
 
