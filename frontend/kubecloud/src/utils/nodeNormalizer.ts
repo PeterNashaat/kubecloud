@@ -22,48 +22,59 @@ export function normalizeNode(node: RawNode): NormalizedNode {
   };
 }
 
-export function getTotalCPU(node: RentedNode): number {
+type ResourceKey = 'cru' | 'sru' | 'mru';
+
+function getResourceValue(node: RentedNode, resourceKey: ResourceKey, used: boolean = false): number {
   if (!node) return 0;
-  if (node.total_resources && typeof node.total_resources.cru === 'number') return node.total_resources.cru;
-  if (node.resources && typeof node.resources.cpu === 'number') return node.resources.cpu;
+  const resources = used ? node.used_resources : node.total_resources;
+  const fallbackResources = used ? null : node.resources;
+  if (resources && typeof resources[resourceKey] === 'number') {
+    if (resourceKey === 'mru' || resourceKey === 'sru') {
+      return Math.round(resources[resourceKey] / (1024 * 1024 * 1024));
+    }
+    return resources[resourceKey];
+  }
+  if (fallbackResources) {
+    if (resourceKey === 'mru' && typeof fallbackResources.memory === 'number') {
+      return fallbackResources.memory;
+    }
+    if (resourceKey === 'sru' && typeof fallbackResources.storage === 'number') {
+      return fallbackResources.storage;
+    }
+    if (resourceKey === 'cru' && typeof fallbackResources.cpu === 'number') {
+      return fallbackResources.cpu;
+    }
+  }
   return 0;
 }
+
+export function getTotalCPU(node: RentedNode): number {
+  return getResourceValue(node, 'cru', false);
+}
 export function getUsedCPU(node: RentedNode): number {
-  if (!node) return 0;
-  if (node.used_resources && typeof node.used_resources.cru === 'number') return node.used_resources.cru;
-  return 0;
+  return getResourceValue(node, 'cru', true);
 }
 export function getAvailableCPU(node: RentedNode): number {
   if (!node) return 0;
   return Math.max(getTotalCPU(node) - getUsedCPU(node), 0);
 }
 export function getTotalRAM(node: RentedNode): number {
-  if (!node) return 0;
-  if (node.total_resources && typeof node.total_resources.mru === 'number') return Math.round(node.total_resources.mru / (1024 * 1024 * 1024));
-  if (node.resources && typeof node.resources.memory === 'number') return node.resources.memory;
-  return 0;
+  return getResourceValue(node, 'mru', false);
 }
 export function getUsedRAM(node: RentedNode): number {
-  if (!node) return 0;
-  if (node.used_resources && typeof node.used_resources.mru === 'number') return Math.round(node.used_resources.mru / (1024 * 1024 * 1024));
-  return 0;
+  return getResourceValue(node, 'mru', true);
 }
 export function getAvailableRAM(node: RentedNode): number {
   if (!node) return 0;
   return Math.max(getTotalRAM(node) - getUsedRAM(node), 0);
 }
 export function getTotalStorage(node: RentedNode): number {
-  if (!node) return 0;
-  if (node.total_resources && typeof node.total_resources.sru === 'number') return Math.round(node.total_resources.sru / (1024 * 1024 * 1024));
-  if (node.resources && typeof node.resources.storage === 'number') return node.resources.storage;
-  return 0;
+  return getResourceValue(node, 'sru', false);
 }
 export function getUsedStorage(node: RentedNode): number {
-  if (!node) return 0;
-  if (node.used_resources && typeof node.used_resources.sru === 'number') return Math.round(node.used_resources.sru / (1024 * 1024 * 1024));
-  return 0;
+  return getResourceValue(node, 'sru', true);
 }
 export function getAvailableStorage(node: RentedNode): number {
   if (!node) return 0;
   return Math.max(getTotalStorage(node) - getUsedStorage(node), 0);
-} 
+}
