@@ -135,7 +135,8 @@ func TestVerifyRegisterCode(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["message"], "Invalid request format")
 
 	})
@@ -168,7 +169,8 @@ func TestVerifyRegisterCode(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
 		assert.Contains(t, result["error"], "user already registered")
 	})
 
@@ -201,7 +203,8 @@ func TestVerifyRegisterCode(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 
 		var result map[string]interface{}
-		json.Unmarshal(resp.Body.Bytes(), &result)
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+
 		assert.Contains(t, result["error"], "wrong code")
 
 	})
