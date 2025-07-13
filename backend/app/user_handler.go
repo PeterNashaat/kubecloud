@@ -42,7 +42,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine, gridNet string
+	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine, gridNet string,
 ) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,

@@ -23,7 +23,7 @@ func RegisterEWFWorkflows(
 	engine.Register("send_welcome_email", SendWelcomeEmailStep(mail, config))
 	engine.Register("create_payment_intent", CreatePaymentIntentStep(config.Currency))
 	engine.Register("update_user_balance", UpdateUserBalanceStep(db))
-	engine.Register("transfer_tfts", TransferTFTsStep(substrate, config.SystemAccount.Mnemonics))
+	engine.Register("transfer_tfts", TransferTFTsStep(substrate, config.SystemAccount.Mnemonic))
 	engine.Register("create_identity", CreateIdentityStep())
 	engine.Register("reserve_node", ReserveNodeStep(db, substrate))
 	engine.Register("unreserve_node", UnreserveNodeStep(db, substrate))
