@@ -605,6 +605,19 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
+	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Msg("error checking system account balance")
+		InternalServerError(c)
+		return
+	}
+
+	if systemBalanceUSD < float64(request.Amount) {
+		log.Error().Msgf("system account balance is not enough to charge user balance, system balance: %f, requested amount: %d", systemBalanceUSD, request.Amount)
+		InternalServerError(c)
+		return
+	}
+
 	paymentMethod, err := internal.CreatePaymentMethod(request.CardType, request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
@@ -628,6 +641,16 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
+	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		if err = internal.CancelPaymentIntent(intent.ID); err != nil {
+			log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
+		}
+		InternalServerError(c)
+		return
+	}
+
 	user.CreditCardBalance += float64(request.Amount)
 
 	err = h.db.UpdateUserByID(&user)
@@ -637,18 +660,10 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
 	Success(c, http.StatusCreated, "Balance is charged successfully", ChargeBalanceResponse{
 		PaymentIntentID: intent.ID,
 		NewBalance:      user.CreditCardBalance,
 	})
-
 }
 
 // @Summary Get user details
