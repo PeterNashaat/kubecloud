@@ -6,17 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"slices"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
-var (
-	usedIPsTracker = make(map[string]map[uint32][]byte)
-	usedIPsMutex   sync.RWMutex
-)
+// Simple IP tracking - just store used IPs during a single deployment session
+var deploymentIPTracker = make(map[string][]byte) // "network:nodeID" -> []usedHostIDs
 
 func getRandomMyceliumNetSeed() (string, error) {
 	key := make([]byte, MYC_NET_SEED_LEN)
@@ -33,25 +29,29 @@ func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, net
 		return "", errors.Wrapf(err, "invalid IP range %s for node %d", ipRange, nodeID)
 	}
 
-	usedHostIDs, err := getUsedHostIDs(ctx, tfPluginClient, nodeID, networkName, ipRangeCIDR)
+	usedHostIDs, err := getUsedHostIDsFromGrid(ctx, tfPluginClient, nodeID, networkName, ipRangeCIDR)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get used IPs for node %d", nodeID)
 	}
 
-	usedIPsMutex.Lock()
-	defer usedIPsMutex.Unlock()
-
-	if usedIPsTracker[networkName] == nil {
-		usedIPsTracker[networkName] = make(map[uint32][]byte)
-	}
-	trackedIPs := usedIPsTracker[networkName][nodeID]
-	usedHostIDs = append(usedHostIDs, trackedIPs...)
+	trackerKey := fmt.Sprintf("%s:%d", networkName, nodeID)
+	sessionUsedIPs := deploymentIPTracker[trackerKey]
+	allUsedIPs := append(usedHostIDs, sessionUsedIPs...)
 
 	for hostID := byte(2); hostID < 255; hostID++ {
-		if !slices.Contains(usedHostIDs, hostID) {
-			usedIPsTracker[networkName][nodeID] = append(usedIPsTracker[networkName][nodeID], hostID)
-			vmIP := ip.To4()
+		used := false
+		for _, usedID := range allUsedIPs {
+			if usedID == hostID {
+				used = true
+				break
+			}
+		}
+		if !used {
+			deploymentIPTracker[trackerKey] = append(deploymentIPTracker[trackerKey], hostID)
+			vmIP := make(net.IP, len(ip.To4()))
+			copy(vmIP, ip.To4())
 			vmIP[3] = hostID
+
 			return vmIP.String(), nil
 		}
 	}
@@ -59,7 +59,7 @@ func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, net
 	return "", fmt.Errorf("all IPs are exhausted for network %s on node %d", networkName, nodeID)
 }
 
-func getUsedHostIDs(ctx context.Context, tfPluginClient deployer.TFPluginClient, nodeID uint32, networkName string, ipRangeCIDR *net.IPNet) ([]byte, error) {
+func getUsedHostIDsFromGrid(ctx context.Context, tfPluginClient deployer.TFPluginClient, nodeID uint32, networkName string, ipRangeCIDR *net.IPNet) ([]byte, error) {
 	nodeClient, err := tfPluginClient.NcPool.GetNodeClient(tfPluginClient.SubstrateConn, nodeID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not get node client for node %d", nodeID)

@@ -16,8 +16,6 @@ const (
 	K3S_DATA_DIR     = "/mydisk"
 	K3S_IFACE        = "mycelium-br"
 	K3S_TOKEN        = "randomely_generated_token"
-
-	PROJECT_PREFIX = "kc_"
 )
 
 // DeploymentNames holds all the name conversions for a deployment
@@ -30,18 +28,21 @@ type DeploymentNames struct {
 
 // NewDeploymentNames creates a new naming context for a deployment
 func NewDeploymentNames(userID, originalClusterName string) DeploymentNames {
-	projectName := PROJECT_PREFIX + userID + "_" + originalClusterName
+	// Kubernetes only allow alphanumeric characters with - and .
+	// Grid only allow alphanumeric characters with _
+	// So we should allow only alphanumeric characters with
+	projectName := "kc" + userID + originalClusterName
 	return DeploymentNames{
 		UserID:              userID,
-		OriginalClusterName: originalClusterName,      // OriginalClusterName is used for logging and debugging
-		ProjectName:         projectName,              // used as a clusterName and as a projectName in the contracts metadata
-		NetworkName:         projectName + "_network", // used as a networkName
+		OriginalClusterName: originalClusterName, // OriginalClusterName is used for logging and debugging
+		ProjectName:         projectName,         // used as a clusterName and as a projectName in the contracts metadata
+		NetworkName:         projectName + "net", // used as a networkName
 	}
 }
 
 // GetNodeName returns the prefixed node name
 func (dn DeploymentNames) GetNodeName(originalNodeName string) string {
-	return dn.ProjectName + "_" + originalNodeName
+	return dn.ProjectName + originalNodeName
 }
 
 func ensureLeaderNode(cluster *Cluster) {
