@@ -758,7 +758,7 @@ func TestChargeBalanceHandler(t *testing.T) {
 			Email:    email,
 			Password: []byte("securepassword"),
 			Verified: true,
-			Mnemonic: "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
+			Mnemonic: "test-menmonic",
 		}
 		err = app.handlers.db.RegisterUser(user)
 		assert.NoError(t, err)
@@ -879,7 +879,7 @@ func TestGetUserBalanceHandler(t *testing.T) {
 
 		email := "balanceuser@example.com"
 		username := "Balance User"
-		mnemonic := "winner giant reward damage expose pulse recipe manual brand volcano dry avoid"
+		mnemonic := app.config.SystemAccount.Mnemonic
 		user := &models.User{
 			ID:       1,
 			Username: username,
