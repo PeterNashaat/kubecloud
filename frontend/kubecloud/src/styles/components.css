@@ -343,33 +343,6 @@
   background: var(--color-info);
 }
 
-/* ===== BADGES ===== */
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.badge.success {
-  background: var(--color-success);
-  color: white;
-}
-
-.badge.warning {
-  background: var(--color-warning);
-  color: white;
-}
-
-.badge.error {
-  background: var(--color-error);
-  color: white;
-}
 
 /* ===== STATS GRID ===== */
 
@@ -511,4 +484,4 @@
 
 .v-card:hover {
   border-color: var(--color-border-light) !important;
-} 
+}
