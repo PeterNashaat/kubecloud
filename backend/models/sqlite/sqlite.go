@@ -119,7 +119,14 @@ func (s *Sqlite) ListAllUsers() ([]models.User, error) {
 
 // DeleteUserByID deletes user by its ID
 func (s *Sqlite) DeleteUserByID(userID int) error {
-	return s.db.Where("id = ?", userID).Delete(&models.User{}).Error
+	result := s.db.Where("id = ?", userID).Delete(&models.User{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // CreateVoucher creates new voucher in system
