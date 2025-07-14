@@ -86,6 +86,36 @@ func TestRegisterHandler(t *testing.T) {
 		assert.Equal(t, http.StatusConflict, resp.Code)
 
 	})
+
+	t.Run("Register Existing Not Verified User", func(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+
+	err = app.handlers.db.RegisterUser(&models.User{
+		ID:       2,
+		Username: "Unverified User",
+		Email:    "unverified@example.com",
+		Password: []byte("securepassword"),
+		Verified: false,
+	})
+	assert.NoError(t, err)
+
+	payload := map[string]interface{}{
+		"name":             "Unverified User",
+		"email":            "unverified@example.com",
+		"password":         "securepassword",
+		"confirm_password": "securepassword",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "/api/v1/user/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusCreated, resp.Code)
+})
 }
 
 func TestVerifyRegisterCode(t *testing.T) {
