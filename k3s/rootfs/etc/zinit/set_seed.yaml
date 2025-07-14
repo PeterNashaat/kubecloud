@@ -1,2 +1,0 @@
-exec: bash -c "echo $NET_SEED > /etc/netseed"
-oneshot: true

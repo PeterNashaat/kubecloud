@@ -14,8 +14,9 @@ if [ -z "${K3S_FLANNEL_IFACE}" ]; then
 fi
 
 if [[ "${DUAL_STACK}" = "true" && "${MASTER}" = "true" ]]; then
-    EXTRA_ARGS="$EXTRA_ARGS --cluster-cidr=10.42.0.0/16,2001:cafe:42::/56"
-    EXTRA_ARGS="$EXTRA_ARGS --service-cidr=10.43.0.0/16,2001:cafe:43::/112"
+    EXTRA_ARGS="$EXTRA_ARGS --cluster-cidr=2001:cafe:42::/56"
+    EXTRA_ARGS="$EXTRA_ARGS --service-cidr=2001:cafe:43::/112"
+    EXTRA_ARGS="$EXTRA_ARGS --flannel-ipv6-masq"
 fi
 
 if [ -z "${K3S_URL}" ]; then
