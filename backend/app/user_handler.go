@@ -131,42 +131,6 @@ type SSHKeyInput struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
-// Update isUserVerifiedViaSponsorship to query tf-kyc-verifier API for sponsorship/verification status
-// Remove DB calls for sponsorships
-func (h *Handler) isUserVerifiedViaSponsorship(userID int) (bool, error) {
-	user, err := h.db.GetUserByID(userID)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get user by ID")
-		return false, err
-	}
-
-	kycClient, err := internal.NewKYCClient(
-		h.config.KYCVerifierAPIURL,
-		h.config.KYCSponsorAddress,
-		h.config.KYCSponsorPhrase,
-		h.config.KYCChallengeDomain,
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to initialize KYC client")
-		return false, err
-	}
-
-	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create sponsee keypair from mnemonic")
-		return false, err
-	}
-
-	// Call KYC verifier API to check verification status
-	verified, err := kycClient.IsUserVerified(user.Username, sponseeKeyPair)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to check user verification status via KYC verifier API")
-		return false, err
-	}
-
-	return verified, nil
-}
-
 // Helper: validate registration input
 func validateRegisterInput(request *RegisterInput) error {
 	if request.Password != request.ConfirmPassword {
