@@ -159,28 +159,6 @@ func createStripeCustomer(name, email string) (string, error) {
 	return customer.ID, nil
 }
 
-// Helper: create KYC sponsorship
-func (h *Handler) createKYCSponsorship(mnemonic string) error {
-	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
-	if err != nil {
-		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
-	}
-	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
-	if err != nil {
-		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
-	}
-	kycClient, err := internal.NewKYCClient(
-		h.config.KYCVerifierAPIURL,
-		h.config.KYCSponsorAddress,
-		h.config.KYCSponsorPhrase,
-		h.config.KYCChallengeDomain,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize KYC client: %w", err)
-	}
-	return kycClient.CreateSponsorship(sponseeAddress, sponseeKeyPair)
-}
-
 // Helper: refresh and update user verification status from KYC verifier
 func (h *Handler) refreshUserVerification(user *models.User) error {
 	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
@@ -193,7 +171,7 @@ func (h *Handler) refreshUserVerification(user *models.User) error {
 	}
 	kycClient, err := internal.NewKYCClient(
 		h.config.KYCVerifierAPIURL,
-		"", // sponsor address not needed for verification
+		"",
 		"", // sponsor phrase not needed for verification
 		h.config.KYCChallengeDomain,
 	)
@@ -210,6 +188,38 @@ func (h *Handler) refreshUserVerification(user *models.User) error {
 	}
 	log.Info().Msgf("[KYC] Refreshed verification for user %s: %v", user.Email, verified)
 	return nil
+}
+
+// Helper: create KYC sponsorship
+func (h *Handler) createKYCSponsorship(mnemonic string) error {
+	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	if err != nil {
+		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
+	}
+	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
+	if err != nil {
+		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
+	}
+
+	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(h.config.KYCSponsorPhrase, "")
+	if err != nil {
+		return fmt.Errorf("failed to create sponsor keypair from phrase: %w", err)
+	}
+	sponsorAddress, err := sponsorKeyPair.SS58Address(42)
+	if err != nil {
+		return fmt.Errorf("failed to get sponsor address from phrase: %w", err)
+	}
+
+	kycClient, err := internal.NewKYCClient(
+		h.config.KYCVerifierAPIURL,
+		sponsorAddress,
+		h.config.KYCSponsorPhrase,
+		h.config.KYCChallengeDomain,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize KYC client: %w", err)
+	}
+	return kycClient.CreateSponsorship(sponseeAddress, sponseeKeyPair)
 }
 
 // Refactored RegisterHandler
