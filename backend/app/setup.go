@@ -70,7 +70,7 @@ func SetUp(t testing.TB) (*App, error) {
   },
   "activation_service_url": "https://activation.dev.grid.tf/activation/activate",
   "system_account": {
-    "mnemonic": "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
+    "mnemonic": "mnemonic",
     "network": "dev"
   },
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
