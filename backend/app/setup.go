@@ -69,10 +69,6 @@ func SetUp(t testing.TB) (*App, error) {
     "document_hash": "6f2b4109704ba2883d978a7b94e5f295"
   },
   "activation_service_url": "https://activation.dev.grid.tf/activation/activate",
-  "system_account": {
-    "mnemonic": "mnemonic",
-    "network": "dev"
-  },
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
   "firesquid_url": "https://firesquid.dev.grid.tf/graphql",
   "redis": {
@@ -80,10 +76,6 @@ func SetUp(t testing.TB) (*App, error) {
     "port": 6379,
     "password": "pass",
     "db": 0
-  },
-  "grid": {
-    "mne": "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
-    "net": "dev"
   },
   "deployer_workers_num": 3,
   "invoice": {
