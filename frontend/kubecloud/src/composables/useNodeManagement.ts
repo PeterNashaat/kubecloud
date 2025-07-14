@@ -109,7 +109,7 @@ export function useNodeManagement() {
     try {
       const response = await userService.listReservedNodes()
       const responseData = response.data as any
-      
+
       if (responseData.data?.nodes) {
         // Map the grid proxy node structure to our frontend structure
         rentedNodes.value = responseData.data.nodes.map((node: any) => ({
@@ -183,6 +183,30 @@ export function useNodeManagement() {
     }
   }
 
+  // Add node to deployment
+  async function addNodeToDeployment(deploymentName: string, nodePayload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
+    try {
+      const response = await userService.addNodeToDeployment(deploymentName, nodePayload)
+      // Optionally refresh data or handle response
+      return response
+    } catch (err: any) {
+      console.error('Failed to add node to deployment:', err)
+      throw err
+    }
+  }
+
+  // Remove node from deployment
+  async function removeNodeFromDeployment(deploymentName: string, nodeName: string) {
+    try {
+      const response = await userService.removeNodeFromDeployment(deploymentName, nodeName)
+      // Optionally refresh data or handle response
+      return response
+    } catch (err: any) {
+      console.error('Failed to remove node from deployment:', err)
+      throw err
+    }
+  }
+
   // Calculate total monthly cost of rented nodes
   const totalMonthlyCost = computed(() => {
     return rentedNodes.value
@@ -191,11 +215,11 @@ export function useNodeManagement() {
   })
 
   // Get nodes by status
-  const healthyNodes = computed(() => 
+  const healthyNodes = computed(() =>
     rentedNodes.value.filter(node => node.healthy)
   )
 
-  const unhealthyNodes = computed(() => 
+  const unhealthyNodes = computed(() =>
     rentedNodes.value.filter(node => !node.healthy)
   )
 
@@ -207,9 +231,11 @@ export function useNodeManagement() {
     fetchRentedNodes,
     reserveNode,
     unreserveNode,
+    addNodeToDeployment,
+    removeNodeFromDeployment,
     totalMonthlyCost,
     healthyNodes,
     unhealthyNodes,
     reserveNodeLoading
   }
-} 
+}

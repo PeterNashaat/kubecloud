@@ -10,21 +10,7 @@
     </div>
 
     <!-- Stats Grid -->
-    <div class="stats-grid">
-      <div
-        v-for="(stat, index) in statsData"
-        :key="index"
-        class="stat-item"
-      >
-        <div class="stat-icon">
-          <v-icon :icon="stat.icon" size="24" color="var(--color-primary)"></v-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-number">{{ stat.value }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
-        </div>
-      </div>
-    </div>
+    <StatsGrid :stats="statsData" />
 
     <!-- Quick Actions -->
     <div class="quick-actions-section">
@@ -67,6 +53,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
+import StatsGrid from '../StatsGrid.vue'
 
 interface Cluster {
   id: number

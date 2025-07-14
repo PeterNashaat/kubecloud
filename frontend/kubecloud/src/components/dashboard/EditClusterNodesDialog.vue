@@ -154,7 +154,7 @@ const editNodesWithStorage = computed(() =>
 );
 function closeDialog() { emit('update:modelValue', false); }
 function removeNode(nodeName: string) {
-  emit('nodes-updated', editNodes.value.filter((n: any) => n.name !== nodeName));
+  emit('remove-node', nodeName);
 }
 // Add node form state
 const addFormNodeId = ref<number|null>(null);
