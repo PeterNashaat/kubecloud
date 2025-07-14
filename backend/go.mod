@@ -20,6 +20,7 @@ require (
 	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250707084605-fd852df30b94
 	github.com/threefoldtech/zosbase v0.1.7
 	github.com/tyler-smith/go-bip39 v1.1.0
+	github.com/vedhavyas/go-subkey v1.0.3
 	gorm.io/gorm v1.30.0
 )
 
@@ -86,7 +87,6 @@ require (
 	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.9-0.20250707084605-fd852df30b94 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/vedhavyas/go-subkey v1.0.3 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

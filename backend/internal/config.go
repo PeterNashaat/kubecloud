@@ -30,6 +30,12 @@ type Configuration struct {
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
 	Invoice              InvoiceCompanyData `json:"invoice"`
 	SSH                  SSHConfig          `json:"ssh" validate:"required,dive"`
+
+	// KYC Verifier config
+	KYCVerifierAPIURL  string `json:"kyc_verifier_api_url" validate:"required,url"`
+	KYCSponsorAddress  string `json:"kyc_sponsor_address" validate:"required"`
+	KYCSponsorPhrase   string `json:"kyc_sponsor_phrase" validate:"required"`
+	KYCChallengeDomain string `json:"kyc_challenge_domain" validate:"required"`
 }
 
 type SSHConfig struct {

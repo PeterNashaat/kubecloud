@@ -17,6 +17,8 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"gorm.io/gorm"
+
+	"github.com/vedhavyas/go-subkey/sr25519"
 )
 
 // Handler struct holds configs for all handlers
@@ -129,36 +131,136 @@ type SSHKeyInput struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
-// @Summary Register a user
-// @Description Registers a new user to the system
-// @Tags users
-// @ID register-user
-// @Accept json
-// @Produce json
-// @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse
-// @Failure 400 {object} APIResponse "Invalid request format"
-// @Failure 409 {object} APIResponse "User already registered"
-// @Failure 500 {object} APIResponse
-// @Router /user/register [post]
-// RegisterHandler registers user to the system
+// Update isUserVerifiedViaSponsorship to query tf-kyc-verifier API for sponsorship/verification status
+// Remove DB calls for sponsorships
+func (h *Handler) isUserVerifiedViaSponsorship(userID int) (bool, error) {
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user by ID")
+		return false, err
+	}
+
+	kycClient, err := internal.NewKYCClient(
+		h.config.KYCVerifierAPIURL,
+		h.config.KYCSponsorAddress,
+		h.config.KYCSponsorPhrase,
+		h.config.KYCChallengeDomain,
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize KYC client")
+		return false, err
+	}
+
+	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create sponsee keypair from mnemonic")
+		return false, err
+	}
+
+	// Call KYC verifier API to check verification status
+	verified, err := kycClient.IsUserVerified(user.Username, sponseeKeyPair)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check user verification status via KYC verifier API")
+		return false, err
+	}
+
+	return verified, nil
+}
+
+// Helper: validate registration input
+func validateRegisterInput(request *RegisterInput) error {
+	if request.Password != request.ConfirmPassword {
+		return fmt.Errorf("password and confirm password don't match")
+	}
+	return nil
+}
+
+// Helper: send verification email
+func (h *Handler) sendVerificationEmail(name, email string, code int) error {
+	subject, body := h.mailService.SignUpMailContent(code, h.config.MailSender.Timeout, name, h.config.Server.Host)
+	return h.mailService.SendMail(h.config.MailSender.Email, email, subject, body)
+}
+
+// Helper: setup TFChain user
+func (h *Handler) setupTFChainUser() (mnemonic string, twinID uint32, err error) {
+	return internal.SetupUserOnTFChain(h.substrateClient, h.config)
+}
+
+// Helper: create Stripe customer
+func createStripeCustomer(name, email string) (string, error) {
+	customer, err := internal.CreateStripeCustomer(name, email)
+	if err != nil {
+		return "", err
+	}
+	return customer.ID, nil
+}
+
+// Helper: create KYC sponsorship
+func (h *Handler) createKYCSponsorship(mnemonic string) error {
+	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	if err != nil {
+		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
+	}
+	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
+	if err != nil {
+		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
+	}
+	kycClient, err := internal.NewKYCClient(
+		h.config.KYCVerifierAPIURL,
+		h.config.KYCSponsorAddress,
+		h.config.KYCSponsorPhrase,
+		h.config.KYCChallengeDomain,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize KYC client: %w", err)
+	}
+	return kycClient.CreateSponsorship(sponseeAddress, sponseeKeyPair)
+}
+
+// Helper: refresh and update user verification status from KYC verifier
+func (h *Handler) refreshUserVerification(user *models.User) error {
+	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
+	if err != nil {
+		return fmt.Errorf("failed to create keypair for verification refresh: %w", err)
+	}
+	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
+	if err != nil {
+		return fmt.Errorf("failed to get SS58 address for verification refresh: %w", err)
+	}
+	kycClient, err := internal.NewKYCClient(
+		h.config.KYCVerifierAPIURL,
+		"", // sponsor address not needed for verification
+		"", // sponsor phrase not needed for verification
+		h.config.KYCChallengeDomain,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to init KYC client for verification refresh: %w", err)
+	}
+	verified, err := kycClient.IsUserVerified(sponseeAddress, sponseeKeyPair)
+	if err != nil {
+		return fmt.Errorf("failed to check verification status: %w", err)
+	}
+	user.Verified = verified
+	if err := h.db.UpdateUserByID(user); err != nil {
+		return fmt.Errorf("failed to update user verification flag: %w", err)
+	}
+	log.Info().Msgf("[KYC] Refreshed verification for user %s: %v", user.Email, verified)
+	return nil
+}
+
+// Refactored RegisterHandler
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
-
-	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
 		return
 	}
-
-	// password and confirm password should match
-	if request.Password != request.ConfirmPassword {
-		Error(c, http.StatusBadRequest, "Validation Error", "password and confirm password don't match")
+	if err := validateRegisterInput(&request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
-	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
 	if getErr != gorm.ErrRecordNotFound {
 		if existingUser.Verified {
@@ -168,16 +270,12 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	}
 
 	code := internal.GenerateRandomCode()
-	subject, body := h.mailService.SignUpMailContent(code, h.config.MailSender.Timeout, request.Name, h.config.Server.Host)
-
-	err := h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
-	if err != nil {
+	if err := h.sendVerificationEmail(request.Name, request.Email, code); err != nil {
 		log.Error().Err(err).Msg("failed to send verification code")
 		InternalServerError(c)
 		return
 	}
 
-	// hash password
 	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
 	if err != nil {
 		log.Error().Err(err).Msg("error hashing password")
@@ -186,7 +284,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	}
 
 	isAdmin := internal.Contains(h.config.Admins, request.Email)
-
 	user := models.User{
 		Username: request.Name,
 		Email:    request.Email,
@@ -199,46 +296,52 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	if getErr != gorm.ErrRecordNotFound {
 		if !user.Verified {
 			user.ID = existingUser.ID
-			err = h.db.UpdateUserByID(&user)
-			if err != nil {
+			if err := h.db.UpdateUserByID(&user); err != nil {
 				log.Error().Err(err).Send()
 				InternalServerError(c)
 				return
 			}
 		}
+		Success(c, http.StatusCreated, "Verification code sent successfully", RegisterResponse{
+			Email:   request.Email,
+			Timeout: fmt.Sprintf("%d seconds", h.config.MailSender.Timeout),
+		})
+		return
 	}
 
-	// create user model in db
-	if getErr != nil {
-		mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to setup user on TFChain")
-			InternalServerError(c)
-			return
-		}
-		customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-
-		user.Mnemonic = mnemonic
-		user.StripeCustomerID = customer.ID
-
-		err = h.db.RegisterUser(&user)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
+	mnemonic, _, err := h.setupTFChainUser()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to setup user on TFChain")
+		InternalServerError(c)
+		return
 	}
-
+	stripeID, err := createStripeCustomer(request.Name, request.Email)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+	user.Mnemonic = mnemonic
+	user.StripeCustomerID = stripeID
+	if err := h.db.RegisterUser(&user); err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+	if err := h.createKYCSponsorship(mnemonic); err != nil {
+		log.Error().Err(err).Msg("failed to create KYC sponsorship")
+		InternalServerError(c)
+		return
+	}
+	// Refresh and cache verification status
+	if err := h.refreshUserVerification(&user); err != nil {
+		log.Error().Err(err).Msg("failed to refresh user verification after registration")
+		// Not fatal for registration, just log
+	}
 	Success(c, http.StatusCreated, "Verification code sent successfully", RegisterResponse{
 		Email:   request.Email,
 		Timeout: fmt.Sprintf("%d seconds", h.config.MailSender.Timeout),
 	})
-
 }
 
 // @Summary Verify registration code
@@ -348,6 +451,12 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	if !match {
 		Error(c, http.StatusUnauthorized, "login failed", "email or password is incorrect")
 		return
+	}
+
+	// refresh verification status on login
+	if err := h.refreshUserVerification(&user); err != nil {
+		log.Error().Err(err).Msg("failed to refresh user verification on login")
+		// Not fatal for login, just log
 	}
 
 	// create token pairs
