@@ -59,8 +59,8 @@ func RegisterEWFWorkflows(
 	engine.RegisterTemplate("charge-balance", &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
 			{Name: "create_payment_intent", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "update_user_balance", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 			{Name: "transfer_tfts", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "update_user_balance", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 

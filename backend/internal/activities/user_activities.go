@@ -6,6 +6,7 @@ import (
 	"kubecloud/internal"
 	"kubecloud/models"
 
+	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/xmonader/ewf"
 	"gorm.io/gorm"
@@ -275,6 +276,51 @@ func CreatePaymentIntentStep(currency string) ewf.StepFn {
 	}
 }
 
+func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		amountVal, ok := state["amount"]
+		if !ok {
+			return fmt.Errorf("missing 'amount' in state")
+		}
+		var amount float64
+		switch v := amountVal.(type) {
+		case float64:
+			amount = v
+		case int:
+			amount = float64(v)
+		default:
+			return fmt.Errorf("'amount' in state is not a float64 or int")
+		}
+
+		mnemonicVal, ok := state["mnemonic"]
+		if !ok {
+			return fmt.Errorf("missing 'mnemonic' in state")
+		}
+		mnemonic, ok := mnemonicVal.(string)
+		if !ok {
+			return fmt.Errorf("'mnemonic' in state is not a string")
+		}
+
+		paymentIntentVal, ok := state["payment_intent_id"]
+		if !ok {
+			return fmt.Errorf("missing 'payment intent id' in state")
+		}
+		paymentIntentID, ok := paymentIntentVal.(string)
+		if !ok {
+			return fmt.Errorf("'payment intent id' is not a string")
+		}
+		err := internal.TransferTFTs(substrate, uint64(amount), mnemonic, systemMnemonic)
+		if err != nil {
+			log.Error().Err(err).Send()
+			if err = internal.CancelPaymentIntent(paymentIntentID); err != nil {
+				log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
+			}
+			return err
+		}
+		return nil
+	}
+}
+
 func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		userIDVal, ok := state["user_id"]
@@ -310,38 +356,6 @@ func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
 		}
 		state["new_balance"] = user.CreditCardBalance
 		state["mnemonic"] = user.Mnemonic
-		return nil
-	}
-}
-
-func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf.StepFn {
-	return func(ctx context.Context, state ewf.State) error {
-		amountVal, ok := state["amount"]
-		if !ok {
-			return fmt.Errorf("missing 'amount' in state")
-		}
-		var amount float64
-		switch v := amountVal.(type) {
-		case float64:
-			amount = v
-		case int:
-			amount = float64(v)
-		default:
-			return fmt.Errorf("'amount' in state is not a float64 or int")
-		}
-
-		mnemonicVal, ok := state["mnemonic"]
-		if !ok {
-			return fmt.Errorf("missing 'mnemonic' in state")
-		}
-		mnemonic, ok := mnemonicVal.(string)
-		if !ok {
-			return fmt.Errorf("'mnemonic' in state is not a string")
-		}
-		err := internal.TransferTFTs(substrate, uint64(amount), mnemonic, systemMnemonic)
-		if err != nil {
-			return fmt.Errorf("error transferring TFTs: %w", err)
-		}
 		return nil
 	}
 }
