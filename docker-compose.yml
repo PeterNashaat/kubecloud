@@ -13,10 +13,12 @@ services:
       - "8080:8080"
     depends_on:
       - redis-db
+    working_dir: /opt/project      
     volumes:
-       - ./backend/config.json:/app/configs.json
-       - /root/.ssh:/root/.ssh:ro
-    command: ["/kubecloud", "--config", "/app/configs.json"]
+      - ./backend/kubecloud.db:/app/kubecloud.db
+      - ./backend/config.json:/app/config.json
+      - /root/.ssh:/root/.ssh:ro
+    command: ["/kubecloud", "--config", "/app/config.json"]
 
   frontend:
     environment:

@@ -50,3 +50,11 @@ func CreatePaymentIntent(customerID, paymentMethodID, currency string, amount ui
 
 	return result, err
 }
+
+func CancelPaymentIntent(paymentIntentID string) error {
+	_, err := paymentintent.Cancel(paymentIntentID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to cancel payment intent: %w", err)
+	}
+	return nil
+}
