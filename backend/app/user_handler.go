@@ -554,6 +554,19 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
+	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Msg("error checking system account balance")
+		InternalServerError(c)
+		return
+	}
+
+	if systemBalanceUSD < float64(request.Amount) {
+		log.Error().Msgf("system account balance is not enough to charge user balance, system balance: %f, requested amount: %d", systemBalanceUSD, request.Amount)
+		InternalServerError(c)
+		return
+	}
+
 	paymentMethod, err := internal.CreatePaymentMethod(request.CardType, request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
@@ -575,7 +588,6 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
-
 	}
 
 	wf.State = ewf.State{

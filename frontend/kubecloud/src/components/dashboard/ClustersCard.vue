@@ -13,65 +13,58 @@
       </v-btn>
     </div>
     <div class="card-content">
-      <!-- Recent Clusters -->
-      <div class="recent-clusters">
-        <h3 class="section-title">Recent Clusters</h3>
-        <div v-if="recentClusters.length === 0" class="empty-state restyled-empty-state">
-          <v-icon icon="mdi-server-off" size="56" color="primary" class="mb-3"></v-icon>
-          <div class="empty-title">No clusters found</div>
-          <div class="empty-desc">Deploy your first cluster to get started!</div>
-        </div>
-        <div v-else class="cluster-list">
-          <div
-            v-for="cluster in recentClusters"
-            :key="cluster.id"
-            class="list-item-interactive"
-            @click="viewCluster(cluster.project_name)"
-          >
-            <div class="cluster-info">
-              <div class="cluster-name">{{ cluster.project_name }}</div>
-              <div class="cluster-details">
-                <span class="cluster-region">{{ cluster.cluster.region }}</span>
-                <span>•</span>
-                <span>{{ Array.isArray(cluster.cluster.nodes) ? cluster.cluster.nodes.length : (typeof cluster.cluster.nodes === 'number' ? cluster.cluster.nodes : 0) }} nodes</span>
-              </div>
-            </div>
-            <div class="cluster-status" :class="(cluster.cluster.status || '').toLowerCase()">
-              <span class="status-dot" :class="(cluster.cluster.status || '').toLowerCase()"></span>
-              {{ cluster.cluster.status }}
-            </div>
-            <div class="cluster-actions">
-              <v-btn
-                variant="outlined"
-                size="small"
-                class="btn btn-outline btn-sm"
-                @click.stop="viewCluster(cluster.project_name)"
-              >
-                <v-icon icon="mdi-eye" size="16"></v-icon>
-              </v-btn>
-              <v-btn
-                variant="outlined"
-                size="small"
-                class="btn btn-outline btn-sm"
-                @click.stop="openDeleteModal(cluster.project_name)"
-              >
-                <v-icon icon="mdi-delete" size="16"></v-icon>
-              </v-btn>
-            </div>
-          </div>
-        </div>
+      <div class="clusters-list-toolbar">
+        <v-text-field
+          v-model="search"
+          label="Search by name"
+          prepend-inner-icon="mdi-magnify"
+          clearable
+          class="search-bar"
+        />
+        <v-select
+          v-model="sortBy"
+          :items="sortOptions"
+          label="Sort by"
+          class="filter-select"
+        />
       </div>
-
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <v-btn
-          variant="outlined"
-          class="btn btn-outline"
-          @click="viewAllClusters"
-        >
-          View All Clusters
-        </v-btn>
+      <v-divider class="mb-4" />
+      <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
+      <v-progress-linear v-if="isLoading" indeterminate color="primary" class="mb-4" />
+      <div v-if="filteredClusters.length === 0 && !isLoading" class="empty-message">
+        <v-icon icon="mdi-cloud-off-outline" size="48" class="mb-2" color="grey" />
+        <div>No clusters found.</div>
       </div>
+      <v-table v-else class="clusters-table">
+        <thead>
+          <tr>
+            <th @click="setSort('name')" :class="sortBy === 'name' ? 'active-sort' : ''">Name <v-icon v-if="sortBy === 'name'" size="14">mdi-arrow-up-down</v-icon></th>
+            <th @click="setSort('nodes')" :class="sortBy === 'nodes' ? 'active-sort' : ''">Nodes <v-icon v-if="sortBy === 'nodes'" size="14">mdi-arrow-up-down</v-icon></th>
+            <th @click="setSort('createdAt')" :class="sortBy === 'createdAt' ? 'active-sort' : ''">Created <v-icon v-if="sortBy === 'createdAt'" size="14">mdi-arrow-up-down</v-icon></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="cluster in paginatedClusters" :key="cluster.id">
+            <td class="cluster-name-cell">
+              <span class="cluster-name">{{ cluster.project_name }}</span>
+            </td>
+            <td>{{ Array.isArray(cluster.cluster.nodes) ? cluster.cluster.nodes.length : (typeof cluster.cluster.nodes === 'number' ? cluster.cluster.nodes : 0) }}</td>
+            <td>{{ formatDate(cluster.created_at) }}</td>
+            <td>
+              <v-btn icon size="small" class="mr-1" @click="viewCluster(cluster.project_name)"><v-icon icon="mdi-eye-outline" /></v-btn>
+              <v-btn icon size="small" class="ml-1" color="error" @click="deleteCluster(cluster.project_name)"><v-icon icon="mdi-delete-outline" /></v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+      <v-pagination
+        v-model="page"
+        :length="pageCount"
+        circle
+        total-visible="7"
+        class="mt-4"
+      />
     </div>
     <v-dialog v-model="showDeleteModal" max-width="400">
       <v-card>
@@ -88,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 
@@ -99,31 +92,65 @@ const showDeleteModal = ref(false)
 const deleting = ref(false)
 const clusterToDelete = ref<string | null>(null)
 
+const search = ref('')
+const sortBy = ref('createdAt')
+const page = ref(1)
+const pageSize = 5
+
+const sortOptions = [
+  { value: 'name', title: 'Name' },
+  { value: 'createdAt', title: 'Created' },
+  { value: 'nodes', title: 'Nodes' },
+]
+
+const error = computed(() => clusterStore.error)
+const isLoading = computed(() => clusterStore.isLoading)
+
+function setSort(field: string) {
+  sortBy.value = field
+}
+
 onMounted(() => {
   clusterStore.fetchClusters()
 })
 
-const recentClusters = computed(() => {
-  // Show up to 3 most recently created clusters
-  return [...clusterStore.clusters].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 3)
+const filteredClusters = computed(() => {
+  let clusters = [...clusterStore.clusters]
+  if (search.value) {
+    clusters = clusters.filter(c => c.project_name.toLowerCase().includes(search.value.toLowerCase()))
+  }
+  // Sorting
+  clusters.sort((a, b) => {
+    if (sortBy.value === 'name') return a.project_name.localeCompare(b.project_name)
+    if (sortBy.value === 'createdAt') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (sortBy.value === 'nodes') {
+      const aNodes = Array.isArray(a.cluster.nodes) ? a.cluster.nodes.length : (typeof a.cluster.nodes === 'number' ? a.cluster.nodes : 0)
+      const bNodes = Array.isArray(b.cluster.nodes) ? b.cluster.nodes.length : (typeof b.cluster.nodes === 'number' ? b.cluster.nodes : 0)
+      return bNodes - aNodes
+    }
+    return 0
+  })
+  return clusters
 })
 
+const pageCount = computed(() => Math.ceil(filteredClusters.value.length / pageSize))
+
+const paginatedClusters = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return filteredClusters.value.slice(start, start + pageSize)
+})
 
 const viewCluster = (projectName: string) => {
   router.push(`/clusters/${projectName}`)
 }
 
-function openDeleteModal(projectName: string) {
+function deleteCluster(projectName: string) {
   clusterToDelete.value = projectName
   showDeleteModal.value = true
 }
 
 const goToDeployCluster = () => {
   router.push('/deploy')
-}
-
-const viewAllClusters = () => {
-  router.push('/dashboard/clusters')
 }
 
 async function confirmDelete() {
@@ -135,153 +162,60 @@ async function confirmDelete() {
   deleting.value = false
   clusterToDelete.value = null
 }
+
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
 </script>
 
 <style scoped>
-.restyled-empty-state {
+.clusters-list-toolbar {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem 0 2rem 0;
-  color: var(--color-text-muted);
-}
-.empty-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: var(--color-text);
-}
-.empty-desc {
-  font-size: 1.05rem;
-  color: var(--color-text-muted);
+  gap: 1rem;
   margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
-.recent-clusters {
-  margin-top: var(--space-4);
+.search-bar {
+  min-width: 220px;
+  flex: 1 1 220px;
 }
-
-.section-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin: 0 0 var(--space-4) 0;
+.filter-select {
+  min-width: 160px;
 }
-
-.cluster-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.clusters-table {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface-1, #18192b);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
-
-.list-item-interactive {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-3) 1rem;
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
 }
-
-.cluster-info {
-  flex: 1;
-  min-width: 0;
+th {
+  background: var(--color-surface-2, #23243a);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
 }
-
-.cluster-name {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  font-size: var(--font-size-base);
+th.active-sort {
+  color: var(--color-primary, #6366f1);
 }
-
-.cluster-details {
-  display: flex;
-  gap: var(--space-4);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+tr {
+  border-bottom: 1px solid var(--color-surface-2, #23243a);
 }
-
-.cluster-region {
-  color: var(--color-primary);
+tr:last-child {
+  border-bottom: none;
 }
-
-.cluster-status {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: var(--space-4);
+.cluster-name-cell {
+  font-weight: 600;
+  color: var(--color-primary, #6366f1);
 }
-
-.cluster-status.running {
-  background: var(--color-success-subtle);
-  color: var(--color-success);
-  border: 1px solid var(--color-success);
-}
-
-.cluster-status.stopped {
-  background: var(--color-error-subtle);
-  color: var(--color-error);
-  border: 1px solid var(--color-error);
-}
-
-.cluster-actions {
-  margin-left: var(--space-4);
-  display: flex;
-  gap: var(--space-2);
-}
-
-.quick-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-4);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .card-content {
-    gap: var(--space-6);
-  }
-
-  .cluster-list {
-    gap: var(--space-2);
-  }
-
-  .cluster-details {
-    font-size: var(--font-size-xs);
-  }
-
-  .cluster-status {
-    font-size: var(--font-size-xs);
-  }
-
-  .cluster-actions {
-    gap: var(--space-1);
-  }
-}
-
-@media (max-width: 480px) {
-  .cluster-list {
-    gap: var(--space-2);
-  }
-
-  .cluster-name {
-    font-size: var(--font-size-sm);
-  }
-
-  .cluster-details {
-    font-size: var(--font-size-xs);
-  }
-
-  .cluster-status {
-    font-size: var(--font-size-xs);
-  }
-
-  .cluster-actions {
-    gap: var(--space-1);
-  }
+.empty-message {
+  text-align: center;
+  color: var(--color-text-muted, #7c7fa5);
+  margin-top: 3rem;
 }
 </style>
