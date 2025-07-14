@@ -62,21 +62,31 @@ func (c *Client) CreateCluster(ctx context.Context, cluster Cluster) (Cluster, e
 	return cluster, nil
 }
 
-func (c *Client) AddClusterNode(ctx context.Context, cluster Cluster, leaderIP string, existingCluster *Cluster) (Cluster, error) {
-	deploymentNames := NewDeploymentNames(c.userID, cluster.Name)
-	cluster.Name = deploymentNames.ProjectName
-	cluster.NetworkWorkload = existingCluster.NetworkWorkload
+func (c *Client) AddClusterNode(ctx context.Context, newCluster Cluster, existingCluster *Cluster) (Cluster, error) {
+	// get leader ip from existing cluster
+	ensureLeaderNode(existingCluster)
+	leaderIP := ""
+	for _, node := range existingCluster.Nodes {
+		if node.Type == NodeTypeLeader {
+			leaderIP = node.IP
+			break
+		}
+	}
 
-	if err := deployNetwork(ctx, c.gridClient, cluster, deploymentNames); err != nil {
+	deploymentNames := NewDeploymentNames(c.userID, newCluster.Name)
+	newCluster.Name = deploymentNames.ProjectName
+	newCluster.Network = existingCluster.Network
+
+	if err := deployNetwork(ctx, c.gridClient, newCluster, deploymentNames); err != nil {
 		return Cluster{}, err
 	}
 
-	if err := deployNodes(ctx, c.gridClient, cluster, deploymentNames, c.masterPubKey, leaderIP); err != nil {
-		c.rollbackAddClusterNode(ctx, cluster, deploymentNames)
+	if err := deployNodes(ctx, c.gridClient, newCluster, deploymentNames, c.masterPubKey, leaderIP); err != nil {
+		c.rollbackAddClusterNode(ctx, newCluster, deploymentNames)
 		return Cluster{}, err
 	}
 
-	newNodesCluster, err := loadNewClusterState(ctx, c.gridClient, cluster, deploymentNames)
+	newNodesCluster, err := loadNewClusterState(ctx, c.gridClient, newCluster, deploymentNames)
 	if err != nil {
 		return Cluster{}, err
 	}
@@ -101,6 +111,8 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 	var nodeToRemove *Node
 	var nodeIndex int
 	for i, node := range cluster.Nodes {
+		fmt.Println("full node name:", fullNodeName)
+		fmt.Println("Found node to remove:", node.Name)
 		if node.Name == fullNodeName {
 			nodeToRemove = &node
 			nodeIndex = i
@@ -116,16 +128,13 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 		return fmt.Errorf("cannot remove leader nodes")
 	}
 
-	if len(cluster.Nodes) <= 1 {
-		return fmt.Errorf("cannot remove the last remaining node")
-	}
-
 	var contractsToCancel []uint64
 	if nodeToRemove.ContractID != 0 {
 		contractsToCancel = append(contractsToCancel, nodeToRemove.ContractID)
 	}
 
-	networkWorkload := cluster.NetworkWorkload
+	networkWorkload := cluster.Network
+	// is the network still used by other nodes?
 	if networkContractID, exists := networkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists && networkContractID != 0 {
 		networkStillInUse := false
 		for _, otherNode := range cluster.Nodes {
@@ -144,17 +153,19 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 	}
 
 	if len(contractsToCancel) > 0 {
+		log.Info().Msgf("Removing node %s with contracts: %v", nodeToRemove.Name, contractsToCancel)
 		if err := c.gridClient.BatchCancelContract(contractsToCancel); err != nil {
 			return fmt.Errorf("failed to cancel node and/or network contracts: %v", err)
 		}
 	}
 
+	// Update cluster state
 	updatedNodes := make([]Node, 0, len(cluster.Nodes)-1)
 	updatedNodes = append(updatedNodes, cluster.Nodes[:nodeIndex]...)
 	updatedNodes = append(updatedNodes, cluster.Nodes[nodeIndex+1:]...)
 	cluster.Nodes = updatedNodes
 
-	if networkContractID, exists := cluster.NetworkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists {
+	if networkContractID, exists := cluster.Network.NodeDeploymentID[nodeToRemove.NodeID]; exists {
 		networkWasCanceled := false
 		for _, contractID := range contractsToCancel {
 			if contractID == networkContractID {
@@ -163,27 +174,27 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 			}
 		}
 
-		delete(cluster.NetworkWorkload.NodeDeploymentID, nodeToRemove.NodeID)
+		delete(cluster.Network.NodeDeploymentID, nodeToRemove.NodeID)
 
 		var updatedNetworkNodes []uint32
-		for _, nodeID := range cluster.NetworkWorkload.Nodes {
+		for _, nodeID := range cluster.Network.Nodes {
 			if nodeID != nodeToRemove.NodeID {
 				updatedNetworkNodes = append(updatedNetworkNodes, nodeID)
 			}
 		}
-		cluster.NetworkWorkload.Nodes = updatedNetworkNodes
+		cluster.Network.Nodes = updatedNetworkNodes
 
-		if cluster.NetworkWorkload.NodesIPRange != nil {
-			delete(cluster.NetworkWorkload.NodesIPRange, nodeToRemove.NodeID)
+		if cluster.Network.NodesIPRange != nil {
+			delete(cluster.Network.NodesIPRange, nodeToRemove.NodeID)
 		}
-		if cluster.NetworkWorkload.MyceliumKeys != nil {
-			delete(cluster.NetworkWorkload.MyceliumKeys, nodeToRemove.NodeID)
+		if cluster.Network.MyceliumKeys != nil {
+			delete(cluster.Network.MyceliumKeys, nodeToRemove.NodeID)
 		}
-		if cluster.NetworkWorkload.Keys != nil {
-			delete(cluster.NetworkWorkload.Keys, nodeToRemove.NodeID)
+		if cluster.Network.Keys != nil {
+			delete(cluster.Network.Keys, nodeToRemove.NodeID)
 		}
-		if cluster.NetworkWorkload.WGPort != nil {
-			delete(cluster.NetworkWorkload.WGPort, nodeToRemove.NodeID)
+		if cluster.Network.WGPort != nil {
+			delete(cluster.Network.WGPort, nodeToRemove.NodeID)
 		}
 
 		if networkWasCanceled {

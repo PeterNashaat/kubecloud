@@ -12,7 +12,7 @@ import (
 )
 
 // Simple IP tracking - just store used IPs during a single deployment session
-var deploymentIPTracker = make(map[string][]byte) // "network:nodeID" -> []usedHostIDs
+var deploymentIPTracker = make(map[string][]byte) // "network:nodeID" -> []usedHostIDs (third octet of IP)
 
 func getRandomMyceliumNetSeed() (string, error) {
 	key := make([]byte, MYC_NET_SEED_LEN)
@@ -38,6 +38,7 @@ func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, net
 	sessionUsedIPs := deploymentIPTracker[trackerKey]
 	allUsedIPs := append(usedHostIDs, sessionUsedIPs...)
 
+	// skip 0, 1, and 255 as they are reserved
 	for hostID := byte(2); hostID < 255; hostID++ {
 		used := false
 		for _, usedID := range allUsedIPs {

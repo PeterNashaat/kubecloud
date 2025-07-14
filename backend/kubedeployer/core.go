@@ -11,6 +11,7 @@ import (
 )
 
 func deployNetwork(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster, deploymentNames DeploymentNames) error {
+	// one network for deployments on the same node
 	seen := make(map[uint32]bool)
 	nodeIDs := make([]uint32, 0, len(cluster.Nodes))
 	for _, node := range cluster.Nodes {
@@ -23,9 +24,9 @@ func deployNetwork(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 	var net workloads.ZNet
 	var err error
 
-	if len(cluster.NetworkWorkload.NodeDeploymentID) > 0 {
-		log.Info().Msgf("Using existing network workload for network: %s", deploymentNames.NetworkName)
-		net = cluster.NetworkWorkload
+	if len(cluster.Network.NodeDeploymentID) > 0 {
+		log.Info().Msgf("updating network workload for network: %s", deploymentNames.NetworkName)
+		net = cluster.Network
 
 		for _, nodeID := range nodeIDs {
 			found := false
@@ -71,6 +72,7 @@ func deployNetwork(ctx context.Context, tfplugin deployer.TFPluginClient, cluste
 }
 
 func deployNodes(ctx context.Context, tfplugin deployer.TFPluginClient, cluster Cluster, deploymentNames DeploymentNames, sshKey, leaderIP string) error {
+	// assign IPs to nodes early to avoid conflicts later
 	nodeIPs := make(map[string]string)
 	for _, node := range cluster.Nodes {
 		ip, err := getIpForVm(ctx, tfplugin, deploymentNames.NetworkName, node.NodeID)
@@ -130,13 +132,6 @@ func loadNewClusterState(ctx context.Context, tfplugin deployer.TFPluginClient, 
 		}
 
 		seed := cluster.Nodes[idx].EnvVars["NET_SEED"]
-		if seed == "" {
-			seed = result.Vms[0].EnvVars["NET_SEED"]
-		}
-		if seed == "" {
-			return Cluster{}, fmt.Errorf("NET_SEED env var is missing for node %s", node.Name)
-		}
-
 		inspections, err := resource.InspectMycelium([]byte(seed))
 		if err != nil {
 			return Cluster{}, fmt.Errorf("failed to inspect mycelium for node %s: %v", node.Name, err)
@@ -153,6 +148,6 @@ func loadNewClusterState(ctx context.Context, tfplugin deployer.TFPluginClient, 
 		return Cluster{}, fmt.Errorf("failed to load complete network workload from grid: %v", err)
 	}
 
-	cluster.NetworkWorkload = netWorkload
+	cluster.Network = netWorkload
 	return cluster, nil
 }

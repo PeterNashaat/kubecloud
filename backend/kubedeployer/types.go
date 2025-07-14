@@ -18,7 +18,7 @@ type Cluster struct {
 	Nodes []Node `json:"nodes"`
 
 	// Computed
-	NetworkWorkload workloads.ZNet `json:"network_workload"`
+	Network workloads.ZNet `json:"network,omitempty"`
 }
 
 type Node struct {

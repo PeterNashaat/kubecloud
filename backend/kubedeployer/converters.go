@@ -81,16 +81,16 @@ func mergeClusterStates(existingCluster, newNodesCluster Cluster) Cluster {
 		}
 	}
 
-	networkWorkload := newNodesCluster.NetworkWorkload
+	networkWorkload := newNodesCluster.Network
 	if len(networkWorkload.NodeDeploymentID) == 0 {
-		networkWorkload = existingCluster.NetworkWorkload
+		networkWorkload = existingCluster.Network
 	}
 
 	return Cluster{
-		Name:            existingCluster.Name,
-		Token:           existingCluster.Token,
-		Nodes:           mergedNodes,
-		NetworkWorkload: networkWorkload,
+		Name:    existingCluster.Name,
+		Token:   existingCluster.Token,
+		Nodes:   mergedNodes,
+		Network: networkWorkload,
 	}
 }
 
@@ -99,8 +99,6 @@ func createWorkloadsFromNode(node Node, deploymentNames DeploymentNames, network
 	if err != nil {
 		return workloads.VM{}, workloads.Disk{}, err
 	}
-
-	// Use prefixed node name for internal workload name
 	workloadName := deploymentNames.GetNodeName(node.Name)
 
 	disk := workloads.Disk{

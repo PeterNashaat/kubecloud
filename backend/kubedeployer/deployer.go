@@ -56,7 +56,7 @@ func AddNodesToCluster(ctx context.Context, gridNet, mnemonic string, cluster Cl
 	// Set the internal names for the cluster
 	cluster.Name = deploymentNames.ProjectName
 
-	cluster.NetworkWorkload = existingCluster.NetworkWorkload
+	cluster.Network = existingCluster.Network
 
 	if err := deployNetwork(ctx, tfplugin, cluster, deploymentNames); err != nil {
 		return Cluster{}, err
