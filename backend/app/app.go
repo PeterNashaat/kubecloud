@@ -237,15 +237,13 @@ func (app *App) StartBackgroundWorkers() {
 
 // Run starts the server
 func (app *App) Run() error {
-	addr := fmt.Sprintf("%s:%s", app.config.Server.Host, app.config.Server.Port)
-
 	app.StartBackgroundWorkers()
 	app.httpServer = &http.Server{
-		Addr:    addr,
+		Addr:    fmt.Sprintf(":%s", app.config.Server.Port),
 		Handler: app.router,
 	}
 
-	log.Info().Msgf("Starting server at http://%s", addr)
+	log.Info().Msgf("Starting server at %s:%s", app.config.Server.Host, app.config.Server.Port)
 
 	if err := app.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Error().Err(err).Msg("Failed to start server")
