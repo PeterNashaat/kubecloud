@@ -31,6 +31,11 @@ func SetUp(t testing.TB) (*App, error) {
 		return nil, err
 	}
 
+	mnemonic := os.Getenv("TEST_MNEMONIC")
+	if mnemonic == "" {
+		return nil, fmt.Errorf("TEST_MNEMONIC environment variable must be set for tests")
+	}
+
 	t.Cleanup(func() {
 		os.Remove(privateKeyPath)
 		os.Remove(publicKeyPath)
@@ -69,6 +74,10 @@ func SetUp(t testing.TB) (*App, error) {
     "document_hash": "6f2b4109704ba2883d978a7b94e5f295"
   },
   "activation_service_url": "https://activation.dev.grid.tf/activation/activate",
+  "system_account": {
+    "mnemonic": "%s",
+    "network": "dev"
+  },
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
   "firesquid_url": "https://firesquid.dev.grid.tf/graphql",
   "redis": {
@@ -76,6 +85,10 @@ func SetUp(t testing.TB) (*App, error) {
     "port": 6379,
     "password": "pass",
     "db": 0
+  },
+  "grid": {
+    "mne": "%s",
+    "net": "dev"
   },
   "deployer_workers_num": 3,
   "invoice": {
@@ -89,7 +102,7 @@ func SetUp(t testing.TB) (*App, error) {
     "public_key_path": "%s"
   }
 }
-`, dbPath, workflowPath, privateKeyPath, publicKeyPath)
+`, dbPath, mnemonic, mnemonic, workflowPath, privateKeyPath, publicKeyPath)
 
 	err = os.WriteFile(configPath, []byte(config), 0644)
 	if err != nil {
