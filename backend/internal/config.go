@@ -33,7 +33,6 @@ type Configuration struct {
 
 	// KYC Verifier config
 	KYCVerifierAPIURL  string `json:"kyc_verifier_api_url" validate:"required,url"`
-	KYCSponsorPhrase   string `json:"kyc_sponsor_phrase" validate:"required"`
 	KYCChallengeDomain string `json:"kyc_challenge_domain" validate:"required"`
 }
 

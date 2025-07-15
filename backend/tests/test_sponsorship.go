@@ -123,7 +123,6 @@ func (c *KYCClient) CreateSponsorship(sponseeAddress string, sponseeKeyPair subk
 // Config struct for config.json
 type Config struct {
 	KYCVerifierAPIURL  string `json:"kyc_verifier_api_url"`
-	KYCSponsorPhrase   string `json:"kyc_sponsor_phrase"`
 	KYCChallengeDomain string `json:"kyc_challenge_domain"`
 }
 
@@ -149,7 +148,7 @@ func main() {
 	log.Printf("[INFO] Loaded config: API URL=%s, ChallengeDomain=%s", cfg.KYCVerifierAPIURL, cfg.KYCChallengeDomain)
 
 	// Sponsor
-	sponsorPhrase := cfg.KYCSponsorPhrase
+	sponsorPhrase := "your test sponsor 12-word mnemonic phrase here" // Replace with actual test mnemonic or load from env/config
 	log.Printf("[INFO] Sponsor phrase: %s", sponsorPhrase)
 	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(sponsorPhrase, "")
 	if err != nil {

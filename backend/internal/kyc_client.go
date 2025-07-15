@@ -24,9 +24,13 @@ type KYCClient struct {
 
 // NewKYCClient creates a new KYCClient instance
 func NewKYCClient(apiURL, sponsorAddress, sponsorPhrase, challengeDomain string) (*KYCClient, error) {
-	kr, err := sr25519.Scheme{}.FromPhrase(sponsorPhrase, "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sponsor keypair: %w", err)
+	var kr subkey.KeyPair
+	var err error
+	if sponsorPhrase != "" {
+		kr, err = sr25519.Scheme{}.FromPhrase(sponsorPhrase, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sponsor keypair: %w", err)
+		}
 	}
 	return &KYCClient{
 		APIURL:          apiURL,

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -169,24 +170,35 @@ func (h *Handler) refreshUserVerification(user *models.User) error {
 	if err != nil {
 		return fmt.Errorf("failed to get SS58 address for verification refresh: %w", err)
 	}
-	kycClient, err := internal.NewKYCClient(
-		h.config.KYCVerifierAPIURL,
-		"",
-		"", // sponsor phrase not needed for verification
-		h.config.KYCChallengeDomain,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to init KYC client for verification refresh: %w", err)
-	}
-	verified, err := kycClient.IsUserVerified(sponseeAddress, sponseeKeyPair)
+
+	url := fmt.Sprintf("%s/api/v1/status?client_id=%s", h.config.KYCVerifierAPIURL, sponseeAddress)
+	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to check verification status: %w", err)
 	}
-	user.Verified = verified
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		user.Verified = false
+		h.db.UpdateUserByID(user)
+		return fmt.Errorf("KYC verifier returned status: %s", resp.Status)
+	}
+
+	var result struct {
+		Result struct {
+			Status string `json:"status"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to decode KYC verifier response: %w", err)
+	}
+
+	user.KYCVerified = (result.Result.Status == "VERIFIED")
+	user.Verified = user.KYCVerified && user.EmailVerified // keep in sync for now
 	if err := h.db.UpdateUserByID(user); err != nil {
 		return fmt.Errorf("failed to update user verification flag: %w", err)
 	}
-	log.Info().Msgf("[KYC] Refreshed verification for user %s: %v", user.Email, verified)
+	log.Info().Msgf("[KYC] Refreshed verification for user %s: %v", user.Email, user.Verified)
 	return nil
 }
 
@@ -201,7 +213,8 @@ func (h *Handler) createKYCSponsorship(mnemonic string) error {
 		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
 	}
 
-	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(h.config.KYCSponsorPhrase, "")
+	sponsorPhrase := h.config.SystemAccount.Mnemonic // Use system account mnemonic as sponsor
+	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(sponsorPhrase, "")
 	if err != nil {
 		return fmt.Errorf("failed to create sponsor keypair from phrase: %w", err)
 	}
@@ -213,7 +226,7 @@ func (h *Handler) createKYCSponsorship(mnemonic string) error {
 	kycClient, err := internal.NewKYCClient(
 		h.config.KYCVerifierAPIURL,
 		sponsorAddress,
-		h.config.KYCSponsorPhrase,
+		sponsorPhrase,
 		h.config.KYCChallengeDomain,
 	)
 	if err != nil {
@@ -297,6 +310,17 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	}
 	user.Mnemonic = mnemonic
 	user.StripeCustomerID = stripeID
+	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "failed to create keypair for SS58 address", err.Error())
+		return
+	}
+	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
+	if err != nil {
+		Error(c, http.StatusInternalServerError, "failed to get SS58 address", err.Error())
+		return
+	}
+	user.Address = sponseeAddress
 	if err := h.db.RegisterUser(&user); err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -371,6 +395,14 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 
 	}
 
+	user.EmailVerified = true
+	user.Verified = user.KYCVerified && user.EmailVerified // keep in sync for now
+	if err := h.db.UpdateUserByID(&user); err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
 	subject, body := h.mailService.WelcomeMailContent(user.Username, h.config.Server.Host)
 	err = h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
 	if err != nil {
@@ -431,6 +463,15 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	if err := h.refreshUserVerification(&user); err != nil {
 		log.Error().Err(err).Msg("failed to refresh user verification on login")
 		// Not fatal for login, just log
+	}
+
+	if !user.KYCVerified {
+		Error(c, http.StatusForbidden, "KYC not completed", "Please complete KYC verification.")
+		return
+	}
+	if !user.EmailVerified {
+		Error(c, http.StatusForbidden, "Email not verified", "Please verify your email address.")
+		return
 	}
 
 	// create token pairs

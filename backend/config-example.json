@@ -53,6 +53,5 @@
     "public_key_path": "/home/user/.ssh/id_rsa.pub"
   },
   "kyc_verifier_api_url": "kyc-url",
-  "kyc_challenge_domain": "kyc-domain",
-  "kyc_sponsor_phrase": "your system account 12-word mnemonic phrase"
+  "kyc_challenge_domain": "kyc-domain"
 }
