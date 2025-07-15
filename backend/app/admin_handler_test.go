@@ -54,26 +54,24 @@ func TestListUsersHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusOK, resp.Code)
 
-		var result map[string]interface{}
-		err := json.Unmarshal(resp.Body.Bytes(), &result)
+		type UsersResponse struct {
+			Message string `json:"message"`
+			Data    struct {
+				Users []models.User `json:"users"`
+			} `json:"data"`
+		}
+
+		var usersResp UsersResponse
+		err := json.Unmarshal(resp.Body.Bytes(), &usersResp)
 		assert.NoError(t, err)
-		assert.Equal(t, "Users are retrieved successfully", result["message"])
-		assert.NotNil(t, result["data"])
-		usersData, ok := result["data"].(map[string]interface{})
-		assert.True(t, ok)
-		users, ok := usersData["users"].([]interface{})
-		assert.True(t, ok)
+		assert.Equal(t, "Users are retrieved successfully", usersResp.Message)
+		users := usersResp.Data.Users
 		var foundAdmin, foundUser bool
-		for _, u := range users {
-			userMap, ok := u.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			email := userMap["email"].(string)
-			if email == adminUser.Email {
+		for _, user := range users {
+			if user.Email == adminUser.Email {
 				foundAdmin = true
 			}
-			if email == normalUser.Email {
+			if user.Email == normalUser.Email {
 				foundUser = true
 			}
 		}
@@ -344,26 +342,25 @@ func TestListVouchersHandler(t *testing.T) {
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusOK, resp.Code)
-		var result map[string]interface{}
-		err := json.Unmarshal(resp.Body.Bytes(), &result)
+
+		type VouchersResponse struct {
+			Message string `json:"message"`
+			Data    struct {
+				Vouchers []models.Voucher `json:"vouchers"`
+			} `json:"data"`
+		}
+
+		var vouchersResp VouchersResponse
+		err := json.Unmarshal(resp.Body.Bytes(), &vouchersResp)
 		assert.NoError(t, err)
-		assert.Equal(t, "Vouchers are Retrieved successfully", result["message"])
-		assert.NotNil(t, result["data"])
-		data, ok := result["data"].(map[string]interface{})
-		assert.True(t, ok)
-		vouchers, ok := data["vouchers"].([]interface{})
-		assert.True(t, ok)
+		assert.Equal(t, "Vouchers are Retrieved successfully", vouchersResp.Message)
+		vouchers := vouchersResp.Data.Vouchers
 		var found1, found2 bool
 		for _, v := range vouchers {
-			voucherMap, ok := v.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			code := voucherMap["code"].(string)
-			if code == voucher1.Code {
+			if v.Code == voucher1.Code {
 				found1 = true
 			}
-			if code == voucher2.Code {
+			if v.Code == voucher2.Code {
 				found2 = true
 			}
 		}
