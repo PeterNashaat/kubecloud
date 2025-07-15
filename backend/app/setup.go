@@ -3,14 +3,17 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/models"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func SetUp(t testing.TB) (*App, error) {
@@ -132,4 +135,20 @@ func GetAuthToken(t *testing.T, app *App, id int, email, username string, isAdmi
 	tokenPair, err := app.handlers.tokenManager.CreateTokenPair(id, username, isAdmin)
 	assert.NoError(t, err)
 	return tokenPair.AccessToken
+}
+
+// Helper to create a test user
+func CreateTestUser(t *testing.T, app *App, email, username string, hashedPassword []byte, verified, admin bool, code int, updatedAt time.Time) *models.User {
+	user := &models.User{
+		Username:  username,
+		Email:     email,
+		Password:  hashedPassword,
+		Verified:  verified,
+		Admin:     admin,
+		Code:      code,
+		UpdatedAt: updatedAt,
+	}
+	err := app.handlers.db.RegisterUser(user)
+	require.NoError(t, err)
+	return user
 }
