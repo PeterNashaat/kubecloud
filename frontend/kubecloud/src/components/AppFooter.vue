@@ -15,7 +15,6 @@
       </div>
       <nav class="footer-links">
         <router-link to="/docs" class="footer-link">Docs</router-link>
-        <router-link to="/pricing" class="footer-link">Pricing</router-link>
         <a href="https://github.com/neverhack/kubecloud" target="_blank" rel="noopener" class="footer-link">GitHub</a>
         <router-link to="/privacy" class="footer-link">Privacy</router-link>
       </nav>
