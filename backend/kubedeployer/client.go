@@ -13,13 +13,14 @@ type Client struct {
 	gridNet      string
 	mnemonic     string
 	masterPubKey string
-	userID       string
+	UserID       string
 }
 
 func NewClient(mnemonic, gridNet, masterPubKey, userID string) (*Client, error) {
 	tfplugin, err := deployer.NewTFPluginClient(
 		mnemonic,
 		deployer.WithNetwork(gridNet),
+		// TODO: for testing
 		deployer.WithLogs(),
 	)
 	if err != nil {
@@ -31,7 +32,7 @@ func NewClient(mnemonic, gridNet, masterPubKey, userID string) (*Client, error) 
 		gridNet:      gridNet,
 		mnemonic:     mnemonic,
 		masterPubKey: masterPubKey,
-		userID:       userID,
+		UserID:       userID,
 	}, nil
 }
 
@@ -40,7 +41,7 @@ func (c *Client) Close() {
 }
 
 func (c *Client) CreateCluster(ctx context.Context, cluster Cluster) (Cluster, error) {
-	deploymentNames := NewDeploymentNames(c.userID, cluster.Name)
+	deploymentNames := NewDeploymentNames(c.UserID, cluster.Name)
 	cluster.Name = deploymentNames.ProjectName
 
 	if err := deployNetwork(ctx, c.gridClient, cluster, deploymentNames); err != nil {
@@ -73,7 +74,7 @@ func (c *Client) AddClusterNode(ctx context.Context, newCluster Cluster, existin
 		}
 	}
 
-	deploymentNames := NewDeploymentNames(c.userID, newCluster.Name)
+	deploymentNames := NewDeploymentNames(c.UserID, newCluster.Name)
 	newCluster.Name = deploymentNames.ProjectName
 	newCluster.Network = existingCluster.Network
 
@@ -95,7 +96,7 @@ func (c *Client) AddClusterNode(ctx context.Context, newCluster Cluster, existin
 }
 
 func (c *Client) DeleteCluster(ctx context.Context, clusterName string) error {
-	deploymentNames := NewDeploymentNames(c.userID, clusterName)
+	deploymentNames := NewDeploymentNames(c.UserID, clusterName)
 
 	if err := c.gridClient.CancelByProjectName(deploymentNames.ProjectName); err != nil {
 		return fmt.Errorf("failed to cancel deployment contracts by project name: %v", err)
@@ -105,7 +106,7 @@ func (c *Client) DeleteCluster(ctx context.Context, clusterName string) error {
 }
 
 func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeName string) error {
-	deploymentNames := NewDeploymentNames(c.userID, cluster.Name)
+	deploymentNames := NewDeploymentNames(c.UserID, cluster.Name)
 	fullNodeName := deploymentNames.GetNodeName(nodeName)
 
 	var nodeToRemove *Node
