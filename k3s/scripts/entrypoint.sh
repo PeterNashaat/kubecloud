@@ -7,15 +7,15 @@ if [ ! -z "${K3S_DATA_DIR}" ]; then
 fi
 
 if [ -z "${K3S_FLANNEL_IFACE}" ]; then
-    K3S_FLANNEL_IFACE=mycelium-br
+    K3S_FLANNEL_IFACE=flannel-br
     if [ -z "${DUAL_STACK}" ]; then
     K3S_FLANNEL_IFACE=eth0
     fi
 fi
 
 if [[ "${DUAL_STACK}" = "true" && "${MASTER}" = "true" ]]; then
-    EXTRA_ARGS="$EXTRA_ARGS --cluster-cidr=2001:cafe:42::/56"
-    EXTRA_ARGS="$EXTRA_ARGS --service-cidr=2001:cafe:43::/112"
+    EXTRA_ARGS="$EXTRA_ARGS --cluster-cidr=10.42.0.0/16,2001:cafe:42::/56"
+    EXTRA_ARGS="$EXTRA_ARGS --service-cidr=10.43.0.0/16,2001:cafe:43::/112"
     EXTRA_ARGS="$EXTRA_ARGS --flannel-ipv6-masq"
 fi
 
