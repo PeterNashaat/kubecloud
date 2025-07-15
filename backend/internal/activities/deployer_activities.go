@@ -9,6 +9,13 @@ import (
 	"github.com/xmonader/ewf"
 )
 
+type ClientConfig struct {
+	SSHPublicKey string `json:"ssh_public_key"`
+	Mnemonic     string `json:"mnemonic"`
+	UserID       string `json:"user_id"`
+	Network      string `json:"network"`
+}
+
 func ensureClient(ctx context.Context, state ewf.State) (*kubedeployer.Client, error) {
 	client, ok := state["kubeclient"].(*kubedeployer.Client)
 	if ok {
@@ -17,31 +24,18 @@ func ensureClient(ctx context.Context, state ewf.State) (*kubedeployer.Client, e
 	}
 
 	// create client again if not found in state
-	mnemonic, ok := state["mnemonic"].(string)
+	config, ok := state["config"].(ClientConfig)
 	if !ok {
-		log.Error().Msg("Missing 'mnemonic' in state")
-		return nil, fmt.Errorf("missing 'mnemonic' in state")
+		log.Error().Msg("Missing or invalid 'config' in state")
+		return nil, fmt.Errorf("missing or invalid 'config' in state")
 	}
 
-	gridNet, ok := state["grid_net"].(string)
-	if !ok {
-		log.Error().Msg("Missing 'grid_net' in state")
-		return nil, fmt.Errorf("missing 'grid_net' in state")
+	if config.SSHPublicKey == "" || config.Mnemonic == "" || config.UserID == "" || config.Network == "" {
+		log.Error().Msg("Incomplete client configuration in state")
+		return nil, fmt.Errorf("incomplete client configuration in state")
 	}
 
-	masterPubKey, ok := state["master_pub_key"].(string)
-	if !ok {
-		log.Error().Msg("Missing 'master_pub_key' in state")
-		return nil, fmt.Errorf("missing 'master_pub_key' in state")
-	}
-
-	userID, ok := state["user_id"].(string)
-	if !ok {
-		log.Error().Msg("Missing 'user_id' in state")
-		return nil, fmt.Errorf("missing 'user_id' in state")
-	}
-
-	kubeClient, err := kubedeployer.NewClient(mnemonic, gridNet, masterPubKey, userID)
+	kubeClient, err := kubedeployer.NewClient(ctx, config.Mnemonic, config.Network, config.SSHPublicKey, config.UserID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create kubedeployer client")
 		return nil, fmt.Errorf("failed to create kubedeployer client: %w", err)
@@ -163,7 +157,11 @@ func CancelDeploymentStep() ewf.StepFn {
 			return fmt.Errorf("missing or invalid 'project_name' in state")
 		}
 
-		kubeClient.CancelCluster(ctx, projectName)
+		if err := kubeClient.CancelCluster(ctx, projectName); err != nil {
+			log.Error().Err(err).Str("project_name", projectName).Msg("Failed to cancel deployment")
+			return fmt.Errorf("failed to cancel deployment: %w", err)
+		}
+
 		log.Info().Str("project_name", projectName).Msg("Deployment canceled successfully")
 		return nil
 	}
@@ -187,11 +185,6 @@ func AddDeploymentNodeStep() ewf.StepFn {
 		if !ok {
 			log.Error().Msg("Missing or invalid 'existing_cluster' in state")
 			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
-		}
-
-		if err := addedCluster.PrepareCluster(kubeClient.UserID); err != nil {
-			log.Error().Err(err).Str("cluster_name", addedCluster.Name).Msg("Failed to prepare added cluster")
-			return fmt.Errorf("failed to prepare added cluster: %w", err)
 		}
 
 		if err := kubeClient.AssignNodeIPs(ctx, &addedCluster); err != nil {
@@ -249,12 +242,12 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 	engine.Register("setup_client", SetClientStep())
 	engine.Register("deploy_network", DeployNetworkStep())
 	engine.Register("deploy_nodes", DeployNodesStep())
+	engine.Register("remove_cluster", CancelDeploymentStep())
+	engine.Register("add_node", AddDeploymentNodeStep())
+	engine.Register("remove_node", RemoveDeploymentNodeStep())
 
 	engine.Register("store_deployment", StoreDeploymentStep())
 	engine.Register("notify_user", NotifyUserStep())
-	engine.Register("cancel_deployment", CancelDeploymentStep())
-	engine.Register("add_deployment_node", AddDeploymentNodeStep())
-	engine.Register("remove_deployment_node", RemoveDeploymentNodeStep())
 
 	engine.RegisterTemplate("deploy_cluster", &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
@@ -264,22 +257,23 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 		},
 	})
 
-	engine.RegisterTemplate("cancel_deployment", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate("remove_cluster", &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "cancel_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "remove_cluster", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
-	engine.RegisterTemplate("add_deployment_node", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate("add_node", &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "add_deployment_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "deploy_network", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
+			{Name: "add_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
-	engine.RegisterTemplate("remove_deployment_node", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate("remove_node", &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "remove_deployment_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "remove_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 }

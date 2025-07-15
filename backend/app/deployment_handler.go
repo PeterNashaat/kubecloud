@@ -2,7 +2,7 @@ package app
 
 import (
 	"fmt"
-	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/kubedeployer"
 	"net"
 	"net/http"
@@ -12,113 +12,19 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
+	"github.com/xmonader/ewf"
 	"golang.org/x/crypto/ssh"
 )
 
-const (
-	KUBECLOUD_KEY = "kubecloud/"
-)
-
-// DeployResponse represents the response structure for deployment requests
-type DeployResponse struct {
+// Response represents the response structure for deployment requests
+type Response struct {
 	TaskID    string    `json:"task_id"`
 	Status    string    `json:"status"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// HandleAsyncDeploy handles asynchronous Kubernetes cluster deployment requests.
-//
-// This endpoint accepts a JSON payload containing cluster configuration and queues
-// a deployment task for processing. The deployment is handled asynchronously via
-// Redis task queue and workers.
-//
-// Request: POST /deployments
-// Content-Type: application/json
-// Body: kubedeployer.Cluster JSON structure containing:
-//   - name: cluster name (becomes project name)
-//   - network: optional network configuration
-//   - token: optional k3s token
-//   - nodes: array of node configurations with CPU, memory, storage specs
-//
-// Response: 202 Accepted with deployment task information
-//
-//	{
-//	  "task_id": "uuid-string",
-//	  "status": "pending",
-//	  "message": "Deployment task queued successfully",
-//	  "created_at": "2025-01-01T12:00:00Z"
-//	}
-//
-// Authentication: Requires valid user JWT token
-// Authorization: User can only deploy to their own account
-func (h *Handler) HandleAsyncDeploy(c *gin.Context) {
-	var cluster kubedeployer.Cluster
-	if err := c.ShouldBindJSON(&cluster); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
-		return
-	}
-	// TODO: add an early validation
-
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	id := fmt.Sprintf("%v", userID)
-	taskID := uuid.New().String()
-	task := &internal.DeploymentTask{
-		TaskID:    taskID,
-		UserID:    id,
-		Status:    internal.TaskStatusPending,
-		CreatedAt: time.Now(),
-		Payload:   cluster,
-	}
-
-	if err := h.redis.AddTask(c.Request.Context(), task); err != nil {
-		log.Error().Err(err).Str("task_id", taskID).Msg("Failed to add task to Task queue")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue deployment task"})
-		return
-	}
-
-	response := DeployResponse{
-		TaskID:    taskID,
-		Status:    string(internal.TaskStatusPending),
-		Message:   "Deployment task queued successfully",
-		CreatedAt: task.CreatedAt,
-	}
-
-	c.JSON(http.StatusAccepted, response)
-}
-
-// HandleListDeployments retrieves all Kubernetes cluster deployments for the authenticated user.
-//
-// This endpoint returns a paginated list of all deployments associated with the current user,
-// including deployment metadata and cluster configuration details.
-//
-// Request: GET /deployments
-// Authentication: Requires valid user JWT token
-//
-// Response: 200 OK with deployment list
-//
-//	{
-//	  "deployments": [
-//	    {
-//	      "id": 123,
-//	      "project_name": "my-cluster",
-//	      "cluster": { /* kubedeployer.Cluster object */ },
-//	      "created_at": "2025-01-01T12:00:00Z",
-//	      "updated_at": "2025-01-01T12:00:00Z"
-//	    }
-//	  ],
-//	  "count": 1
-//	}
-//
-// Authorization: Returns only deployments owned by the authenticated user
 func (h *Handler) HandleListDeployments(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -157,43 +63,6 @@ func (h *Handler) HandleListDeployments(c *gin.Context) {
 	})
 }
 
-// HandleGetDeployment retrieves detailed information for a specific deployment by name.
-//
-// This endpoint returns comprehensive details about a single Kubernetes cluster deployment,
-// including the full cluster configuration and node specifications.
-//
-// Request: GET /deployments/{name}
-// Path Parameters:
-//   - name: The project name of the deployment to retrieve
-//
-// Response: 200 OK with deployment details
-//
-//	{
-//	  "id": 123,
-//	  "project_name": "my-cluster",
-//	  "cluster": {
-//	    "name": "my-cluster",
-//	    "nodes": [
-//	      {
-//	        "name": "leader",
-//	        "type": "leader",
-//	        "node_id": 1,
-//	        "cpu": 2,
-//	        "memory": 4096,
-//	        "ip": "10.20.0.1",
-//	        "mycelium_ip": "400:1234::1",
-//	        "planetary_ip": "302:9e63::1"
-//	      }
-//	    ]
-//	  },
-//	  "created_at": "2025-01-01T12:00:00Z",
-//	  "updated_at": "2025-01-01T12:00:00Z"
-//	}
-//
-// Authentication: Requires valid user JWT token
-// Authorization: User can only access their own deployments
-// Errors:
-//   - 404 Not Found: Deployment doesn't exist or doesn't belong to user
 func (h *Handler) HandleGetDeployment(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -233,35 +102,6 @@ func (h *Handler) HandleGetDeployment(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// HandleGetKubeconfig retrieves the kubectl configuration file for a deployed cluster.
-//
-// This endpoint connects via SSH to the leader/master node of the specified cluster
-// and downloads the kubeconfig file. The configuration is post-processed to use
-// external IP addresses for connectivity from outside the cluster network.
-//
-// Request: GET /deployments/{name}/kubeconfig
-// Path Parameters:
-//   - name: The project name of the deployment
-//
-// Response: 200 OK with kubeconfig YAML file
-// Content-Type: application/x-yaml
-// Content-Disposition: attachment; filename="{name}-kubeconfig.yaml"
-//
-// The response body contains a standard kubectl configuration file that can be
-// used to connect to the cluster from external clients.
-//
-// Authentication: Requires valid user JWT token
-// Authorization: User can only access kubeconfig for their own deployments
-//
-// Technical Details:
-// - Attempts SSH connection to leader node first, falls back to master nodes
-// - Tries multiple kubeconfig retrieval commands for compatibility
-// - Uses mycelium IP first, falls back to planetary IP
-// - Includes retry logic for transient network issues
-//
-// Errors:
-//   - 404 Not Found: Deployment doesn't exist or doesn't belong to user
-//   - 500 Internal Server Error: SSH connection failed or kubeconfig not found
 func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -290,7 +130,6 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 		return
 	}
 
-	// Find the leader or master node
 	var targetNode *kubedeployer.Node
 	for _, node := range clusterResult.Nodes {
 		if node.Type == kubedeployer.NodeTypeLeader {
@@ -327,33 +166,9 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 		return
 	}
 
-	// c.Header("Content-Type", "application/x-yaml")
-	// c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-kubeconfig.yaml\"", projectName))
-	// c.String(http.StatusOK, kubeconfig)
 	c.JSON(http.StatusOK, gin.H{"kubeconfig": kubeconfig})
 }
 
-// getKubeconfigViaSSH connects to a cluster node via SSH and retrieves the kubeconfig file.
-//
-// This method attempts to connect to the specified node using both mycelium and planetary
-// IP addresses, trying multiple commands to locate and retrieve the kubeconfig file.
-// It includes retry logic and fallback mechanisms for robustness.
-//
-// The retrieved kubeconfig is automatically processed to replace local/internal IP addresses
-// with the external IP address used for the SSH connection, ensuring external connectivity.
-//
-// Parameters:
-//   - privateKey: SSH private key in PEM format for authentication
-//   - node: Target node containing IP addresses and metadata
-//
-// Returns:
-//   - string: Post-processed kubeconfig YAML content with external IP addresses
-//   - error: Connection or retrieval error
-//
-// The method tries the following kubeconfig locations in order:
-// 1. kubectl config view --minify --raw (if kubectl is available)
-// 2. /etc/rancher/k3s/k3s.yaml (standard k3s location)
-// 3. ~/.kube/config (standard kubectl location)
 func (h *Handler) getKubeconfigViaSSH(privateKey string, node *kubedeployer.Node) (string, error) {
 	ips := []string{}
 	if node.MyceliumIP != "" {
@@ -406,26 +221,6 @@ func (h *Handler) getKubeconfigViaSSH(privateKey string, node *kubedeployer.Node
 	return "", fmt.Errorf("failed to retrieve kubeconfig from any IP address: %v", lastErr)
 }
 
-// executeSSHCommand establishes an SSH connection and executes a single command.
-//
-// This method handles SSH connection establishment with retry logic for transient
-// network issues. It uses the provided private key for authentication and connects
-// as the root user with a reasonable timeout.
-//
-// Parameters:
-//   - privateKey: SSH private key in PEM format
-//   - address: Target IP address (IPv4 or IPv6)
-//   - command: Shell command to execute on the remote host
-//
-// Returns:
-//   - string: Combined stdout and stderr output from the command
-//   - error: Connection or execution error
-//
-// Connection details:
-// - Uses root user for authentication
-// - 15-second connection timeout
-// - Up to 3 connection retry attempts
-// - Insecure host key verification (for lab environments)
 func (h *Handler) executeSSHCommand(privateKey, address, command string) (string, error) {
 	key, err := ssh.ParsePrivateKey([]byte(privateKey))
 	if err != nil {
@@ -512,139 +307,41 @@ func (h *Handler) processKubeconfig(kubeconfigYAML, externalIP string) (string, 
 	return updatedConfig, nil
 }
 
-// HandleDeleteDeployment cancels all ThreeFold Grid contracts and removes a deployment.
-//
-// This endpoint performs a complete cleanup of a Kubernetes cluster deployment by:
-// 1. Canceling all associated ThreeFold Grid contracts (compute, storage, network)
-// 2. Removing the deployment record from the database
-//
-// The operation is atomic - if contract cancellation fails, the database record
-// is preserved to allow retry attempts.
-//
-// Request: DELETE /deployments/{name}
-// Path Parameters:
-//   - name: The project name of the deployment to delete
-//
-// Response: 200 OK on successful deletion
-//
-//	{
-//	  "message": "deployment deleted successfully",
-//	  "name": "cluster-name"
-//	}
-//
-// Authentication: Requires valid user JWT token
-// Authorization: User can only delete their own deployments
-//
-// Technical Details:
-// - Uses grid client's CancelByProjectName to cancel all related contracts
-// - Project names are prefixed with "kubecloud/" for contract identification
-// - Cancellation includes all node contracts, network contracts, and storage
-// - Database cleanup only occurs after successful contract cancellation
-//
-// Errors:
-//   - 404 Not Found: Deployment doesn't exist or doesn't belong to user
-//   - 500 Internal Server Error: Contract cancellation or database operation failed
-//
-// Note: This operation cannot be undone. All cluster data and configurations
-// will be permanently destroyed.
-func (h *Handler) HandleDeleteDeployment(c *gin.Context) {
-	deploymentName := c.Param("name")
-	if deploymentName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment name is required"})
-		return
-	}
-
+func (h *Handler) getClientConfig(c *gin.Context) (activities.ClientConfig, error) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
+		return activities.ClientConfig{}, fmt.Errorf("user_id not found in context")
 	}
-
 	userIDStr := fmt.Sprintf("%v", userID)
-	log.Debug().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Starting deployment deletion")
 
-	cluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
+	sshPublicKeyBytes, err := os.ReadFile(h.config.SSH.PublicKeyPath)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
-		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
-		return
+		return activities.ClientConfig{}, fmt.Errorf("failed to read SSH public key: %v", err)
 	}
+	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	cl, err := cluster.GetClusterResult()
-	if err != nil {
-		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
-		return
-	}
-
-	// get user client
 	userIDInt, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to parse user ID")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user ID"})
-		return
+		return activities.ClientConfig{}, fmt.Errorf("failed to parse user ID: %v", err)
 	}
+
 	user, err := h.db.GetUserByID(userIDInt)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to get user")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
-		return
+		return activities.ClientConfig{}, fmt.Errorf("failed to get user: %v", err)
 	}
 
-	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.SystemAccount.Network))
-	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to create grid client")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create grid client"})
-		return
-	}
-
-	if err := gridClient.CancelByProjectName(cl.Name); err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to cancel deployment contracts by project name")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel deployment contracts"})
-		return
-	}
-
-	if err := h.db.DeleteCluster(userIDStr, deploymentName); err != nil {
-		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to delete deployment from database")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove deployment from database"})
-		return
-	}
-
-	log.Info().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("project_name", deploymentName).Msg("Successfully deleted deployment")
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "deployment deleted successfully",
-		"name":    deploymentName,
-	})
+	return activities.ClientConfig{
+		SSHPublicKey: sshPublicKey,
+		Mnemonic:     user.Mnemonic,
+		UserID:       userIDStr,
+		Network:      h.config.SystemAccount.Network,
+	}, nil
 }
 
-// HandleAddNodeToDeployment adds a new node to an existing Kubernetes cluster deployment.
-//
-// This endpoint accepts a JSON payload containing node configuration and queues
-// a deployment task for processing. The new node deployment is handled asynchronously via
-// Redis task queue and workers, similar to the main deployment process.
-//
-// Request: POST /deployments/{name}/nodes
-// Content-Type: application/json
-// Body: kubedeployer.Cluster JSON structure containing:
-//   - name: cluster name (should match the deployment name)
-//   - nodes: array with the new node configuration (CPU, memory, storage specs)
-//
-// Response: 202 Accepted with deployment task information
-//
-//	{
-//	  "task_id": "uuid-string",
-//	  "status": "pending",
-//	  "message": "Node addition task queued successfully",
-//	  "created_at": "2025-01-01T12:00:00Z"
-//	}
-//
-// Authentication: Requires valid user JWT token
-// Authorization: User can only modify their own deployments
-func (h *Handler) HandleAddNodeToDeployment(c *gin.Context) {
-	deploymentName := c.Param("name")
-	if deploymentName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment name is required"})
+func (h *Handler) HandleDeployCluster(c *gin.Context) {
+	config, err := h.getClientConfig(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -654,77 +351,116 @@ func (h *Handler) HandleAddNodeToDeployment(c *gin.Context) {
 		return
 	}
 
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	wf, err := h.ewfEngine.NewWorkflow("deploy_cluster")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
 	}
 
-	userIDStr := fmt.Sprintf("%v", userID)
+	wf.State = ewf.State{
+		"config":  config,
+		"cluster": cluster,
+	}
 
-	// Verify the deployment exists and belongs to the user
-	existingCluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
+	h.ewfEngine.RunAsync(c, wf)
+
+	c.JSON(http.StatusAccepted, Response{
+		TaskID:    wf.UUID,
+		Status:    string(wf.Status),
+		Message:   "Deployment workflow started successfully",
+		CreatedAt: wf.CreatedAt,
+	})
+}
+
+func (h *Handler) HandleDeleteCluster(c *gin.Context) {
+	config, err := h.getClientConfig(c)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	deploymentName := c.Param("name")
+	if deploymentName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment name is required"})
+		return
+	}
+	projectName := kubedeployer.GetProjectName(config.UserID, deploymentName)
+	_, err = h.db.GetClusterByName(config.UserID, projectName)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
 		return
 	}
 
-	// Ensure cluster name matches deployment name
-	cluster.Name = deploymentName
-
-	taskID := uuid.New().String()
-	task := &internal.DeploymentTask{
-		TaskID:    taskID,
-		UserID:    userIDStr,
-		Status:    internal.TaskStatusPending,
-		CreatedAt: time.Now(),
-		Payload:   cluster,
-	}
-
-	if err := h.redis.AddTask(c.Request.Context(), task); err != nil {
-		log.Error().Err(err).Str("task_id", taskID).Msg("Failed to add node addition task to Task queue")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue node addition task"})
+	wf, err := h.ewfEngine.NewWorkflow("remove_cluster")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
 	}
 
-	log.Info().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("task_id", taskID).Int("cluster_id", existingCluster.ID).Msg("Queued node addition task")
-
-	response := DeployResponse{
-		TaskID:    taskID,
-		Status:    string(internal.TaskStatusPending),
-		Message:   "Node addition task queued successfully",
-		CreatedAt: task.CreatedAt,
+	wf.State = ewf.State{
+		"config":       config,
+		"project_name": projectName,
 	}
 
-	c.JSON(http.StatusAccepted, response)
+	h.ewfEngine.RunAsync(c, wf)
+
+	c.JSON(http.StatusOK, Response{
+		TaskID:    wf.UUID,
+		Status:    string(wf.Status),
+		Message:   "Deployment deletion workflow started successfully",
+		CreatedAt: wf.CreatedAt,
+	})
 }
 
-// HandleRemoveNodeFromDeployment removes a node from an existing Kubernetes cluster deployment.
-//
-// This endpoint removes a specific node from the cluster by canceling its contract
-// and updating the deployment configuration. The operation is performed synchronously
-// since it primarily involves contract cancellation.
-//
-// Request: DELETE /deployments/{name}/nodes/{node_name}
-// Path Parameters:
-//   - name: The project name of the deployment
-//   - node_name: The name of the node to remove from the cluster
-//
-// Response: 200 OK with removal confirmation
-//
-//	{
-//	  "message": "Node removed successfully",
-//	  "deployment_name": "my-cluster",
-//	  "node_name": "worker-1"
-//	}
-//
-// Authentication: Requires valid user JWT token
-// Authorization: User can only modify their own deployments
-// Errors:
-//   - 404 Not Found: Deployment or node doesn't exist or doesn't belong to user
-//   - 400 Bad Request: Cannot remove the last remaining node or master/leader node
-func (h *Handler) HandleRemoveNodeFromDeployment(c *gin.Context) {
+func (h *Handler) HandleAddNode(c *gin.Context) {
+	config, err := h.getClientConfig(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var cluster kubedeployer.Cluster
+	if err := c.ShouldBindJSON(&cluster); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
+		return
+	}
+
+	existingCluster, err := h.db.GetClusterByName(config.UserID, cluster.Name)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", config.UserID).Str("deployment_name", cluster.Name).Msg("Failed to find deployment")
+		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		return
+	}
+
+	wf, err := h.ewfEngine.NewWorkflow("add_node")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
+		return
+	}
+
+	wf.State = ewf.State{
+		"config":           config,
+		"added_cluster":    cluster,
+		"existing_cluster": existingCluster,
+	}
+
+	h.ewfEngine.RunAsync(c, wf)
+
+	c.JSON(http.StatusAccepted, Response{
+		TaskID:    wf.UUID,
+		Status:    string(wf.Status),
+		Message:   "Node addition workflow started successfully",
+		CreatedAt: wf.CreatedAt,
+	})
+}
+
+func (h *Handler) HandleRemoveNode(c *gin.Context) {
+	config, err := h.getClientConfig(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	deploymentName := c.Param("name")
 	nodeName := c.Param("node_name")
 
@@ -738,18 +474,10 @@ func (h *Handler) HandleRemoveNodeFromDeployment(c *gin.Context) {
 		return
 	}
 
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userIDStr := fmt.Sprint(userID)
-	log.Debug().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("node_name", nodeName).Msg("Starting node removal")
-
-	cluster, err := h.db.GetClusterByName(userIDStr, deploymentName)
+	projectName := kubedeployer.GetProjectName(config.UserID, deploymentName)
+	cluster, err := h.db.GetClusterByName(config.UserID, projectName)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
+		log.Error().Err(err).Str("user_id", config.UserID).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
 		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
 		return
 	}
@@ -761,146 +489,24 @@ func (h *Handler) HandleRemoveNodeFromDeployment(c *gin.Context) {
 		return
 	}
 
-	// Find the node to remove
-	var nodeToRemove *kubedeployer.Node
-	var nodeIndex int
-	for i, node := range cl.Nodes {
-		if node.Name == nodeName {
-			nodeToRemove = &node
-			nodeIndex = i
-			break
-		}
-	}
-
-	if nodeToRemove == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found in deployment"})
-		return
-	}
-
-	if nodeToRemove.Type == kubedeployer.NodeTypeLeader {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot remove leader nodes"})
-		return
-	}
-
-	// TODO: latest master nodes should not be removed
-	if len(cl.Nodes) <= 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot remove the last remaining node"})
-		return
-	}
-
-	userIDInt, err := strconv.Atoi(userIDStr)
+	wf, err := h.ewfEngine.NewWorkflow("remove_node")
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to parse user ID")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user ID"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
 	}
 
-	user, err := h.db.GetUserByID(userIDInt)
-	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to get user")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
-		return
+	wf.State = ewf.State{
+		"config":           config,
+		"existing_cluster": cl,
+		"node_name":        nodeName,
 	}
 
-	gridClient, err := deployer.NewTFPluginClient(user.Mnemonic, deployer.WithNetwork(h.config.SystemAccount.Network))
-	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Msg("Failed to create grid client")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create grid client"})
-		return
-	}
+	h.ewfEngine.RunAsync(c, wf)
 
-	var contractsToCancel []uint64
-	if nodeToRemove.ContractID != 0 {
-		contractsToCancel = append(contractsToCancel, nodeToRemove.ContractID)
-	}
-
-	networkWorkload := cl.NetworkWorkload
-	if networkContractID, exists := networkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists && networkContractID != 0 {
-		networkStillInUse := false
-		for _, otherNode := range cl.Nodes {
-			if otherNode.NodeID == nodeToRemove.NodeID {
-				continue
-			}
-			if otherNetworkContractID, otherExists := networkWorkload.NodeDeploymentID[otherNode.NodeID]; otherExists && otherNetworkContractID != 0 {
-				networkStillInUse = true
-				break
-			}
-		}
-
-		if !networkStillInUse {
-			contractsToCancel = append(contractsToCancel, networkContractID)
-		}
-	}
-
-	if len(contractsToCancel) > 0 {
-		if err := gridClient.BatchCancelContract(contractsToCancel); err != nil {
-			log.Error().Err(err).Uints64("contract_ids", contractsToCancel).Msg("Failed to cancel contracts")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel node and/or network contracts"})
-			return
-		}
-	}
-
-	// Update cluster state - remove the node from the cluster
-	updatedNodes := make([]kubedeployer.Node, 0, len(cl.Nodes)-1)
-	updatedNodes = append(updatedNodes, cl.Nodes[:nodeIndex]...)
-	updatedNodes = append(updatedNodes, cl.Nodes[nodeIndex+1:]...)
-	cl.Nodes = updatedNodes
-
-	// Update network workload - remove the node from network if it was canceled
-	if networkContractID, exists := cl.NetworkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists {
-		networkWasCanceled := false
-		for _, contractID := range contractsToCancel {
-			if contractID == networkContractID {
-				networkWasCanceled = true
-				break
-			}
-		}
-
-		delete(cl.NetworkWorkload.NodeDeploymentID, nodeToRemove.NodeID)
-
-		var updatedNetworkNodes []uint32
-		for _, nodeID := range cl.NetworkWorkload.Nodes {
-			if nodeID != nodeToRemove.NodeID {
-				updatedNetworkNodes = append(updatedNetworkNodes, nodeID)
-			}
-		}
-		cl.NetworkWorkload.Nodes = updatedNetworkNodes
-
-		if cl.NetworkWorkload.NodesIPRange != nil {
-			delete(cl.NetworkWorkload.NodesIPRange, nodeToRemove.NodeID)
-		}
-		if cl.NetworkWorkload.MyceliumKeys != nil {
-			delete(cl.NetworkWorkload.MyceliumKeys, nodeToRemove.NodeID)
-		}
-		if cl.NetworkWorkload.Keys != nil {
-			delete(cl.NetworkWorkload.Keys, nodeToRemove.NodeID)
-		}
-		if cl.NetworkWorkload.WGPort != nil {
-			delete(cl.NetworkWorkload.WGPort, nodeToRemove.NodeID)
-		}
-
-		if networkWasCanceled {
-			log.Info().Uint32("node_id", nodeToRemove.NodeID).Msg("Cleaned up network workload data for canceled network contract")
-		}
-	}
-
-	if err := cluster.SetClusterResult(cl); err != nil {
-		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to serialize updated cluster result")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update deployment configuration"})
-		return
-	}
-
-	if err := h.db.UpdateCluster(&cluster); err != nil {
-		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to update cluster in database")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update deployment in database"})
-		return
-	}
-
-	log.Info().Str("user_id", userIDStr).Str("deployment_name", deploymentName).Str("node_name", nodeName).Uint64("contract_id", nodeToRemove.ContractID).Msg("Successfully removed node from deployment")
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":         "Node removed successfully",
-		"deployment_name": deploymentName,
-		"node_name":       nodeName,
+	c.JSON(http.StatusOK, Response{
+		TaskID:    wf.UUID,
+		Status:    string(wf.Status),
+		Message:   "Node removal workflow started successfully",
+		CreatedAt: wf.CreatedAt,
 	})
 }
