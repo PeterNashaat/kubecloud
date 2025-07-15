@@ -19,7 +19,7 @@ func ExampleClient_CreateCluster() {
 	gridNet := os.Getenv("NETWORK")
 	sshKey := os.Getenv("SSH_KEY")
 
-	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
+	client, err := NewClient(context.Background(), mnemonic, gridNet, sshKey, "1")
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -76,7 +76,7 @@ func ExampleClient_AddClusterNode() {
 	gridNet := os.Getenv("NETWORK")
 	sshKey := os.Getenv("SSH_KEY")
 
-	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
+	client, err := NewClient(context.Background(), mnemonic, gridNet, sshKey, "1")
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -151,7 +151,7 @@ func ExampleClient_RemoveClusterNode() {
 	gridNet := os.Getenv("NETWORK")
 	sshKey := os.Getenv("SSH_KEY")
 
-	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
+	client, err := NewClient(context.Background(), mnemonic, gridNet, sshKey, "1")
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -211,7 +211,7 @@ func ExampleClient_DeleteCluster() {
 	gridNet := os.Getenv("NETWORK")
 	sshKey := os.Getenv("SSH_KEY")
 
-	client, err := NewClient(mnemonic, gridNet, sshKey, "1")
+	client, err := NewClient(context.Background(), mnemonic, gridNet, sshKey, "1")
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}

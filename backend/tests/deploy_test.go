@@ -20,13 +20,6 @@ func TestDeployment(t *testing.T) {
 		t.Fatalf("Deployment failed: %v", err)
 	}
 	t.Logf("Deployment started with task ID: %s", taskID)
-
-	err = client.ListenToSSEWithLogger(taskID, t.Logf)
-	if err != nil {
-		t.Logf("SSE listening ended: %v", err)
-	} else {
-		t.Logf("SSE connection completed successfully")
-	}
 }
 
 func TestAddNode(t *testing.T) {
@@ -56,13 +49,6 @@ func TestAddNode(t *testing.T) {
 		t.Fatalf("Add node failed: %v", err)
 	}
 	t.Logf("Add node started with task ID: %s", taskID)
-
-	err = client.ListenToSSEWithLogger(taskID, t.Logf)
-	if err != nil {
-		t.Logf("SSE listening ended: %v", err)
-	} else {
-		t.Logf("SSE connection completed successfully")
-	}
 }
 
 func TestRemoveNode(t *testing.T) {
@@ -79,4 +65,19 @@ func TestRemoveNode(t *testing.T) {
 		t.Fatalf("Remove node failed: %v", err)
 	}
 	t.Logf("Node removed successfully")
+}
+
+func TestDeleteDeployment(t *testing.T) {
+	client := NewClient()
+
+	if err := client.Login("alaamahmoud.1223@gmail.com", "Password@22"); err != nil {
+		t.Fatalf("Failed to login: %v", err)
+	}
+
+	err := client.DeleteDeployment(clusterName)
+	if err != nil {
+		t.Fatalf("Failed to delete deployment: %v", err)
+	}
+
+	t.Log("Deployment deleted successfully")
 }

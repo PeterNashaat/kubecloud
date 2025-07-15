@@ -8,9 +8,13 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
+func GetProjectName(userID, clusterName string) string {
+	return "kc" + userID + clusterName
+}
+
 // PrepareCluster prepares the cluster by setting the names and ensuring a leader node exists
 func (c *Cluster) PrepareCluster(userID string) error {
-	projectName := "kc" + userID + c.Name
+	projectName := GetProjectName(userID, c.Name)
 	networkName := projectName + "net"
 
 	c.ProjectName = projectName

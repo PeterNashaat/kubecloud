@@ -9,6 +9,7 @@ import (
 )
 
 type Client struct {
+	ctx          context.Context
 	gridClient   deployer.TFPluginClient
 	gridNet      string
 	mnemonic     string
@@ -16,7 +17,7 @@ type Client struct {
 	UserID       string
 }
 
-func NewClient(mnemonic, gridNet, masterPubKey, userID string) (*Client, error) {
+func NewClient(ctx context.Context, mnemonic, gridNet, masterPubKey, userID string) (*Client, error) {
 	tfplugin, err := deployer.NewTFPluginClient(
 		mnemonic,
 		deployer.WithNetwork(gridNet),
@@ -28,6 +29,7 @@ func NewClient(mnemonic, gridNet, masterPubKey, userID string) (*Client, error) 
 	}
 
 	return &Client{
+		ctx:          ctx,
 		gridClient:   tfplugin,
 		gridNet:      gridNet,
 		mnemonic:     mnemonic,

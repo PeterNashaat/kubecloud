@@ -176,7 +176,7 @@ func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *D
 		}
 
 		// Pass the existing cluster state from database to AddNodesToCluster
-		res, err = kubedeployer.AddNodesToCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey, leaderIP, &existingClusterResult)
+		res, err = kubedeployer.AddNodesToCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey, leaderIP, &existingClusterResult, task.UserID)
 		if err != nil {
 			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
 			result.Status = TaskStatusFailed
@@ -187,7 +187,7 @@ func (w *Worker) performDeployment(ctx context.Context, task *DeploymentTask) *D
 		}
 	} else {
 		log.Info().Str("task_id", task.TaskID).Str("project_name", task.Payload.Name).Msg("Cluster does not exist, creating new deployment")
-		res, err = kubedeployer.DeployCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey)
+		res, err = kubedeployer.DeployCluster(ctx, w.gridNet, user.Mnemonic, task.Payload, w.sshKey, task.UserID)
 		if err != nil {
 			log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to deploy cluster")
 			result.Status = TaskStatusFailed
