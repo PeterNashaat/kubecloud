@@ -88,4 +88,5 @@ func RegisterEWFWorkflows(
 		},
 	})
 
+	registerDeploymentActivities(engine)
 }
