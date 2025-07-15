@@ -184,9 +184,9 @@ export function useNodeManagement() {
   }
 
   // Add node to deployment
-  async function addNodeToDeployment(deploymentName: string, nodePayload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
+  async function addNodeToDeployment(deploymentName: string, clusterPayload: { name: string, nodes: any[] }) {
     try {
-      const response = await userService.addNodeToDeployment(deploymentName, nodePayload)
+      const response = await userService.addNodeToDeployment(deploymentName, clusterPayload)
       // Optionally refresh data or handle response
       return response
     } catch (err: any) {

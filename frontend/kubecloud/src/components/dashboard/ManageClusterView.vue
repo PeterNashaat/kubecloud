@@ -154,6 +154,7 @@ import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
 import { useNotificationStore } from '../../stores/notifications'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
+import { useDeploymentEvents } from '../../composables/useDeploymentEvents';
 
 import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
 
@@ -324,6 +325,7 @@ const availableNodes = computed<RentedNode[]>(() => {
 });
 
 const { rentedNodes, loading: nodesLoading, fetchRentedNodes, addNodeToDeployment, removeNodeFromDeployment } = useNodeManagement()
+const { onTaskEvent } = useDeploymentEvents();
 
 const addFormNodeId = ref(null);
 const addFormRole = ref('master');
@@ -379,27 +381,63 @@ async function addNode(payload: { nodeId: number, role: string, vcpu: number, ra
   addFormError.value = '';
   try {
     if (!cluster.value?.cluster?.name) throw new Error('Cluster name missing');
-    await addNodeToDeployment(cluster.value.cluster.name, {
-      nodeId: node.nodeId,
-      role: payload.role,
-      vcpu: payload.vcpu,
-      ram: payload.ram,
-      storage: payload.storage
+    // Build the node object as expected by the backend
+    const sshKey = cluster.value.cluster.env_vars?.SSH_KEY || '';
+    const k3sToken = cluster.value.cluster.env_vars?.K3S_TOKEN || cluster.value.cluster.token || '';
+    const nodeName = `node${Date.now()}`;
+    // Convert RAM and storage to MB and enforce minimums
+    const memoryMB = Math.max(Math.round(payload.ram * 1024), 256); // RAM in GB to MB, min 256MB
+    const diskSizeMB = Math.max(Math.round(payload.storage * 1024), 1024); // Storage in GB to MB, min 1GB
+    const rootSizeMB = 10240; // You may want to make this user-configurable
+    const nodeObj = {
+      name: nodeName,
+      type: payload.role,
+      node_id: payload.nodeId,
+      cpu: payload.vcpu,
+      memory: memoryMB,
+      root_size: rootSizeMB,
+      disk_size: diskSizeMB,
+      env_vars: {
+        SSH_KEY: sshKey,
+        K3S_TOKEN: k3sToken
+      }
+    };
+    const clusterPayload = {
+      name: cluster.value.cluster.name,
+      nodes: [nodeObj]
+    };
+    const response = await addNodeToDeployment(cluster.value.cluster.name, clusterPayload);
+    const taskId = response.data.task_id;
+    if (!taskId) throw new Error('No task ID returned from backend');
+    // Wait for the deployment event for this task
+    await new Promise<void>((resolve, reject) => {
+      const unsubscribe = onTaskEvent(taskId, async (event: any) => {
+        const status = event.data?.status || event.data?.Status || event.status;
+        if (status === 'completed' || status === 'success') {
+          await fetchRentedNodes();
+          await clusterStore.fetchClusters();
+          // Update editNodes with the latest nodes from the refreshed cluster
+          const updatedCluster = clusterStore.clusters.find(c => c.project_name === cluster.value?.project_name);
+          editNodes.value = updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes) ? updatedCluster.cluster.nodes.map((n: any) => ({ ...n })) : [];
+          // Reset add form state
+          addFormNodeId.value = null;
+          addFormRole.value = 'master';
+          addFormVcpu.value = 1;
+          addFormRam.value = 1;
+          addFormStorage.value = 1;
+          addNodeLoading.value = false;
+          unsubscribe();
+          resolve();
+        } else if (status === 'failed' || status === 'error') {
+          addFormError.value = event.data?.message || event.message || 'Failed to add node';
+          addNodeLoading.value = false;
+          unsubscribe();
+          reject(new Error(addFormError.value));
+        }
+      });
     });
-    await fetchRentedNodes();
-    await clusterStore.fetchClusters();
-    // Update editNodes with the latest nodes from the refreshed cluster
-    const updatedCluster = clusterStore.clusters.find(c => c.project_name === cluster.value?.project_name);
-    editNodes.value = updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes) ? updatedCluster.cluster.nodes.map((n: any) => ({ ...n })) : [];
-    // Reset add form state
-    addFormNodeId.value = null;
-    addFormRole.value = 'master';
-    addFormVcpu.value = 1;
-    addFormRam.value = 1;
-    addFormStorage.value = 1;
   } catch (e: any) {
     addFormError.value = e?.message || 'Failed to add node';
-  } finally {
     addNodeLoading.value = false;
   }
 }

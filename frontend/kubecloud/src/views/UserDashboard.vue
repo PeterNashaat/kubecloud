@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useUserStore } from '../stores/user'
 import ClustersCard from '../components/dashboard/ClustersCard.vue'
 import BillingCard from '../components/dashboard/BillingCard.vue'
@@ -12,11 +12,13 @@ import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
 import { useClusterStore } from '../stores/clusters'
+import { useRoute } from 'vue-router'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
 
 // Initialize selected section from localStorage or default to 'overview'
+const route = useRoute()
 const selected = ref('overview')
 
 const clusterStore = useClusterStore()
@@ -34,9 +36,14 @@ const clustersArray = computed(() =>
 )
 
 onMounted(async () => {
-  const savedSection = localStorage.getItem('dashboard-section')
-  if (savedSection) {
-    selected.value = savedSection
+  // Check for ?section=... in the URL
+  if (route.query.section && typeof route.query.section === 'string') {
+    selected.value = route.query.section
+  } else {
+    const savedSection = localStorage.getItem('dashboard-section')
+    if (savedSection) {
+      selected.value = savedSection
+    }
   }
   // Fetch real invoices for billing history
   const invoices = await userService.listUserInvoices()
@@ -50,6 +57,13 @@ onMounted(async () => {
   await userStore.updateNetBalance()
 })
 
+watch(() => route.query.section, (newSection) => {
+  if (typeof newSection === 'string') {
+    selected.value = newSection
+    localStorage.setItem('dashboard-section', newSection)
+  }
+})
+
 interface Bill {
   id: string | number
   date: string
@@ -59,14 +73,8 @@ interface Bill {
 
 const billingHistory = ref<Bill[]>([])
 
-const sshKeys = ref([
-  { id: 1, name: 'My Laptop', fingerprint: 'SHA256:Abc123...Xyz789', addedDate: '2024-01-01' },
-  { id: 2, name: 'Work PC', fingerprint: 'SHA256:Def456...789', addedDate: '2024-01-05' }
-])
-const vouchers = ref([
-  { id: 1, name: 'Welcome Bonus', description: 'New user welcome credit', amount: '$50.00', expiryDate: '2024-12-31', icon: 'mdi-gift', iconColor: '#F472B6' },
-  { id: 2, name: 'Referral Credit', description: 'Friend referral bonus', amount: '$25.00', expiryDate: '2024-06-30', icon: 'mdi-account-multiple', iconColor: '#38BDF8' }
-])
+const sshKeys = ref([])
+const vouchers = ref([])
 const totalSpent = computed(() => {
   return billingHistory.value
     .filter(bill => bill.amount > 0)
