@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -143,29 +142,23 @@ func (h *Handler) refreshUserVerification(user *models.User) error {
 		return fmt.Errorf("failed to get SS58 address for verification refresh: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/v1/status?client_id=%s", h.config.KYCVerifierAPIURL, sponseeAddress)
-	resp, err := http.Get(url)
+	kycClient, err := internal.NewKYCClient(
+		h.config.KYCVerifierAPIURL,
+		"", // sponsor address not needed for verification
+		"", // sponsor phrase not needed for verification
+		h.config.KYCChallengeDomain,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to check verification status: %w", err)
+		return fmt.Errorf("failed to initialize KYC client: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	sponsored, err := kycClient.IsUserVerified(sponseeAddress, sponseeKeyPair)
+	if err != nil {
 		user.Sponsored = false
 		h.db.UpdateUserByID(user)
-		return fmt.Errorf("KYC verifier returned status: %s", resp.Status)
+		return fmt.Errorf("failed to check KYC sponsorship: %w", err)
 	}
-
-	var result struct {
-		Result struct {
-			Status string `json:"status"`
-		} `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("failed to decode KYC verifier response: %w", err)
-	}
-
-	user.Sponsored = (result.Result.Status == "VERIFIED")
+	user.Sponsored = sponsored
 	if err := h.db.UpdateUserByID(user); err != nil {
 		return fmt.Errorf("failed to update user sponsorship flag: %w", err)
 	}
@@ -206,18 +199,18 @@ func (h *Handler) createKYCSponsorship(mnemonic string) error {
 }
 
 // @Summary Register a user
-// @Description Registers a new user in the system
+// @Description Registers a new user to the system
 // @Tags users
 // @ID register-user
 // @Accept json
 // @Produce json
 // @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse "User registered successfully"
-// @Failure 400 {object} APIResponse "Invalid request format or password mismatch"
+// @Success 201 {object} RegisterResponse
+// @Failure 400 {object} APIResponse "Invalid request format"
 // @Failure 409 {object} APIResponse "User already registered"
 // @Failure 500 {object} APIResponse
 // @Router /user/register [post]
-// RegisterHandler registers a new user
+// RegisterHandler registers user to the system
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
 
@@ -461,10 +454,6 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 
 	if !user.Sponsored {
 		Error(c, http.StatusForbidden, "KYC not completed", "Please complete KYC sponsorship.")
-		return
-	}
-	if !user.Verified {
-		Error(c, http.StatusForbidden, "Email not verified", "Please verify your email address.")
 		return
 	}
 

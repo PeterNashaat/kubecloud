@@ -115,23 +115,8 @@ func (c *KYCClient) CreateSponsorship(sponseeAddress string, sponseeKeyPair subk
 
 // IsUserVerified checks if a user is verified (directly or via sponsorship) by calling the tf-kyc-verifier API
 func (c *KYCClient) IsUserVerified(address string, keyPair subkey.KeyPair) (bool, error) {
-	challenge := c.createChallengeMessage()
-	signature, err := signMessage(keyPair, challenge)
-	if err != nil {
-		return false, err
-	}
-
-	url := c.APIURL + "/api/v1/data"
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Set("X-Client-ID", address)
-	req.Header.Set("X-Challenge", hex.EncodeToString([]byte(challenge)))
-	req.Header.Set("X-Signature", signature)
-
-	resp, err := c.HTTPClient.Do(req)
+	url := fmt.Sprintf("%s/api/v1/status?client_id=%s", c.APIURL, address)
+	resp, err := c.HTTPClient.Get(url)
 	if err != nil {
 		return false, err
 	}
@@ -143,12 +128,12 @@ func (c *KYCClient) IsUserVerified(address string, keyPair subkey.KeyPair) (bool
 
 	var result struct {
 		Result struct {
-			Verified bool `json:"verified"`
+			Status string `json:"status"`
 		} `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return false, err
 	}
 
-	return result.Result.Verified, nil
+	return result.Result.Status == "VERIFIED", nil
 }
