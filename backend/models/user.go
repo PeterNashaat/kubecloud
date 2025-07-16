@@ -18,8 +18,7 @@ type User struct {
 	Mnemonic          string    `json:"-" gorm:"column:mnemonic"`
 	SSHKey            string    `json:"ssh_key"`
 	Debt              float64   `json:"debt"`
-	KYCVerified       bool      `json:"kyc_verified"`
-	EmailVerified     bool      `json:"email_verified"`
+	Sponsored         bool      `json:"sponsored"`
 	Address           string    `json:"address" gorm:"column:address"`
 }
 
