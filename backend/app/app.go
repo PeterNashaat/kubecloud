@@ -144,6 +144,7 @@ func (app *App) registerHandlers() {
 	app.router.Use(middlewares.CorsMiddleware())
 	v1 := app.router.Group("/api/v1")
 	{
+		v1.GET("/health", app.handlers.HealthHandler)
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
 
 		adminGroup := v1.Group("")

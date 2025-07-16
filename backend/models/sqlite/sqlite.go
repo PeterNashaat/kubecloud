@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"database/sql"
 	"fmt"
 	"kubecloud/models"
 	"sync"
@@ -14,6 +15,11 @@ import (
 type Sqlite struct {
 	db    *gorm.DB
 	mutex sync.Mutex
+}
+
+// SQLDB returns the underlying *sql.DB for health checks
+func (s *Sqlite) SQLDB() (*sql.DB, error) {
+	return s.db.DB()
 }
 
 // NewSqliteStorage connects to the database file
