@@ -17,7 +17,7 @@ func RegisterEWFWorkflows(
 ) {
 	engine.Register("send_verification_email", SendVerificationEmailStep(mail, config))
 	engine.Register("setup_tfchain", SetupTFChainStep(substrate, config))
-	engine.Register("create_stripe", CreateStripeCustomerStep())
+	engine.Register("create_stripe_customer", CreateStripeCustomerStep())
 	engine.Register("save_user", SaveUserStep(db, config))
 	engine.Register("update_user_verified", UpdateUserVerifiedStep(db))
 	engine.Register("send_welcome_email", SendWelcomeEmailStep(mail, config))
@@ -38,7 +38,7 @@ func RegisterEWFWorkflows(
 				MaxAttempts: 5,
 				Delay:       3,
 			}},
-			{Name: "create_stripe", RetryPolicy: &ewf.RetryPolicy{
+			{Name: "create_stripe_customer", RetryPolicy: &ewf.RetryPolicy{
 				MaxAttempts: 3,
 				Delay:       2,
 			}},
