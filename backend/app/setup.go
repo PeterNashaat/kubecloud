@@ -84,7 +84,7 @@ func SetUp(t testing.TB) (*App, error) {
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
   "firesquid_url": "https://firesquid.dev.grid.tf/graphql",
   "redis": {
-    "host": "redis-db",
+    "host": "localhost",
     "port": 6379,
     "password": "pass",
     "db": 0
