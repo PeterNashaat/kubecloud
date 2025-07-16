@@ -27,3 +27,5 @@ jobs:
 
       - name: Test
         run: cd backend && go test -v ./...
+        env: 
+          TEST_MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
