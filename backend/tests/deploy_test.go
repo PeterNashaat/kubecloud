@@ -1,9 +1,8 @@
 package main
 
 import (
-	"testing"
-
 	"kubecloud/kubedeployer"
+	"testing"
 )
 
 func TestDeployment(t *testing.T) {
@@ -78,6 +77,20 @@ func TestDeleteDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to delete deployment: %v", err)
 	}
-
 	t.Log("Deployment deleted successfully")
+}
+
+// Standalone SSE listener test for running as a service
+func TestListenSSE(t *testing.T) {
+	client := NewClient()
+	err := client.Login("alaamahmoud.1223@gmail.com", "Password@22")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	t.Logf("Login successful. Listening to all SSE events...")
+
+	// Listen to all SSE events indefinitely (run this test as a service)
+	if err := client.ListenToSSE(""); err != nil {
+		t.Errorf("SSE listen failed: %v", err)
+	}
 }

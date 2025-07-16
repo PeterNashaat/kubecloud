@@ -3,17 +3,21 @@ package activities
 import (
 	"context"
 	"fmt"
+	"kubecloud/internal"
 	"kubecloud/kubedeployer"
+	"kubecloud/models"
 
 	"github.com/rs/zerolog/log"
 	"github.com/xmonader/ewf"
 )
 
 type ClientConfig struct {
-	SSHPublicKey string `json:"ssh_public_key"`
-	Mnemonic     string `json:"mnemonic"`
-	UserID       string `json:"user_id"`
-	Network      string `json:"network"`
+	SSHPublicKey string               `json:"ssh_public_key"`
+	Mnemonic     string               `json:"mnemonic"`
+	UserID       string               `json:"user_id"`
+	Network      string               `json:"network"`
+	SSE          *internal.SSEManager `json:"sse"`
+	DB           models.DB            `json:"db"`
 }
 
 func ensureClient(ctx context.Context, state ewf.State) (*kubedeployer.Client, error) {
@@ -99,6 +103,7 @@ func DeployNodesStep() ewf.StepFn {
 			log.Error().Err(err).Msg("Failed to ensure kubedeployer client in deploy nodes step")
 			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
 		}
+		defer kubeClient.Close()
 
 		cluster, ok := state["cluster"].(kubedeployer.Cluster)
 		if !ok {
@@ -126,6 +131,7 @@ func DeployNodesStep() ewf.StepFn {
 			log.Info().Str("node_name", node.Name).Msg("Node deployed successfully")
 		}
 
+		state["cluster"] = cluster
 		log.Info().Str("cluster_name", cluster.Name).Int("node_count", len(cluster.Nodes)).Msg("All nodes deployed successfully for cluster")
 		return nil
 	}
@@ -133,12 +139,71 @@ func DeployNodesStep() ewf.StepFn {
 
 func StoreDeploymentStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		// TODO: close client
+
+		cluster, ok := state["cluster"].(kubedeployer.Cluster)
+		if !ok {
+			log.Error().Msg("Missing or invalid 'cluster' in state")
+			return fmt.Errorf("missing or invalid 'cluster' in state")
+		}
+
+		config, ok := state["config"].(ClientConfig)
+		if !ok {
+			log.Error().Msg("Missing or invalid 'config' in state")
+			return fmt.Errorf("missing or invalid 'config' in state")
+		}
+
+		dbCluster := &models.Cluster{
+			ProjectName: cluster.ProjectName,
+		}
+
+		if err := dbCluster.SetClusterResult(cluster); err != nil {
+			log.Error().Err(err).Msg("Failed to set cluster result")
+		} else {
+			existingCluster, err := config.DB.GetClusterByName(config.UserID, cluster.ProjectName)
+			if err != nil {
+				if err := config.DB.CreateCluster(dbCluster); err != nil {
+					log.Error().Err(err).Msg("Failed to create cluster in database")
+				} else {
+					log.Info().Str("project_name", cluster.ProjectName).Msg("Cluster created in database")
+				}
+			} else {
+				existingCluster.Result = dbCluster.Result
+				if err := config.DB.UpdateCluster(&existingCluster); err != nil {
+					log.Error().Err(err).Msg("Failed to update cluster in database")
+				} else {
+					log.Info().Str("project_name", cluster.ProjectName).Msg("Cluster updated in database")
+				}
+			}
+		}
+
 		return nil
 	}
 }
 
 func NotifyUserStep() ewf.StepFn {
+	// TODO: more notifications
 	return func(ctx context.Context, state ewf.State) error {
+		cluster, ok := state["cluster"].(kubedeployer.Cluster)
+		if !ok {
+			log.Error().Msg("Missing or invalid 'cluster' in state")
+			return fmt.Errorf("missing or invalid 'cluster' in state")
+		}
+
+		config, ok := state["config"].(ClientConfig)
+		if !ok {
+			log.Error().Msg("Missing or invalid 'config' in state")
+			return fmt.Errorf("missing or invalid 'config' in state")
+		}
+
+		notificationData := map[string]interface{}{
+			"type":    "deployment_update",
+			"message": "Task completed",
+			"data":    cluster,
+		}
+
+		config.SSE.Notify(config.UserID, "deployment_update", notificationData)
+
 		return nil
 	}
 }
@@ -181,7 +246,7 @@ func AddDeploymentNodeStep() ewf.StepFn {
 			return fmt.Errorf("missing or invalid 'cluster' in state")
 		}
 
-		existingCluster, ok := state["existing_cluster"].(kubedeployer.Cluster)
+		existingCluster, ok := state["cluster"].(kubedeployer.Cluster)
 		if !ok {
 			log.Error().Msg("Missing or invalid 'existing_cluster' in state")
 			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
@@ -192,7 +257,7 @@ func AddDeploymentNodeStep() ewf.StepFn {
 			return fmt.Errorf("failed to assign node IPs for added cluster: %w", err)
 		}
 
-		for _, node := range addedCluster.Nodes {
+		for idx, node := range addedCluster.Nodes {
 			if node.ContractID != 0 {
 				log.Info().Str("node_name", node.Name).Uint64("contract_id", node.ContractID).Msg("Node already deployed, skipping")
 				continue
@@ -203,8 +268,12 @@ func AddDeploymentNodeStep() ewf.StepFn {
 				log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to deploy node to existing cluster")
 				return fmt.Errorf("failed to deploy node %s to existing cluster: %w", node.Name, err)
 			}
+
+			// update the added cluster with the deployed node to skip it in future deployments
+			addedCluster.Nodes[idx].ContractID = node.ContractID
 		}
 
+		state["cluster"] = existingCluster
 		log.Info().Str("existing_cluster_name", existingCluster.Name).Msg("All nodes deployed successfully for existing cluster")
 		return nil
 	}
@@ -218,7 +287,7 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
 		}
 
-		existingCluster, ok := state["existing_cluster"].(kubedeployer.Cluster)
+		existingCluster, ok := state["cluster"].(kubedeployer.Cluster)
 		if !ok {
 			log.Error().Msg("Missing or invalid 'existing_cluster' in state")
 			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
@@ -234,6 +303,9 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 			log.Error().Err(err).Str("node_name", nodeName).Msg("Failed to remove node from existing cluster")
 			return fmt.Errorf("failed to remove node %s from existing cluster: %w", nodeName, err)
 		}
+
+		state["cluster"] = existingCluster
+		log.Info().Str("existing_cluster_name", existingCluster.Name).Str("node_name", nodeName).Msg("Node removed successfully from existing cluster")
 		return nil
 	}
 }
@@ -254,6 +326,8 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 			{Name: "deploy_network", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
 			{Name: "deploy_nodes", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
+			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 
@@ -261,6 +335,8 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 		Steps: []ewf.Step{
 			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 			{Name: "remove_cluster", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 	engine.RegisterTemplate("add_node", &ewf.WorkflowTemplate{
@@ -268,12 +344,16 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 			{Name: "deploy_network", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
 			{Name: "add_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 	engine.RegisterTemplate("remove_node", &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
 			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 			{Name: "remove_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 }

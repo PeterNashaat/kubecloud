@@ -335,6 +335,8 @@ func (h *Handler) getClientConfig(c *gin.Context) (activities.ClientConfig, erro
 		Mnemonic:     user.Mnemonic,
 		UserID:       userIDStr,
 		Network:      h.config.SystemAccount.Network,
+		SSE:          h.sseManager,
+		DB:           h.db,
 	}, nil
 }
 
@@ -439,9 +441,9 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 	}
 
 	wf.State = ewf.State{
-		"config":           config,
-		"added_cluster":    cluster,
-		"existing_cluster": existingCluster,
+		"config":        config,
+		"added_cluster": cluster,
+		"cluster":       existingCluster,
 	}
 
 	h.ewfEngine.RunAsync(c, wf)
@@ -496,9 +498,9 @@ func (h *Handler) HandleRemoveNode(c *gin.Context) {
 	}
 
 	wf.State = ewf.State{
-		"config":           config,
-		"existing_cluster": cl,
-		"node_name":        nodeName,
+		"config":    config,
+		"cluster":   cl,
+		"node_name": nodeName,
 	}
 
 	h.ewfEngine.RunAsync(c, wf)
