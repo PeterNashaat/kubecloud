@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -138,7 +139,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("reserve-node")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowReserveNode)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -255,7 +256,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	}
 	contractID := uint32(contractID64)
 
-	wf, err := h.ewfEngine.NewWorkflow("unreserve-node")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUnreserveNode)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

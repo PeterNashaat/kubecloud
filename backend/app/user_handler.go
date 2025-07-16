@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/models"
 	"net/http"
 	"strconv"
@@ -171,7 +172,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("user-registration")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserRegistration)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
@@ -185,9 +186,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	}
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
-
-	// send notification that user registered
-	// same as balance funding
 
 	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow_id.", gin.H{
 		"workflow_id": wf.UUID,
@@ -240,7 +238,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("user-verification")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
@@ -583,7 +581,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("charge-balance")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowChargeBalance)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -722,7 +720,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("redeem-voucher")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

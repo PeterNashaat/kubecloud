@@ -15,73 +15,73 @@ func RegisterEWFWorkflows(
 	mail internal.MailService,
 	substrate *substrate.Substrate,
 ) {
-	engine.Register("send_verification_email", SendVerificationEmailStep(mail, config))
-	engine.Register("setup_tfchain", SetupTFChainStep(substrate, config))
-	engine.Register("create_stripe_customer", CreateStripeCustomerStep())
-	engine.Register("save_user", SaveUserStep(db, config))
-	engine.Register("update_user_verified", UpdateUserVerifiedStep(db))
-	engine.Register("send_welcome_email", SendWelcomeEmailStep(mail, config))
-	engine.Register("create_payment_intent", CreatePaymentIntentStep(config.Currency))
-	engine.Register("update_user_balance", UpdateUserBalanceStep(db))
-	engine.Register("transfer_tfts", TransferTFTsStep(substrate, config.SystemAccount.Mnemonic))
-	engine.Register("cancel_payment_intent", CancelPaymentIntentStep())
-	engine.Register("create_identity", CreateIdentityStep())
-	engine.Register("reserve_node", ReserveNodeStep(db, substrate))
-	engine.Register("unreserve_node", UnreserveNodeStep(db, substrate))
+	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
+	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config))
+	engine.Register(StepCreateStripeCustomer, CreateStripeCustomerStep())
+	engine.Register(StepSaveUser, SaveUserStep(db, config))
+	engine.Register(StepUpdateUserVerified, UpdateUserVerifiedStep(db))
+	engine.Register(StepSendWelcomeEmail, SendWelcomeEmailStep(mail, config))
+	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency))
+	engine.Register(StepUpdateUserBalance, UpdateUserBalanceStep(db))
+	engine.Register(StepTransferTFTs, TransferTFTsStep(substrate, config.SystemAccount.Mnemonic))
+	engine.Register(StepCancelPaymentIntent, CancelPaymentIntentStep())
+	engine.Register(StepCreateIdentity, CreateIdentityStep())
+	engine.Register(StepReserveNode, ReserveNodeStep(db, substrate))
+	engine.Register(StepUnreserveNode, UnreserveNodeStep(db, substrate))
 
-	engine.RegisterTemplate("user-registration", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate(WorkflowUserRegistration, &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "send_verification_email", RetryPolicy: &ewf.RetryPolicy{
+			{Name: StepSendVerificationEmail, RetryPolicy: &ewf.RetryPolicy{
 				MaxAttempts: 3,
 				Delay:       2,
 			}},
-			{Name: "setup_tfchain", RetryPolicy: &ewf.RetryPolicy{
+			{Name: StepSetupTFChain, RetryPolicy: &ewf.RetryPolicy{
 				MaxAttempts: 5,
 				Delay:       3,
 			}},
-			{Name: "create_stripe_customer", RetryPolicy: &ewf.RetryPolicy{
+			{Name: StepCreateStripeCustomer, RetryPolicy: &ewf.RetryPolicy{
 				MaxAttempts: 3,
 				Delay:       2,
 			}},
-			{Name: "save_user", RetryPolicy: &ewf.RetryPolicy{
+			{Name: StepSaveUser, RetryPolicy: &ewf.RetryPolicy{
 				MaxAttempts: 2,
 				Delay:       2,
 			}},
 		},
 	})
 
-	engine.RegisterTemplate("user-verification", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate(WorkflowUserVerification, &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "update_user_verified", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "send_welcome_email", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 2}},
+			{Name: StepUpdateUserVerified, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepSendWelcomeEmail, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 2}},
 		},
 	})
 
-	engine.RegisterTemplate("charge-balance", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate(WorkflowChargeBalance, &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "create_payment_intent", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "transfer_tfts", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "cancel_payment_intent", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}}, // Compensation step
-			{Name: "update_user_balance", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepCreatePaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepCancelPaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}}, // Compensation step
+			{Name: StepUpdateUserBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 
-	engine.RegisterTemplate("redeem-voucher", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate(WorkflowRedeemVoucher, &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "transfer_tfts", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 
-	engine.RegisterTemplate("reserve-node", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate(WorkflowReserveNode, &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "create_identity", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "reserve_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepCreateIdentity, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepReserveNode, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 
-	engine.RegisterTemplate("unreserve-node", &ewf.WorkflowTemplate{
+	engine.RegisterTemplate(WorkflowUnreserveNode, &ewf.WorkflowTemplate{
 		Steps: []ewf.Step{
-			{Name: "unreserve_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: StepUnreserveNode, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})
 
