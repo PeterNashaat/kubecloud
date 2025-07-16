@@ -157,10 +157,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	app.registerHandlers()
 
-	app.workerManager.Start()
+	// app.workerManager.Start()
 
 	return app, nil
-
 }
 
 // registerHandlers registers all routes

@@ -20,100 +20,50 @@ type ClientConfig struct {
 	DB           models.DB            `json:"db"`
 }
 
-func ensureClient(ctx context.Context, state ewf.State) (*kubedeployer.Client, error) {
-	client, ok := state["kubeclient"].(*kubedeployer.Client)
-	if ok {
-		log.Info().Msg("Found existing kubedeployer client in state")
-		return client, nil
-	}
-
-	// create client again if not found in state
-	config, ok := state["config"].(ClientConfig)
-	if !ok {
-		log.Error().Msg("Missing or invalid 'config' in state")
-		return nil, fmt.Errorf("missing or invalid 'config' in state")
-	}
-
-	if config.SSHPublicKey == "" || config.Mnemonic == "" || config.UserID == "" || config.Network == "" {
-		log.Error().Msg("Incomplete client configuration in state")
-		return nil, fmt.Errorf("incomplete client configuration in state")
-	}
-
-	kubeClient, err := kubedeployer.NewClient(ctx, config.Mnemonic, config.Network, config.SSHPublicKey, config.UserID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to create kubedeployer client")
-		return nil, fmt.Errorf("failed to create kubedeployer client: %w", err)
-	}
-
-	log.Info().Msg("Successfully created kubedeployer client")
-	return kubeClient, nil
-}
-
-func SetClientStep() ewf.StepFn {
-	return func(ctx context.Context, state ewf.State) error {
-		kubeClient, err := ensureClient(ctx, state)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to ensure kubedeployer client")
-			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
-		}
-
-		state["kubeclient"] = kubeClient
-		return nil
-	}
-}
+var (
+	// RetryPolicies defines standard retry configurations
+	criticalRetryPolicy = &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5} // For critical operations like deployments
+	standardRetryPolicy = &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2} // For standard operations
+)
 
 func DeployNetworkStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		log.Info().Msg("Deploying network for cluster")
-		kubeClient, err := ensureClient(ctx, state)
+		kubeClient, err := getKubeClient(state)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to ensure kubedeployer client in deploy network step")
-			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
+			return err
 		}
 
-		cluster, ok := state["cluster"].(kubedeployer.Cluster)
-		if !ok {
-			log.Error().Msg("Missing or invalid 'cluster' in state")
-			return fmt.Errorf("missing or invalid 'cluster' in state")
+		cluster, err := getCluster(state)
+		if err != nil {
+			return err
 		}
 
-		log.Info().Str("cluster_name", cluster.Name).Msg("Preparing cluster")
 		if err := cluster.PrepareCluster(kubeClient.UserID); err != nil {
-			log.Error().Err(err).Str("cluster_name", cluster.Name).Msg("Failed to prepare cluster")
 			return fmt.Errorf("failed to prepare cluster: %w", err)
 		}
 
-		log.Info().Str("cluster_name", cluster.Name).Msg("Starting network deployment")
 		if err := kubeClient.DeployNetwork(ctx, &cluster); err != nil {
-			log.Error().Err(err).Str("cluster_name", cluster.Name).Msg("Failed to deploy network")
 			return fmt.Errorf("failed to deploy network: %w", err)
 		}
 
 		state["cluster"] = cluster
-		log.Info().Str("cluster_name", cluster.Name).Msg("Network deployed successfully for cluster")
 		return nil
 	}
 }
 
 func DeployNodesStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		log.Info().Msg("Starting node deployment for cluster")
-		kubeClient, err := ensureClient(ctx, state)
+		kubeClient, err := getKubeClient(state)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to ensure kubedeployer client in deploy nodes step")
-			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
-		}
-		defer kubeClient.Close()
-
-		cluster, ok := state["cluster"].(kubedeployer.Cluster)
-		if !ok {
-			log.Error().Msg("Missing or invalid 'cluster' in state")
-			return fmt.Errorf("missing or invalid 'cluster' in state")
+			return err
 		}
 
-		log.Info().Str("cluster_name", cluster.Name).Int("node_count", len(cluster.Nodes)).Msg("Assigning node IPs")
+		cluster, err := getCluster(state)
+		if err != nil {
+			return err
+		}
+
 		if err := kubeClient.AssignNodeIPs(ctx, &cluster); err != nil {
-			log.Error().Err(err).Str("cluster_name", cluster.Name).Msg("Failed to assign node IPs")
 			return fmt.Errorf("failed to assign node IPs: %w", err)
 		}
 
@@ -125,32 +75,25 @@ func DeployNodesStep() ewf.StepFn {
 
 			// Deploy and update the node on cluster.Nodes
 			if err := kubeClient.DeployNode(ctx, &cluster, node); err != nil {
-				log.Error().Err(err).Str("node_name", node.Name).Int("node_index", idx).Msg("Failed to deploy node")
 				return fmt.Errorf("failed to deploy node %s (index %d): %w", node.Name, idx, err)
 			}
-			log.Info().Str("node_name", node.Name).Msg("Node deployed successfully")
 		}
 
 		state["cluster"] = cluster
-		log.Info().Str("cluster_name", cluster.Name).Int("node_count", len(cluster.Nodes)).Msg("All nodes deployed successfully for cluster")
 		return nil
 	}
 }
 
 func StoreDeploymentStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		// TODO: close client
-
-		cluster, ok := state["cluster"].(kubedeployer.Cluster)
-		if !ok {
-			log.Error().Msg("Missing or invalid 'cluster' in state")
-			return fmt.Errorf("missing or invalid 'cluster' in state")
+		cluster, err := getCluster(state)
+		if err != nil {
+			return err
 		}
 
-		config, ok := state["config"].(ClientConfig)
-		if !ok {
-			log.Error().Msg("Missing or invalid 'config' in state")
-			return fmt.Errorf("missing or invalid 'config' in state")
+		config, err := getConfig(state)
+		if err != nil {
+			return err
 		}
 
 		dbCluster := &models.Cluster{
@@ -158,22 +101,18 @@ func StoreDeploymentStep() ewf.StepFn {
 		}
 
 		if err := dbCluster.SetClusterResult(cluster); err != nil {
-			log.Error().Err(err).Msg("Failed to set cluster result")
-		} else {
-			existingCluster, err := config.DB.GetClusterByName(config.UserID, cluster.ProjectName)
-			if err != nil {
-				if err := config.DB.CreateCluster(dbCluster); err != nil {
-					log.Error().Err(err).Msg("Failed to create cluster in database")
-				} else {
-					log.Info().Str("project_name", cluster.ProjectName).Msg("Cluster created in database")
-				}
-			} else {
-				existingCluster.Result = dbCluster.Result
-				if err := config.DB.UpdateCluster(&existingCluster); err != nil {
-					log.Error().Err(err).Msg("Failed to update cluster in database")
-				} else {
-					log.Info().Str("project_name", cluster.ProjectName).Msg("Cluster updated in database")
-				}
+			return fmt.Errorf("failed to set cluster result: %w", err)
+		}
+
+		existingCluster, err := config.DB.GetClusterByName(config.UserID, cluster.ProjectName)
+		if err != nil { // cluster not found, create a new one
+			if err := config.DB.CreateCluster(dbCluster); err != nil {
+				return fmt.Errorf("failed to create cluster in database: %w", err)
+			}
+		} else { // cluster exists, update it
+			existingCluster.Result = dbCluster.Result
+			if err := config.DB.UpdateCluster(&existingCluster); err != nil {
+				return fmt.Errorf("failed to update cluster in database: %w", err)
 			}
 		}
 
@@ -182,18 +121,15 @@ func StoreDeploymentStep() ewf.StepFn {
 }
 
 func NotifyUserStep() ewf.StepFn {
-	// TODO: more notifications
 	return func(ctx context.Context, state ewf.State) error {
-		cluster, ok := state["cluster"].(kubedeployer.Cluster)
-		if !ok {
-			log.Error().Msg("Missing or invalid 'cluster' in state")
-			return fmt.Errorf("missing or invalid 'cluster' in state")
+		cluster, err := getCluster(state)
+		if err != nil {
+			return err
 		}
 
-		config, ok := state["config"].(ClientConfig)
-		if !ok {
-			log.Error().Msg("Missing or invalid 'config' in state")
-			return fmt.Errorf("missing or invalid 'config' in state")
+		config, err := getConfig(state)
+		if err != nil {
+			return err
 		}
 
 		notificationData := map[string]interface{}{
@@ -203,57 +139,48 @@ func NotifyUserStep() ewf.StepFn {
 		}
 
 		config.SSE.Notify(config.UserID, "deployment_update", notificationData)
-
 		return nil
 	}
 }
 
 func CancelDeploymentStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		kubeClient, err := ensureClient(ctx, state)
+		kubeClient, err := getKubeClient(state)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to ensure kubedeployer client in cancel deployment step")
-			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
+			return err
 		}
 
 		projectName, ok := state["project_name"].(string)
 		if !ok {
-			log.Error().Msg("Missing or invalid 'project_name' in state")
 			return fmt.Errorf("missing or invalid 'project_name' in state")
 		}
 
 		if err := kubeClient.CancelCluster(ctx, projectName); err != nil {
-			log.Error().Err(err).Str("project_name", projectName).Msg("Failed to cancel deployment")
 			return fmt.Errorf("failed to cancel deployment: %w", err)
 		}
 
-		log.Info().Str("project_name", projectName).Msg("Deployment canceled successfully")
 		return nil
 	}
 }
 
 func AddDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		kubeClient, err := ensureClient(ctx, state)
+		kubeClient, err := getKubeClient(state)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to ensure kubedeployer client in add deployment node step")
-			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
+			return err
 		}
 
 		addedCluster, ok := state["added_cluster"].(kubedeployer.Cluster)
 		if !ok {
-			log.Error().Msg("Missing or invalid 'cluster' in state")
 			return fmt.Errorf("missing or invalid 'cluster' in state")
 		}
 
 		existingCluster, ok := state["cluster"].(kubedeployer.Cluster)
 		if !ok {
-			log.Error().Msg("Missing or invalid 'existing_cluster' in state")
 			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
 		}
 
 		if err := kubeClient.AssignNodeIPs(ctx, &addedCluster); err != nil {
-			log.Error().Err(err).Msg("Failed to assign node IPs for added cluster")
 			return fmt.Errorf("failed to assign node IPs for added cluster: %w", err)
 		}
 
@@ -265,7 +192,6 @@ func AddDeploymentNodeStep() ewf.StepFn {
 
 			// assign nodes to the existing cluster (merge)
 			if err := kubeClient.DeployNode(ctx, &existingCluster, node); err != nil {
-				log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to deploy node to existing cluster")
 				return fmt.Errorf("failed to deploy node %s to existing cluster: %w", node.Name, err)
 			}
 
@@ -274,86 +200,177 @@ func AddDeploymentNodeStep() ewf.StepFn {
 		}
 
 		state["cluster"] = existingCluster
-		log.Info().Str("existing_cluster_name", existingCluster.Name).Msg("All nodes deployed successfully for existing cluster")
 		return nil
 	}
 }
 
 func RemoveDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		kubeClient, err := ensureClient(ctx, state)
+		kubeClient, err := getKubeClient(state)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to ensure kubedeployer client in remove deployment node step")
-			return fmt.Errorf("failed to ensure kubedeployer client: %w", err)
+			return err
 		}
 
 		existingCluster, ok := state["cluster"].(kubedeployer.Cluster)
 		if !ok {
-			log.Error().Msg("Missing or invalid 'existing_cluster' in state")
 			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
 		}
 
 		nodeName, ok := state["node_name"].(string)
 		if !ok {
-			log.Error().Msg("Missing or invalid 'node_name' in state")
 			return fmt.Errorf("missing or invalid 'node_name' in state")
 		}
 
 		if err := kubeClient.RemoveClusterNode(ctx, &existingCluster, nodeName); err != nil {
-			log.Error().Err(err).Str("node_name", nodeName).Msg("Failed to remove node from existing cluster")
 			return fmt.Errorf("failed to remove node %s from existing cluster: %w", nodeName, err)
 		}
 
 		state["cluster"] = existingCluster
-		log.Info().Str("existing_cluster_name", existingCluster.Name).Str("node_name", nodeName).Msg("Node removed successfully from existing cluster")
 		return nil
 	}
 }
 
+func validateConfig(config ClientConfig) error {
+	if config.SSHPublicKey == "" {
+		return fmt.Errorf("missing SSH public key in config")
+	}
+	if config.Mnemonic == "" {
+		return fmt.Errorf("missing mnemonic in config")
+	}
+	if config.UserID == "" {
+		return fmt.Errorf("missing user ID in config")
+	}
+	if config.Network == "" {
+		return fmt.Errorf("missing network in config")
+	}
+	return nil
+}
+
+func SetupClient(ctx context.Context, wf *ewf.Workflow) {
+	config, ok := wf.State["config"].(ClientConfig)
+	if !ok {
+		log.Error().Msg("Missing or invalid 'config' in workflow state")
+		return
+	}
+
+	if err := validateConfig(config); err != nil {
+		log.Error().Err(err).Msg("Invalid workflow configuration")
+		return
+	}
+
+	log.Warn().Str("user_id", config.UserID).Str("workflow_name", wf.Name).Msg("Setting up kubeclient for workflow")
+	kubeClient, err := kubedeployer.NewClient(ctx, config.Mnemonic, config.Network, config.SSHPublicKey, config.UserID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create kubeclient")
+		return
+	}
+
+	wf.State["kubeclient"] = kubeClient
+}
+
+func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
+	if kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client); ok {
+		kubeClient.Close()
+		delete(wf.State, "kubeclient")
+	} else {
+		log.Warn().Msg("No kubeclient found in workflow state to close")
+	}
+
+	if err != nil {
+		log.Error().Err(err).Str("workflow_name", wf.Name).Msg("Workflow completed with error")
+	} else {
+		log.Info().Str("workflow_name", wf.Name).Msg("Workflow completed successfully")
+	}
+}
+
 func registerDeploymentActivities(engine *ewf.Engine) {
-	engine.Register("setup_client", SetClientStep())
 	engine.Register("deploy_network", DeployNetworkStep())
 	engine.Register("deploy_nodes", DeployNodesStep())
 	engine.Register("remove_cluster", CancelDeploymentStep())
 	engine.Register("add_node", AddDeploymentNodeStep())
 	engine.Register("remove_node", RemoveDeploymentNodeStep())
-
 	engine.Register("store_deployment", StoreDeploymentStep())
 	engine.Register("notify_user", NotifyUserStep())
 
-	engine.RegisterTemplate("deploy_cluster", &ewf.WorkflowTemplate{
-		Steps: []ewf.Step{
-			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "deploy_network", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
-			{Name: "deploy_nodes", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
-			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+	baseWFTemplate := ewf.WorkflowTemplate{
+		BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
+			func(ctx context.Context, w *ewf.Workflow) {
+				log.Info().Str("workflow_name", w.Name).Msg("Starting workflow")
+			},
+			SetupClient,
 		},
-	})
+		AfterWorkflowHooks: []ewf.AfterWorkflowHook{
+			CloseClient,
+		},
+		BeforeStepHooks: []ewf.BeforeStepHook{
+			func(ctx context.Context, w *ewf.Workflow, step *ewf.Step) {
+				log.Info().Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Starting step")
+			},
+		},
+		AfterStepHooks: []ewf.AfterStepHook{
+			func(ctx context.Context, w *ewf.Workflow, step *ewf.Step, err error) {
+				if err != nil {
+					log.Error().Err(err).Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step failed")
+				} else {
+					log.Debug().Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step completed successfully")
+				}
+			},
+		},
+	}
 
-	engine.RegisterTemplate("remove_cluster", &ewf.WorkflowTemplate{
-		Steps: []ewf.Step{
-			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "remove_cluster", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-		},
-	})
-	engine.RegisterTemplate("add_node", &ewf.WorkflowTemplate{
-		Steps: []ewf.Step{
-			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "deploy_network", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, Delay: 5}},
-			{Name: "add_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-		},
-	})
-	engine.RegisterTemplate("remove_node", &ewf.WorkflowTemplate{
-		Steps: []ewf.Step{
-			{Name: "setup_client", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "remove_node", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "store_deployment", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-			{Name: "notify_user", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
-		},
-	})
+	deployWFTemplate := baseWFTemplate
+	deployWFTemplate.Steps = []ewf.Step{
+		{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
+		{Name: "deploy_nodes", RetryPolicy: criticalRetryPolicy},
+		{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+		{Name: "notify_user", RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate("deploy_cluster", &deployWFTemplate)
+
+	// deleteWFTemplate := baseWFTemplate
+	// deleteWFTemplate.Steps = []ewf.Step{
+	// 	{Name: "remove_cluster", RetryPolicy: standardRetryPolicy},
+	// 	{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+	// 	{Name: "notify_user", RetryPolicy: standardRetryPolicy},
+	// }
+	// engine.RegisterTemplate("remove_cluster", &deleteWFTemplate)
+
+	// addNodeWFTemplate := baseWFTemplate
+	// addNodeWFTemplate.Steps = []ewf.Step{
+	// 	{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
+	// 	{Name: "add_node", RetryPolicy: standardRetryPolicy},
+	// 	{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+	// 	{Name: "notify_user", RetryPolicy: standardRetryPolicy},
+	// }
+	// engine.RegisterTemplate("add_node", &addNodeWFTemplate)
+
+	// removeNodeWFTemplate := baseWFTemplate
+	// removeNodeWFTemplate.Steps = []ewf.Step{
+	// 	{Name: "remove_node", RetryPolicy: standardRetryPolicy},
+	// 	{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+	// 	{Name: "notify_user", RetryPolicy: standardRetryPolicy},
+	// }
+	// engine.RegisterTemplate("remove_node", &removeNodeWFTemplate)
+}
+
+// Helper functions for state management
+func getFromState[T any](state ewf.State, key string) (T, error) {
+	value, ok := state[key].(T)
+	if !ok {
+		var zero T
+		return zero, fmt.Errorf("missing or invalid '%s' in state", key)
+	}
+	return value, nil
+}
+
+func getKubeClient(state ewf.State) (*kubedeployer.Client, error) {
+	return getFromState[*kubedeployer.Client](state, "kubeclient")
+}
+
+func getCluster(state ewf.State) (kubedeployer.Cluster, error) {
+	return getFromState[kubedeployer.Cluster](state, "cluster")
+}
+
+func getConfig(state ewf.State) (ClientConfig, error) {
+	return getFromState[ClientConfig](state, "config")
 }
