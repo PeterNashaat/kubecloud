@@ -20,11 +20,11 @@ func TestRegisterHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		payload := map[string]interface{}{
-			"name":             "Test User",
-			"email":            "testuser@example.com",
-			"password":         "securepassword",
-			"confirm_password": "securepassword",
+		payload := RegisterInput{
+			Name:            "Test User",
+			Email:           "testuser@example.com",
+			Password:        "securepassword",
+			ConfirmPassword: "securepassword",
 		}
 		body, _ := json.Marshal(payload)
 
@@ -63,11 +63,11 @@ func TestRegisterHandler(t *testing.T) {
 
 		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
 
-		payload := map[string]interface{}{
-			"name":             user.Username,
-			"email":            user.Email,
-			"password":         user.Password,
-			"confirm_password": user.Password,
+		payload := RegisterInput{
+			Name:            "New Name",
+			Email:           user.Email,
+			Password:        "newpassword",
+			ConfirmPassword: "newpassword",
 		}
 		body, _ := json.Marshal(payload)
 
@@ -86,11 +86,11 @@ func TestRegisterHandler(t *testing.T) {
 
 		user := CreateTestUser(t, app, "unverified@example.com", "Unverified User", []byte("securepassword"), false, false, 0, time.Now())
 
-		payload := map[string]interface{}{
-			"name":             user.Username,
-			"email":            user.Email,
-			"password":         user.Password,
-			"confirm_password": user.Password,
+		payload := RegisterInput{
+			Name:            "New Name",
+			Email:           user.Email,
+			Password:        "newpassword",
+			ConfirmPassword: "newpassword",
 		}
 		body, _ := json.Marshal(payload)
 
@@ -111,9 +111,9 @@ func TestVerifyRegisterCode(t *testing.T) {
 
 		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, 123, time.Now())
 
-		payload := map[string]interface{}{
-			"email": user.Email,
-			"code":  user.Code,
+		payload := VerifyCodeInput{
+			Email: user.Email,
+			Code:  user.Code,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -130,8 +130,8 @@ func TestVerifyRegisterCode(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		payload := map[string]interface{}{
-			"email": "dupe@example.com",
+		payload := VerifyCodeInput{
+			Email: "dupe@example.com",
 		}
 		body, _ := json.Marshal(payload)
 
@@ -153,9 +153,9 @@ func TestVerifyRegisterCode(t *testing.T) {
 
 		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
 
-		payload := map[string]interface{}{
-			"email": user.Email,
-			"code":  123,
+		payload := VerifyCodeInput{
+			Email: user.Email,
+			Code:  123,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -178,9 +178,9 @@ func TestVerifyRegisterCode(t *testing.T) {
 
 		CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, 555, time.Now())
 
-		payload := map[string]interface{}{
-			"email": "dupe@example.com",
-			"code":  333,
+		payload := VerifyCodeInput{
+			Email: "dupe@example.com",
+			Code:  333,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -204,9 +204,9 @@ func TestVerifyRegisterCode(t *testing.T) {
 
 		user := CreateTestUser(t, app, "test@example.com", "Test User", []byte("securepassword"), false, false, 123, time.Now().Add(-2*time.Hour))
 
-		payload := map[string]interface{}{
-			"email": user.Email,
-			"code":  user.Code,
+		payload := VerifyCodeInput{
+			Email: user.Email,
+			Code:  user.Code,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -234,9 +234,9 @@ func TestLoginUserHandler(t *testing.T) {
 	user := CreateTestUser(t, app, "loginuser@example.com", "Login User", hashedPassword, true, false, 0, time.Now())
 
 	t.Run("Test LoginUserHandler", func(t *testing.T) {
-		payload := map[string]interface{}{
-			"email":    user.Email,
-			"password": "securepassword",
+		payload := LoginInput{
+			Email:    user.Email,
+			Password: "securepassword",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/login", bytes.NewReader(body))
@@ -264,9 +264,9 @@ func TestLoginUserHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		payload := map[string]interface{}{
-			"email":    "notfound@example.com",
-			"password": "irrelevant",
+		payload := LoginInput{
+			Email:    "notfound@example.com",
+			Password: "irrelevant",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/login", bytes.NewReader(body))
@@ -280,9 +280,9 @@ func TestLoginUserHandler(t *testing.T) {
 		assert.Contains(t, result["error"], "email or password is incorrect")
 	})
 	t.Run("Test LoginUserHandler with wrong password", func(t *testing.T) {
-		payload := map[string]interface{}{
-			"email":    user.Email,
-			"password": "wrongpassword",
+		payload := LoginInput{
+			Email:    user.Email,
+			Password: "wrongpassword",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/login", bytes.NewReader(body))
@@ -306,8 +306,8 @@ func TestRefreshTokenHandler(t *testing.T) {
 		user := CreateTestUser(t, app, "refreshtoken@example.com", "Refresh User", []byte("securepassword"), true, false, 0, time.Now())
 		tokenPair, _ := app.handlers.tokenManager.CreateTokenPair(user.ID, user.Username, false)
 
-		payload := map[string]interface{}{
-			"refresh_token": tokenPair.RefreshToken,
+		payload := RefreshTokenInput{
+			RefreshToken: tokenPair.RefreshToken,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/refresh", bytes.NewReader(body))
@@ -341,8 +341,8 @@ func TestRefreshTokenHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		payload := map[string]interface{}{
-			"refresh_token": "invalidtoken",
+		payload := RefreshTokenInput{
+			RefreshToken: "invalidtoken",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/refresh", bytes.NewReader(body))
@@ -365,8 +365,8 @@ func TestForgotPasswordHandler(t *testing.T) {
 
 		user := CreateTestUser(t, app, "forgotuser@example.com", "Forgot User", []byte("securepassword"), true, false, 0, time.Now())
 
-		payload := map[string]interface{}{
-			"email": user.Email,
+		payload := EmailInput{
+			Email: user.Email,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password", bytes.NewReader(body))
@@ -397,8 +397,8 @@ func TestForgotPasswordHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		payload := map[string]interface{}{
-			"email": "notfound@example.com",
+		payload := EmailInput{
+			Email: "notfound@example.com",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password", bytes.NewReader(body))
@@ -422,9 +422,9 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 
 		user := CreateTestUser(t, app, "resetuser@example.com", "Reset User", []byte("securepassword"), false, false, 4231, time.Now())
 
-		payload := map[string]interface{}{
-			"email": user.Email,
-			"code":  user.Code,
+		payload := VerifyCodeInput{
+			Email: user.Email,
+			Code:  user.Code,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password/verify", bytes.NewReader(body))
@@ -458,9 +458,9 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		user := CreateTestUser(t, app, "wrongreset@example.com", "Wrong Reset", []byte("securepassword"), false, false, 0, time.Now())
 
 		assert.NoError(t, err)
-		payload := map[string]interface{}{
-			"email": user.Email,
-			"code":  9999,
+		payload := VerifyCodeInput{
+			Email: user.Email,
+			Code:  9999,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password/verify", bytes.NewReader(body))
@@ -480,9 +480,9 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		router := app.router
 		user := CreateTestUser(t, app, "expiredreset@example.com", "Expired Reset", []byte("securepassword"), false, false, 4231, time.Now().Add(-2*time.Hour))
 
-		payload := map[string]interface{}{
-			"email": user.Email,
-			"code":  user.Code,
+		payload := VerifyCodeInput{
+			Email: user.Email,
+			Code:  user.Code,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password/verify", bytes.NewReader(body))
@@ -500,9 +500,9 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		payload := map[string]interface{}{
-			"email": "notfoundreset@example.com",
-			"code":  4321,
+		payload := VerifyCodeInput{
+			Email: "notfoundreset@example.com",
+			Code:  4321,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password/verify", bytes.NewReader(body))
@@ -527,10 +527,10 @@ func TestChangePasswordHandler(t *testing.T) {
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 
-		payload := map[string]interface{}{
-			"email":            user.Email,
-			"password":         "newsecurepassword",
-			"confirm_password": "newsecurepassword",
+		payload := ChangePasswordInput{
+			Email:           user.Email,
+			Password:        "newsecurepassword",
+			ConfirmPassword: "newsecurepassword",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("PUT", "/api/v1/user/change_password", bytes.NewReader(body))
@@ -568,11 +568,10 @@ func TestChangePasswordHandler(t *testing.T) {
 		user := CreateTestUser(t, app, "changepassmismatch@example.com", "Mismatch", []byte("oldpassword"), true, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		payload := map[string]interface{}{
-			"email":            user.Email,
-			"password":         "newsecurepassword",
-			"confirm_password": "differentpassword",
-			"code":             5555,
+		payload := ChangePasswordInput{
+			Email:           user.Email,
+			Password:        "newsecurepassword",
+			ConfirmPassword: "differentpassword",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("PUT", "/api/v1/user/change_password", bytes.NewReader(body))
@@ -594,9 +593,9 @@ func TestChargeBalanceHandler(t *testing.T) {
 		err = app.handlers.db.UpdateUserByID(user)
 		assert.NoError(t, err)
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		payload := map[string]interface{}{
-			"card_type": "visa",
-			"amount":    10,
+		payload := ChargeBalanceInput{
+			CardType: "visa",
+			Amount:   10,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/balance/charge", bytes.NewReader(body))
@@ -614,10 +613,10 @@ func TestChargeBalanceHandler(t *testing.T) {
 		email := "chargeuser3@example.com"
 		username := "Charge User3"
 		token := GetAuthToken(t, app, 1, email, username, false)
-		payload := map[string]interface{}{
-			"card_type":     "visa",
-			"payment_token": "tok_test",
-			"amount":        0,
+		payload := ChargeBalanceInput{
+			CardType:     "visa",
+			PaymentToken: "tok_test",
+			Amount:       0,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/balance/charge", bytes.NewReader(body))
@@ -633,10 +632,10 @@ func TestChargeBalanceHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 		token := GetAuthToken(t, app, 1, "notfound@example.com", "Not Found", false)
-		payload := map[string]interface{}{
-			"card_type":     "visa",
-			"payment_token": "tok_test",
-			"amount":        100,
+		payload := ChargeBalanceInput{
+			CardType:     "visa",
+			PaymentToken: "tok_test",
+			Amount:       100,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/charge_balance", bytes.NewReader(body))
@@ -923,9 +922,9 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		router := app.router
 		user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		payload := map[string]interface{}{
-			"name":       "mykey",
-			"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
+		payload := SSHKeyInput{
+			Name:      "mykey",
+			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/ssh-keys", bytes.NewReader(body))
@@ -948,8 +947,8 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		user := CreateTestUser(t, app, "addsshuser2@example.com", "Add SSH User2", []byte("securepassword"), true, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		// Missing public_key
-		payload := map[string]interface{}{
-			"name": "mykey2",
+		payload := SSHKeyInput{
+			Name: "mykey2",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/ssh-keys", bytes.NewReader(body))
@@ -966,9 +965,9 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		router := app.router
 		user := CreateTestUser(t, app, "addsshuser3@example.com", "Add SSH User3", []byte("securepassword"), true, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		payload := map[string]interface{}{
-			"name":       "badkey",
-			"public_key": "not-a-valid-ssh-key",
+		payload := SSHKeyInput{
+			Name:      "badkey",
+			PublicKey: "not-a-valid-ssh-key",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/user/ssh-keys", bytes.NewReader(body))
@@ -989,13 +988,13 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		router := app.router
 		user := CreateTestUser(t, app, "addsshuser5@example.com", "Add SSH User5", []byte("securepassword"), true, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		payload1 := map[string]interface{}{
-			"name":       "keyA",
-			"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
+		payload1 := SSHKeyInput{
+			Name:      "keyA",
+			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
 		}
-		payload2 := map[string]interface{}{
-			"name":       "keyA",
-			"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
+		payload2 := SSHKeyInput{
+			Name:      "keyA",
+			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
 		}
 		body1, _ := json.Marshal(payload1)
 		req1, _ := http.NewRequest("POST", "/api/v1/user/ssh-keys", bytes.NewReader(body1))
