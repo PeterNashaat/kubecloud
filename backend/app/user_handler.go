@@ -187,7 +187,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow_id.", gin.H{
+	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow id.", gin.H{
 		"workflow_id": wf.UUID,
 		"email":       request.Email,
 	})
@@ -597,7 +597,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow_id.", map[string]interface{}{
+	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", map[string]interface{}{
 		"workflow_id": wf.UUID,
 		"email":       user.Email,
 	})
