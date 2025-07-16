@@ -24,6 +24,7 @@ func RegisterEWFWorkflows(
 	engine.Register("create_payment_intent", CreatePaymentIntentStep(config.Currency))
 	engine.Register("update_user_balance", UpdateUserBalanceStep(db))
 	engine.Register("transfer_tfts", TransferTFTsStep(substrate, config.SystemAccount.Mnemonic))
+	engine.Register("cancel_payment_intent", CancelPaymentIntentStep())
 	engine.Register("create_identity", CreateIdentityStep())
 	engine.Register("reserve_node", ReserveNodeStep(db, substrate))
 	engine.Register("unreserve_node", UnreserveNodeStep(db, substrate))
@@ -60,6 +61,7 @@ func RegisterEWFWorkflows(
 		Steps: []ewf.Step{
 			{Name: "create_payment_intent", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 			{Name: "transfer_tfts", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
+			{Name: "cancel_payment_intent", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}}, // Compensation step
 			{Name: "update_user_balance", RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, Delay: 2}},
 		},
 	})

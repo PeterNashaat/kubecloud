@@ -156,7 +156,6 @@ func SaveUserStep(db models.DB, config internal.Configuration) ewf.StepFn {
 			Email:            email,
 			Password:         hashedPassword,
 			Code:             code,
-			Verified:         false,
 			Admin:            isAdmin,
 			Mnemonic:         mnemonic,
 			StripeCustomerID: stripeID,
@@ -177,7 +176,7 @@ func SaveUserStep(db models.DB, config internal.Configuration) ewf.StepFn {
 
 		err = db.RegisterUser(&user)
 		if err != nil {
-			return fmt.Errorf("db register failed: %w", err)
+			return fmt.Errorf("user registration failed: %w", err)
 		}
 		return nil
 	}
@@ -276,6 +275,24 @@ func CreatePaymentIntentStep(currency string) ewf.StepFn {
 	}
 }
 
+func CancelPaymentIntentStep() ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		failed, ok := state["transfer_tfts_failed"].(bool)
+		if !ok || !failed {
+			return nil
+		}
+		paymentIntentID, _ := state["payment_intent_id"].(string)
+		if paymentIntentID == "" {
+			return nil
+		}
+		if err := internal.CancelPaymentIntent(paymentIntentID); err != nil {
+			log.Error().Err(err).Msg("error canceling payment intent in compensation step")
+			return err
+		}
+		return nil
+	}
+}
+
 func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		amountVal, ok := state["amount"]
@@ -301,22 +318,13 @@ func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf
 			return fmt.Errorf("'mnemonic' in state is not a string")
 		}
 
-		paymentIntentVal, ok := state["payment_intent_id"]
-		if !ok {
-			return fmt.Errorf("missing 'payment intent id' in state")
-		}
-		paymentIntentID, ok := paymentIntentVal.(string)
-		if !ok {
-			return fmt.Errorf("'payment intent id' is not a string")
-		}
 		err := internal.TransferTFTs(substrate, uint64(amount), mnemonic, systemMnemonic)
 		if err != nil {
 			log.Error().Err(err).Send()
-			if err = internal.CancelPaymentIntent(paymentIntentID); err != nil {
-				log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
-			}
+			state["transfer_tfts_failed"] = true
 			return err
 		}
+		state["transfer_tfts_failed"] = false
 		return nil
 	}
 }
