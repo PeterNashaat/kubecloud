@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mattn/go-sqlite3"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -800,9 +802,14 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	}
 
 	if err := h.db.CreateSSHKey(&sshKey); err != nil {
-		log.Error().Err(err).Msg("failed to create SSH key")
-		InternalServerError(c)
-		return
+    var sqliteErr sqlite3.Error
+    if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+        Error(c, http.StatusBadRequest, "Duplicate SSH key", "SSH key name or public key already exists for this user.")
+        return
+    }
+    log.Error().Err(err).Msg("failed to create SSH key")
+    InternalServerError(c)
+    return
 	}
 
 	Success(c, http.StatusCreated, "SSH key added successfully", sshKey)

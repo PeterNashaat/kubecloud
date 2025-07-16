@@ -1010,7 +1010,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		req2.Header.Set("Content-Type", "application/json")
 		resp2 := httptest.NewRecorder()
 		router.ServeHTTP(resp2, req2)
-		assert.Equal(t, http.StatusInternalServerError, resp2.Code)
+		assert.Equal(t, http.StatusBadRequest, resp2.Code)
 	})
 
 }
