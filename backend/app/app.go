@@ -169,7 +169,6 @@ func (app *App) registerHandlers() {
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
-		v1.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
 
 		adminGroup := v1.Group("")
 		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
@@ -200,6 +199,7 @@ func (app *App) registerHandlers() {
 			userGroup.POST("/refresh", app.handlers.RefreshTokenHandler)
 			userGroup.POST("/forgot_password", app.handlers.ForgotPasswordHandler)
 			userGroup.POST("/forgot_password/verify", app.handlers.VerifyForgetPasswordCodeHandler)
+			userGroup.GET("/registration/workflow_status", app.handlers.RegistrationWorkflowStatusHandler)
 
 			authGroup := userGroup.Group("")
 			authGroup.Use(middlewares.UserMiddleware(app.handlers.tokenManager))
@@ -218,6 +218,7 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/ssh-keys", app.handlers.ListSSHKeysHandler)
 				authGroup.POST("/ssh-keys", app.handlers.AddSSHKeyHandler)
 				authGroup.DELETE("/ssh-keys/:ssh_key_id", app.handlers.DeleteSSHKeyHandler)
+				authGroup.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
 			}
 		}
 

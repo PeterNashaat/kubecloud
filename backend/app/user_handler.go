@@ -712,14 +712,6 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	user.CreditedBalance += voucher.Value
-	err = h.db.UpdateUserByID(&user)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -727,12 +719,13 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 	wf.State = map[string]interface{}{
+		"user_id":  user.ID,
 		"amount":   voucher.Value,
 		"mnemonic": user.Mnemonic,
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusOK, "Voucher is redeemed successfully. TFT transfer in progress.", map[string]interface{}{
+	Success(c, http.StatusOK, "Voucher is redeemed successfully. Money transfer in progress.", map[string]interface{}{
 		"workflow_id":  wf.UUID,
 		"voucher_code": voucher.Code,
 		"amount":       voucher.Value,
@@ -868,7 +861,7 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 }
 
 // @Summary Get workflow status
-// @Description Returns the status of a workflow by its ID
+// @Description Returns the status of a workflow by its ID. Requires authentication.
 // @Tags workflow
 // @ID get-workflow-status
 // @Accept json
@@ -878,6 +871,7 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 // @Failure 400 {object} APIResponse "Invalid request or missing workflow ID"
 // @Failure 404 {object} APIResponse "Workflow not found"
 // @Failure 500 {object} APIResponse "Internal server error"
+// @Security BearerAuth
 // @Router /workflow/{workflow_id} [get]
 func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 
@@ -887,7 +881,7 @@ func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 		return
 	}
 
-	workflow, err := h.ewfEngine.Store().LoadWorkflow(c, workflowID)
+	workflow, err := h.ewfEngine.Store().LoadWorkflowByUUID(c, workflowID)
 	if err != nil {
 		InternalServerError(c)
 		return
@@ -895,4 +889,36 @@ func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 
 	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
 
+}
+
+// @Summary Get registration/verification workflow status
+// @Description Returns the status of a workflow by its ID. Requires authentication.
+// @Tags users
+// @ID registration-workflow-status
+// @Accept json
+// @Produce json
+// @Param workflow_id path string true "Workflow ID"
+// @Success 200 {object} string "Workflow status returned successfully"
+// @Failure 400 {object} APIResponse "Invalid request or code"
+// @Failure 404 {object} APIResponse "Workflow not found"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @Router /user/registration/workflow_status [get]
+func (h *Handler) RegistrationWorkflowStatusHandler(c *gin.Context) {
+	workflowID := c.Param("workflow_id")
+	if workflowID == "" {
+		Error(c, http.StatusBadRequest, "Invalid request", "Workflow ID is required")
+		return
+	}
+
+	workflow, err := h.ewfEngine.Store().LoadWorkflowByUUID(c, workflowID)
+	if err != nil {
+		Error(c, http.StatusNotFound, "Workflow not found", "")
+		return
+	}
+	if workflow.Name != activities.WorkflowUserRegistration && workflow.Name != activities.WorkflowUserVerification {
+		Error(c, http.StatusBadRequest, "Invalid workflow type", "")
+		return
+	}
+
+	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
 }

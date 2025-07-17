@@ -20,7 +20,7 @@ require (
 	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250707084605-fd852df30b94
 	github.com/threefoldtech/zosbase v0.1.7
 	github.com/tyler-smith/go-bip39 v1.1.0
-	github.com/xmonader/ewf v0.0.0-20250708123819-f2395c9b21da
+	github.com/xmonader/ewf v0.0.0-20250716190554-ee315eb0c024
 	gorm.io/gorm v1.30.0
 )
 

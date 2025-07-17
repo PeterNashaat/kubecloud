@@ -329,7 +329,7 @@ func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf
 	}
 }
 
-func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
+func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		userIDVal, ok := state["user_id"]
 		if !ok {
@@ -364,6 +364,47 @@ func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
 		}
 		state["new_balance"] = user.CreditCardBalance
 		state["mnemonic"] = user.Mnemonic
+		return nil
+	}
+}
+
+func UpdateCreditedBalanceStep(db models.DB) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		if failed, ok := state["transfer_tfts_failed"].(bool); ok && failed {
+			return fmt.Errorf("TFT transfer failed, not updating credited balance")
+		}
+		userIDVal, ok := state["user_id"]
+		if !ok {
+			return fmt.Errorf("missing 'user_id' in state")
+		}
+		userID, ok := userIDVal.(int)
+		if !ok {
+			return fmt.Errorf("'user_id' in state is not an int")
+		}
+
+		amountVal, ok := state["amount"]
+		if !ok {
+			return fmt.Errorf("missing 'amount' in state")
+		}
+		var amount float64
+		switch v := amountVal.(type) {
+		case float64:
+			amount = v
+		case int:
+			amount = float64(v)
+		default:
+			return fmt.Errorf("'amount' in state is not a float64 or int")
+		}
+
+		user, err := db.GetUserByID(userID)
+		if err != nil {
+			return fmt.Errorf("user not found: %w", err)
+		}
+		user.CreditedBalance += amount
+		if err := db.UpdateUserByID(&user); err != nil {
+			return fmt.Errorf("error updating user: %w", err)
+		}
+		state["new_balance"] = user.CreditedBalance
 		return nil
 	}
 }
