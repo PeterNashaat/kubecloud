@@ -18,7 +18,7 @@ require (
 	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20250703093252-e7500b106618
 	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.9-0.20250707084605-fd852df30b94
 	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250707084605-fd852df30b94
-	github.com/threefoldtech/zosbase v0.1.7
+	github.com/threefoldtech/zosbase v0.1.10
 	github.com/tyler-smith/go-bip39 v1.1.0
 	gorm.io/gorm v1.30.0
 )
@@ -53,6 +53,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -66,8 +67,11 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/josharian/native v0.0.0-20200817173448-b6b71def0850 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
+	github.com/mdlayher/genetlink v1.0.0 // indirect
+	github.com/mdlayher/netlink v1.4.0 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/phpdave11/gofpdi v1.0.14-0.20211212211723-1f10f9844311 // indirect
 	github.com/pierrec/xxHash v0.1.5 // indirect
@@ -96,6 +100,7 @@ require (
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
+	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
