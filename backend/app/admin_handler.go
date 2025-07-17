@@ -228,6 +228,32 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
+	systemBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	if systemBalance < float64(request.Amount) {
+		Error(c, http.StatusBadRequest, fmt.Sprintf("System balance is not enough, only %v is available", systemBalance), "")
+		return
+	}
+
+	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(request.Amount))
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
 	if err := h.db.CreateTransaction(&transaction); err != nil {
 		log.Error().Err(err).Msg("Failed to create credit transaction")
 		InternalServerError(c)
@@ -240,17 +266,33 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
 	Success(c, http.StatusCreated, "User is credited successfully", CreditUserResponse{
 		User:   user.Email,
 		Amount: request.Amount,
 		Memo:   request.Memo,
 	})
+}
 
+// @Summary List pending records
+// @Description Returns all pending records in the system
+// @Tags admin
+// @ID list-pending-records
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.PendingRecord
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /pending-records [get]
+// ListPendingRecordsHandler returns all pending records in the system
+func (h *Handler) ListPendingRecordsHandler(c *gin.Context) {
+	pendingRecords, err := h.db.ListAllPendingRecords()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list all pending records")
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
+		"pending_records": pendingRecords,
+	})
 }

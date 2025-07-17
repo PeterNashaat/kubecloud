@@ -641,7 +641,32 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(request.Amount))
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	systemUSDBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	if systemUSDBalance < float64(request.Amount) {
+		if err = h.db.CreatePendingRecord(&models.PendingRecord{
+			UserID:    userID,
+			TFTAmount: requestedTFTs,
+		}); err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		if err = internal.CancelPaymentIntent(intent.ID); err != nil {
@@ -784,7 +809,32 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(voucher.Value))
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	systemUSDBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	if systemUSDBalance < float64(voucher.Value) {
+		if err = h.db.CreatePendingRecord(&models.PendingRecord{
+			UserID:    userID,
+			TFTAmount: requestedTFTs,
+		}); err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

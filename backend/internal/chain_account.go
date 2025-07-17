@@ -90,38 +90,40 @@ func ActivateAccount(substrateAccountID string, url string) error {
 }
 
 // TransferTFTs transfer balance to users' account
-func TransferTFTs(substrateClient *substrate.Substrate, usdcBalance uint64, userMnemonic, systemMnemonic string) error {
+func TransferTFTs(substrateClient *substrate.Substrate, tftBalance uint64, userMnemonic, systemMnemonic string) error {
 	// Create identity of user from mnemonic
 	userIdentity, err := substrate.NewIdentityFromSr25519Phrase(userMnemonic)
 	if err != nil {
 		return err
 	}
 
-	// get tft price for conversion
-	price, err := substrateClient.GetTFTPrice()
-	if err != nil {
-		return err
-	}
-
-	tftBalance := float64(usdcBalance) / (float64(price) / 1000) * 1e7
-
 	// Create identity of system from mnemonic
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(systemMnemonic)
 	if err != nil {
 		return err
 	}
-	return substrateClient.Transfer(systemIdentity, uint64(tftBalance), substrate.AccountID(userIdentity.PublicKey()))
 
+	return substrateClient.Transfer(systemIdentity, tftBalance, substrate.AccountID(userIdentity.PublicKey()))
 }
 
 // GetUserBalanceUSD gets balance of user in USD
 func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string) (float64, error) {
+	tftBalance, err := GetUserTFTBalance(substrateClient, userMnemonic)
+	if err != nil {
+		return 0, err
+	}
+
+	return FromTFTtoUSD(substrateClient, tftBalance)
+}
+
+// GetUserBalanceUSD gets balance of user in TFT
+func GetUserTFTBalance(substrateClient *substrate.Substrate, userMnemonic string) (uint64, error) {
 	// Create identity from mnemonic
 	identity, err := substrate.NewIdentityFromSr25519Phrase(userMnemonic)
 	if err != nil {
 		return 0, err
-
 	}
+
 	account, err := substrate.FromAddress(identity.Address())
 	if err != nil {
 		return 0, err
@@ -133,13 +135,7 @@ func GetUserBalanceUSD(substrateClient *substrate.Substrate, userMnemonic string
 		return 0, err
 	}
 
-	usdBalance, err := FromTFTtoUSD(substrateClient, tftBalance.Free.Uint64())
-	if err != nil {
-		return 0, err
-	}
-
-	return usdBalance, nil
-
+	return tftBalance.Free.Uint64(), nil
 }
 
 func FromTFTtoUSD(substrateClient *substrate.Substrate, amount uint64) (float64, error) {
@@ -150,10 +146,18 @@ func FromTFTtoUSD(substrateClient *substrate.Substrate, amount uint64) (float64,
 	price, err := substrateClient.GetTFTPrice()
 	if err != nil {
 		return 0, err
-
 	}
 
 	usdBalance := float64(tft) * (float64(price) / 1000)
 	return usdBalance, nil
+}
 
+func FromUSDToTFT(substrateClient *substrate.Substrate, amount float64) (uint64, error) {
+	price, err := substrateClient.GetTFTPrice()
+	if err != nil {
+		return 0, err
+	}
+
+	tft := (amount * 1000) / (float64(price) * 1e7)
+	return uint64(tft), nil
 }

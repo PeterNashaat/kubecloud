@@ -157,6 +157,7 @@ func (app *App) registerHandlers() {
 			}
 
 			adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
+			adminGroup.GET("/pending-records", app.handlers.ListPendingRecordsHandler)
 
 			vouchersGroup := adminGroup.Group("/vouchers")
 			{
@@ -233,6 +234,7 @@ func (app *App) registerHandlers() {
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
 	go app.handlers.TrackUserDebt(app.gridClient)
+	go app.handlers.MonitorSystemBalanceAndHandleSettlement()
 }
 
 // Run starts the server

@@ -114,7 +114,12 @@ func (s *Sqlite) ListAllUsers() ([]models.User, error) {
 		return nil, err
 	}
 	return users, nil
+}
 
+// ListAdmins gets all admins
+func (s *Sqlite) ListAdmins() ([]models.User, error) {
+	var admins []models.User
+	return admins, s.db.Where("admin = true and verified = true").Find(&admins).Error
 }
 
 // DeleteUserByID deletes user by its ID
@@ -379,4 +384,27 @@ func (s *Sqlite) UpdateCluster(cluster *models.Cluster) error {
 // DeleteCluster deletes a cluster by name for a specific user
 func (s *Sqlite) DeleteCluster(userID string, projectName string) error {
 	return s.db.Where("user_id = ? AND project_name = ?", userID, projectName).Delete(&models.Cluster{}).Error
+}
+
+func (s *Sqlite) CreatePendingRecord(record *models.PendingRecord) error {
+	record.CreatedAt = time.Now()
+	return s.db.Create(record).Error
+}
+
+func (s *Sqlite) ListAllPendingRecords() ([]models.PendingRecord, error) {
+	var pendingRecords []models.PendingRecord
+	return pendingRecords, s.db.Find(&pendingRecords).Error
+}
+
+func (s *Sqlite) ListOnlyPendingRecords() ([]models.PendingRecord, error) {
+	var pendingRecords []models.PendingRecord
+	return pendingRecords, s.db.Where("amount > transferred_amount").Find(&pendingRecords).Error
+}
+
+func (s *Sqlite) UpdatePendingRecordTransferredAmount(id int, amount uint64) error {
+	return s.db.Model(&models.PendingRecord{}).
+		Where("id = ?", id).
+		UpdateColumn("transferred_amount", gorm.Expr("transferred_amount + ?", amount)).
+		UpdateColumn("updated_at", gorm.Expr("updated_at + ?", time.Now())).
+		Error
 }
