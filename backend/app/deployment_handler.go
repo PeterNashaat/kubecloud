@@ -314,6 +314,7 @@ func (h *Handler) getClientConfig(c *gin.Context) (activities.ClientConfig, erro
 	}
 	userIDStr := fmt.Sprintf("%v", userID)
 
+	// TODO: load it at startup instead
 	sshPublicKeyBytes, err := os.ReadFile(h.config.SSH.PublicKeyPath)
 	if err != nil {
 		return activities.ClientConfig{}, fmt.Errorf("failed to read SSH public key: %v", err)
@@ -347,13 +348,19 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 		return
 	}
 
+	// TODO: validate the cluster required fields/ pingable nodes
 	var cluster kubedeployer.Cluster
 	if err := c.ShouldBindJSON(&cluster); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("deploy_cluster")
+	// Create the workflow template
+	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID) // TODO: should be cleaned
+	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, wfName, len(cluster.Nodes))
+
+	// Get the workflow
+	wf, err := h.ewfEngine.NewWorkflow(wfName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
@@ -434,7 +441,12 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("add_node")
+	// Create the workflow template
+	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID) // TODO: should be cleaned
+	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, wfName, len(cluster.Nodes))
+
+	// get the workflow
+	wf, err := h.ewfEngine.NewWorkflow(wfName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
