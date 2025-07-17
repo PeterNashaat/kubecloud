@@ -99,9 +99,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
 		// TODO: remove this after testing
-		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
-		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
+		deployer.WithRelayURL("wss://relay.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)

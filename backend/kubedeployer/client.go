@@ -10,7 +10,7 @@ import (
 
 type Client struct {
 	ctx          context.Context
-	gridClient   deployer.TFPluginClient
+	GridClient   deployer.TFPluginClient
 	gridNet      string
 	mnemonic     string
 	masterPubKey string
@@ -22,7 +22,10 @@ func NewClient(ctx context.Context, mnemonic, gridNet, masterPubKey, userID stri
 		mnemonic,
 		deployer.WithNetwork(gridNet),
 		// TODO: for testing
-		deployer.WithLogs(),
+		// deployer.WithLogs(),
+		deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
+		deployer.WithRelayURL("wss://relay.dev.grid.tf"),
+		deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TFPluginClient: %v", err)
@@ -30,7 +33,7 @@ func NewClient(ctx context.Context, mnemonic, gridNet, masterPubKey, userID stri
 
 	return &Client{
 		ctx:          ctx,
-		gridClient:   tfplugin,
+		GridClient:   tfplugin,
 		gridNet:      gridNet,
 		mnemonic:     mnemonic,
 		masterPubKey: masterPubKey,
@@ -39,25 +42,25 @@ func NewClient(ctx context.Context, mnemonic, gridNet, masterPubKey, userID stri
 }
 
 func (c *Client) Close() {
-	c.gridClient.Close()
+	c.GridClient.Close()
 }
 
 func (c *Client) CreateCluster(ctx context.Context, cluster Cluster) (Cluster, error) {
 	deploymentNames := NewDeploymentNames(c.UserID, cluster.Name)
 	cluster.Name = deploymentNames.ProjectName
 
-	if err := deployNetwork(ctx, c.gridClient, cluster, deploymentNames); err != nil {
+	if err := deployNetwork(ctx, c.GridClient, cluster, deploymentNames); err != nil {
 		return Cluster{}, err
 	}
 
 	ensureLeaderNode(&cluster)
 
-	if err := deployNodes(ctx, c.gridClient, cluster, deploymentNames, c.masterPubKey, ""); err != nil {
+	if err := deployNodes(ctx, c.GridClient, cluster, deploymentNames, c.masterPubKey, ""); err != nil {
 		c.rollbackCreateCluster(ctx, deploymentNames)
 		return Cluster{}, err
 	}
 
-	cluster, err := loadNewClusterState(ctx, c.gridClient, cluster, deploymentNames)
+	cluster, err := loadNewClusterState(ctx, c.GridClient, cluster, deploymentNames)
 	if err != nil {
 		return Cluster{}, fmt.Errorf("failed to load new cluster state: %v", err)
 	}
@@ -80,16 +83,16 @@ func (c *Client) AddClusterNode(ctx context.Context, newCluster Cluster, existin
 	newCluster.Name = deploymentNames.ProjectName
 	newCluster.Network = existingCluster.Network
 
-	if err := deployNetwork(ctx, c.gridClient, newCluster, deploymentNames); err != nil {
+	if err := deployNetwork(ctx, c.GridClient, newCluster, deploymentNames); err != nil {
 		return Cluster{}, err
 	}
 
-	if err := deployNodes(ctx, c.gridClient, newCluster, deploymentNames, c.masterPubKey, leaderIP); err != nil {
+	if err := deployNodes(ctx, c.GridClient, newCluster, deploymentNames, c.masterPubKey, leaderIP); err != nil {
 		c.rollbackAddClusterNode(ctx, newCluster, deploymentNames)
 		return Cluster{}, err
 	}
 
-	newNodesCluster, err := loadNewClusterState(ctx, c.gridClient, newCluster, deploymentNames)
+	newNodesCluster, err := loadNewClusterState(ctx, c.GridClient, newCluster, deploymentNames)
 	if err != nil {
 		return Cluster{}, err
 	}
@@ -100,7 +103,7 @@ func (c *Client) AddClusterNode(ctx context.Context, newCluster Cluster, existin
 func (c *Client) DeleteCluster(ctx context.Context, clusterName string) error {
 	deploymentNames := NewDeploymentNames(c.UserID, clusterName)
 
-	if err := c.gridClient.CancelByProjectName(deploymentNames.ProjectName); err != nil {
+	if err := c.GridClient.CancelByProjectName(deploymentNames.ProjectName); err != nil {
 		return fmt.Errorf("failed to cancel deployment contracts by project name: %v", err)
 	}
 
@@ -157,7 +160,7 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 
 	if len(contractsToCancel) > 0 {
 		log.Info().Msgf("Removing node %s with contracts: %v", nodeToRemove.Name, contractsToCancel)
-		if err := c.gridClient.BatchCancelContract(contractsToCancel); err != nil {
+		if err := c.GridClient.BatchCancelContract(contractsToCancel); err != nil {
 			return fmt.Errorf("failed to cancel node and/or network contracts: %v", err)
 		}
 	}
@@ -211,7 +214,7 @@ func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeNa
 func (c *Client) rollbackCreateCluster(ctx context.Context, deploymentNames DeploymentNames) {
 	log.Warn().Str("project_name", deploymentNames.ProjectName).Msg("Rolling back cluster creation")
 
-	if err := c.gridClient.CancelByProjectName(deploymentNames.ProjectName); err != nil {
+	if err := c.GridClient.CancelByProjectName(deploymentNames.ProjectName); err != nil {
 		log.Error().Err(err).Str("project_name", deploymentNames.ProjectName).Msg("Failed to rollback cluster creation")
 	}
 }
@@ -223,13 +226,13 @@ func (c *Client) rollbackAddClusterNode(ctx context.Context, cluster Cluster, de
 
 	for _, node := range cluster.Nodes {
 		nodeName := deploymentNames.GetNodeName(node.Name)
-		result, err := c.gridClient.State.LoadDeploymentFromGrid(ctx, node.NodeID, nodeName)
+		result, err := c.GridClient.State.LoadDeploymentFromGrid(ctx, node.NodeID, nodeName)
 		if err == nil && result.ContractID != 0 {
 			contractsToCancel = append(contractsToCancel, result.ContractID)
 		}
 	}
 
-	if err := c.gridClient.BatchCancelContract(contractsToCancel); err != nil {
+	if err := c.GridClient.BatchCancelContract(contractsToCancel); err != nil {
 		log.Error().Err(err).Uints64("contract_ids", contractsToCancel).Msg("Failed to rollback node contracts")
 	}
 }

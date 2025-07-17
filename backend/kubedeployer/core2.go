@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 )
 
@@ -28,6 +29,8 @@ func (c *Cluster) PrepareCluster(userID string) error {
 		}
 	}
 
+	log.Info().Msgf("Prepared cluster: %s with network: %s", c.Name, c.Network.Name)
+
 	if !hasLeader {
 		for i, node := range c.Nodes {
 			if node.Type == NodeTypeMaster {
@@ -41,19 +44,28 @@ func (c *Cluster) PrepareCluster(userID string) error {
 }
 
 // GetLeaderNode MUST return the leader node in the cluster
-func (c *Cluster) GetLeaderNode() Node {
+func (c *Cluster) GetLeaderNode() (Node, error) {
 	for _, node := range c.Nodes {
 		if node.Type == NodeTypeLeader {
-			return node
+			return node, nil
 		}
 	}
-	return Node{}
+	return Node{}, fmt.Errorf("no leader node found in cluster %s", c.Name)
+}
+
+func (n *Node) AssignNodeIP(ctx context.Context, gridClient deployer.TFPluginClient, networkName string) error {
+	ip, err := getIpForVm(ctx, gridClient, networkName, n.NodeID)
+	if err != nil {
+		return fmt.Errorf("failed to get IP for node %s: %v", n.Name, err)
+	}
+	n.IP = ip
+	return nil
 }
 
 // AssignNodeIPs assigns IPs to each node in the cluster (after network is deployed)
 func (c *Client) AssignNodeIPs(ctx context.Context, cluster *Cluster) error {
 	for idx, node := range cluster.Nodes {
-		ip, err := getIpForVm(ctx, c.gridClient, cluster.Network.Name, node.NodeID)
+		ip, err := getIpForVm(ctx, c.GridClient, cluster.Network.Name, node.NodeID)
 		if err != nil {
 			return fmt.Errorf("failed to get IP for node %s: %v", node.Name, err)
 		}
@@ -65,12 +77,28 @@ func (c *Client) AssignNodeIPs(ctx context.Context, cluster *Cluster) error {
 
 // DeployNode deploys a node in the cluster and assigns the resulting node to the cluster
 func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node) error {
+	log.Info().Str("node_name", node.Name).Msg(">>>>>>>> Deploying node")
+
+	var leaderIP string
+	if node.Type == NodeTypeLeader {
+		// For leader nodes, we don't need another leader's IP
+		leaderIP = ""
+	} else {
+		// For non-leader nodes, we need the leader's IP to join the cluster
+		leaderNode, err := cluster.GetLeaderNode()
+		if err != nil {
+			return fmt.Errorf("failed to get leader node IP: %v", err)
+		}
+		leaderIP = leaderNode.IP
+	}
+	log.Info().Str("node_name", node.Name).Str("type", string(node.Type)).Str("leader_ip", leaderIP).Msg("Checking node type")
+
 	depl, err := deploymentFromNode(
 		ctx,
 		node,
 		cluster.Name,
 		cluster.Network.Name,
-		cluster.GetLeaderNode().IP,
+		leaderIP,
 		cluster.Token,
 		c.masterPubKey,
 	)
@@ -78,27 +106,49 @@ func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node) er
 		return fmt.Errorf("failed to create VM for node: %v", err)
 	}
 
-	if err := c.gridClient.DeploymentDeployer.Deploy(ctx, &depl); err != nil {
+	log.Info().Str("ip", node.IP).Msg("Node IP assigned")
+
+	log.Info().Str("node_name", node.Name).Msg("Starting deployment to grid")
+	if err := c.GridClient.DeploymentDeployer.Deploy(ctx, &depl); err != nil {
+		log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to deploy node to grid")
 		return fmt.Errorf("failed to deploy node %s: %v", node.Name, err)
 	}
+	log.Info().Str("node_name", node.Name).Msg("Grid deployment successful")
 
+	log.Info().Str("node_name", node.Name).Msg("Extracting node info from deployment")
 	res, err := nodeFromDeployment(ctx, depl)
 	if err != nil {
+		log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to extract node from deployment")
 		return fmt.Errorf("failed to get node from deployment: %v", err)
 	}
+
+	log.Info().
+		Str("deployment_node_name", res.Name).
+		Str("input_node_name", node.Name).
+		Uint64("contract_id", res.ContractID).
+		Str("ip", res.IP).
+		Str("mycelium_ip", res.MyceliumIP).
+		Msg("Node deployment completed")
 
 	// used to handling adding new nodes or updating existing ones
 	updated := false
 	for i, n := range cluster.Nodes {
+		log.Info().
+			Str("cluster_node_name", n.Name).
+			Str("deployment_node_name", res.Name).
+			Bool("match", n.Name == res.Name).
+			Msg("Comparing node names")
 		if n.Name == res.Name {
 			cluster.Nodes[i] = res
 			updated = true
+			log.Info().Str("node_name", res.Name).Msg("Updated existing node in cluster")
 			break
 		}
 	}
 
 	if !updated {
 		cluster.Nodes = append(cluster.Nodes, res)
+		log.Info().Str("node_name", res.Name).Msg("Added new node to cluster")
 	}
 
 	return nil
@@ -158,7 +208,7 @@ func (c *Client) DeployNetwork(ctx context.Context, cluster *Cluster) error {
 	}
 
 	log.Debug().Msgf("Deploying network %s with nodes %v", net.Name, net.Nodes)
-	if err := c.gridClient.NetworkDeployer.Deploy(ctx, &net); err != nil {
+	if err := c.GridClient.NetworkDeployer.Deploy(ctx, &net); err != nil {
 		return fmt.Errorf("failed to deploy network: %v", err)
 	}
 
@@ -168,7 +218,7 @@ func (c *Client) DeployNetwork(ctx context.Context, cluster *Cluster) error {
 }
 
 func (c *Client) CancelCluster(ctx context.Context, projectName string) error {
-	if err := c.gridClient.CancelByProjectName(projectName); err != nil {
+	if err := c.GridClient.CancelByProjectName(projectName); err != nil {
 		return fmt.Errorf("failed to cancel deployment contracts by project name: %v", err)
 	}
 
@@ -220,7 +270,7 @@ func (c *Client) RemoveNode(ctx context.Context, cluster *Cluster, fullNodeName 
 
 	if len(contractsToCancel) > 0 {
 		log.Info().Msgf("Removing node %s with contracts: %v", nodeToRemove.Name, contractsToCancel)
-		if err := c.gridClient.BatchCancelContract(contractsToCancel); err != nil {
+		if err := c.GridClient.BatchCancelContract(contractsToCancel); err != nil {
 			return fmt.Errorf("failed to cancel node and/or network contracts: %v", err)
 		}
 	}

@@ -113,7 +113,7 @@ func (w *Worker) processTask(ctx context.Context, task *DeploymentTask) error {
 		} else {
 			existingCluster, err := w.db.GetClusterByName(task.UserID, result.Result.Name)
 			if err != nil {
-				if err := w.db.CreateCluster(cluster); err != nil {
+				if err := w.db.CreateCluster(result.UserID, cluster); err != nil {
 					log.Error().Err(err).Str("task_id", task.TaskID).Msg("Failed to create cluster in database")
 				} else {
 					log.Info().Str("task_id", task.TaskID).Str("project_name", result.Result.Name).Msg("Cluster saved to database")

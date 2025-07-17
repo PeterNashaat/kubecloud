@@ -31,6 +31,7 @@ type Configuration struct {
 	Invoice              InvoiceCompanyData `json:"invoice"`
 	WorkflowDBFile       string             `json:"workflow_db_file" validate:"required"`
 	SSH                  SSHConfig          `json:"ssh" validate:"required,dive"`
+	Debug                bool               `json:"debug"`
 }
 
 type SSHConfig struct {
