@@ -203,13 +203,13 @@ func TestDownloadInvoiceHandler(t *testing.T) {
 
 	t.Run("Download an invoice successfully", func(t *testing.T) {
 		token := GetAuthToken(t, app, user1.ID, user1.Email, user1.Username, false)
-		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/user/invoice/1"), nil)
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/user/invoice/%d", invoice.ID), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusOK, resp.Code)
-		// assert.Equal(t, "application/pdf", resp.Header().Get("Content-Type"))
-		// assert.True(t, len(resp.Body.Bytes()) > 0)
+		assert.Equal(t, "application/pdf", resp.Header().Get("Content-Type"))
+		assert.True(t, len(resp.Body.Bytes()) > 0)
 	})
 
 	t.Run("Download invoice with no token", func(t *testing.T) {
