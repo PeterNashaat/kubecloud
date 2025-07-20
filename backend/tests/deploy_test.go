@@ -1,37 +1,90 @@
-package main
+//go:build example
+
+package tests
 
 import (
 	"kubecloud/kubedeployer"
 	"testing"
 )
 
-func TestDeployment(t *testing.T) {
+const (
+	testEmail    = "alaamahmoud.1223@gmail.com"
+	testPassword = "Password@22"
+)
+
+func TestClient_DeployCluster(t *testing.T) {
 	client := NewClient()
 
-	err := client.Login("alaamahmoud.1223@gmail.com", "Password@22")
+	err := client.Login(testEmail, testPassword)
 	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+		t.Errorf("Login failed: %v", err)
+		return
 	}
-	t.Logf("Login successful")
+	t.Log("Login successful")
 
-	taskID, err := client.DeployCluster(clusterName)
+	cluster := kubedeployer.Cluster{
+		Name:  "jrk8s02",
+		Token: "test-token-123",
+		Nodes: []kubedeployer.Node{
+			{
+				Name:     "leader",
+				Type:     kubedeployer.NodeTypeLeader,
+				CPU:      1,
+				Memory:   2 * 1024,
+				RootSize: 10240,
+				DiskSize: 10240,
+				EnvVars: map[string]string{
+					"SSH_KEY": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJ1t4Ug8EfykmJwAbYudyYYN/f7dZaVg3KGD2Pz0bd9pajAAASWYrss3h2ctCZWluM6KAt289RMNzxlNUkOMJ9WhCIxqDAwtg05h/J27qlaGCPP8BCEITwqNKsLwzmMZY1UFc+sSUyjd35d3kjtv+rzo2meaReZnUFNPisvxGoygftAE6unqNa7TKonVDS1YXzbpT8XdtCV1Y6ACx+3a82mFR07zgmY4BVOixNBy2Lzpq9KiZTz91Bmjg8dy4xUyWLiTmnye51hEBgUzPprjffZByYSb2Ag9hpNE1AdCGCli/0TbEwFn9iEroh/xmtvZRpux+L0OmO93z5Sz+RLiYXKiYVV5R5XYP8y5eYi48RY2qr82sUl5+WnKhI8nhzayO9yjPEp3aTvR1FdDDj5ocB7qKi47R8FXIuwzZf+kJ7ZYmMSG7N21zDIJrz6JGy9KMi7nX1sqy7NSqX3juAasIjx0IJsE8zv9qokZ83hgcDmTJjnI+YXimelhcHn4M52hU= omar@jarvis",
+				},
+				NodeID: 337,
+			},
+			{
+				Name:     "master",
+				Type:     kubedeployer.NodeTypeMaster,
+				CPU:      1,
+				Memory:   2 * 1024,
+				RootSize: 10240,
+				DiskSize: 10240,
+				EnvVars: map[string]string{
+					"SSH_KEY": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJ1t4Ug8EfykmJwAbYudyYYN/f7dZaVg3KGD2Pz0bd9pajAAASWYrss3h2ctCZWluM6KAt289RMNzxlNUkOMJ9WhCIxqDAwtg05h/J27qlaGCPP8BCEITwqNKsLwzmMZY1UFc+sSUyjd35d3kjtv+rzo2meaReZnUFNPisvxGoygftAE6unqNa7TKonVDS1YXzbpT8XdtCV1Y6ACx+3a82mFR07zgmY4BVOixNBy2Lzpq9KiZTz91Bmjg8dy4xUyWLiTmnye51hEBgUzPprjffZByYSb2Ag9hpNE1AdCGCli/0TbEwFn9iEroh/xmtvZRpux+L0OmO93z5Sz+RLiYXKiYVV5R5XYP8y5eYi48RY2qr82sUl5+WnKhI8nhzayO9yjPEp3aTvR1FdDDj5ocB7qKi47R8FXIuwzZf+kJ7ZYmMSG7N21zDIJrz6JGy9KMi7nX1sqy7NSqX3juAasIjx0IJsE8zv9qokZ83hgcDmTJjnI+YXimelhcHn4M52hU= omar@jarvis",
+				},
+				NodeID: 179,
+			},
+			{
+				Name:     "worker2",
+				Type:     kubedeployer.NodeTypeWorker,
+				CPU:      1,
+				Memory:   2 * 1024,
+				RootSize: 10240,
+				DiskSize: 10240,
+				EnvVars: map[string]string{
+					"SSH_KEY": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJ1t4Ug8EfykmJwAbYudyYYN/f7dZaVg3KGD2Pz0bd9pajAAASWYrss3h2ctCZWluM6KAt289RMNzxlNUkOMJ9WhCIxqDAwtg05h/J27qlaGCPP8BCEITwqNKsLwzmMZY1UFc+sSUyjd35d3kjtv+rzo2meaReZnUFNPisvxGoygftAE6unqNa7TKonVDS1YXzbpT8XdtCV1Y6ACx+3a82mFR07zgmY4BVOixNBy2Lzpq9KiZTz91Bmjg8dy4xUyWLiTmnye51hEBgUzPprjffZByYSb2Ag9hpNE1AdCGCli/0TbEwFn9iEroh/xmtvZRpux+L0OmO93z5Sz+RLiYXKiYVV5R5XYP8y5eYi48RY2qr82sUl5+WnKhI8nhzayO9yjPEp3aTvR1FdDDj5ocB7qKi47R8FXIuwzZf+kJ7ZYmMSG7N21zDIJrz6JGy9KMi7nX1sqy7NSqX3juAasIjx0IJsE8zv9qokZ83hgcDmTJjnI+YXimelhcHn4M52hU= omar@jarvis",
+				},
+				NodeID: 179,
+			},
+		},
+	}
+
+	taskID, err := client.DeployCluster(cluster)
 	if err != nil {
-		t.Fatalf("Deployment failed: %v", err)
+		t.Errorf("Deployment failed: %v", err)
+		return
 	}
 	t.Logf("Deployment started with task ID: %s", taskID)
 }
 
-func TestAddNode(t *testing.T) {
+func TestClient_AddNode(t *testing.T) {
 	client := NewClient()
 
-	err := client.Login("alaamahmoud.1223@gmail.com", "Password@22")
+	err := client.Login(testEmail, testPassword)
 	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+		t.Errorf("Login failed: %v", err)
+		return
 	}
-	t.Logf("Login successful")
+	t.Log("Login successful")
 
 	newNode := kubedeployer.Node{
-		Name:     workerNodeName,
+		Name:     "worker2",
 		Type:     kubedeployer.NodeTypeWorker,
 		CPU:      1,
 		Memory:   2 * 1024,
@@ -43,53 +96,57 @@ func TestAddNode(t *testing.T) {
 		NodeID: 150,
 	}
 
-	taskID, err := client.AddNode(clusterName, newNode)
+	taskID, err := client.AddNode("jrk8s02", newNode)
 	if err != nil {
-		t.Fatalf("Add node failed: %v", err)
+		t.Errorf("Add node failed: %v", err)
+		return
 	}
 	t.Logf("Add node started with task ID: %s", taskID)
 }
 
-func TestRemoveNode(t *testing.T) {
+func TestClient_RemoveNode(t *testing.T) {
 	client := NewClient()
 
-	err := client.Login("alaamahmoud.1223@gmail.com", "Password@22")
+	err := client.Login(testEmail, testPassword)
 	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+		t.Errorf("Login failed: %v", err)
+		return
 	}
-	t.Logf("Login successful")
+	t.Log("Login successful")
 
-	err = client.RemoveNode(clusterName, workerNodeName)
+	err = client.RemoveNode("jrk8s02", "worker2")
 	if err != nil {
-		t.Fatalf("Remove node failed: %v", err)
+		t.Errorf("Remove node failed: %v", err)
+		return
 	}
-	t.Logf("Node removed successfully")
+	t.Log("Node removed successfully")
 }
 
-func TestDeleteDeployment(t *testing.T) {
+func TestClient_DeleteCluster(t *testing.T) {
 	client := NewClient()
 
-	if err := client.Login("alaamahmoud.1223@gmail.com", "Password@22"); err != nil {
-		t.Fatalf("Failed to login: %v", err)
+	if err := client.Login(testEmail, testPassword); err != nil {
+		t.Errorf("Failed to login: %v", err)
+		return
 	}
 
-	err := client.DeleteDeployment(clusterName)
+	err := client.DeleteCluster("jrk8s02")
 	if err != nil {
-		t.Fatalf("Failed to delete deployment: %v", err)
+		t.Errorf("Failed to delete cluster: %v", err)
+		return
 	}
-	t.Log("Deployment deleted successfully")
+	t.Log("Cluster deleted successfully")
 }
 
-// Standalone SSE listener test for running as a service
-func TestListenSSE(t *testing.T) {
+func TestClient_ListenToSSE(t *testing.T) {
 	client := NewClient()
-	err := client.Login("alaamahmoud.1223@gmail.com", "Password@22")
+	err := client.Login(testEmail, testPassword)
 	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+		t.Errorf("Login failed: %v", err)
+		return
 	}
-	t.Logf("Login successful. Listening to all SSE events...")
+	t.Log("Login successful. Listening to all SSE events...")
 
-	// Listen to all SSE events indefinitely (run this test as a service)
 	if err := client.ListenToSSE(""); err != nil {
 		t.Errorf("SSE listen failed: %v", err)
 	}

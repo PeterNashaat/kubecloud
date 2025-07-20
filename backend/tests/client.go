@@ -1,4 +1,6 @@
-package main
+//go:build example
+
+package tests
 
 import (
 	"bufio"
@@ -13,13 +15,6 @@ import (
 
 	"kubecloud/app"
 	"kubecloud/kubedeployer"
-)
-
-const (
-	clusterName    = "jrk8s02"
-	leaderNodeName = "leader"
-	workerNodeName = "worker2"
-	masterNodeName = "master"
 )
 
 type Client struct {
@@ -118,50 +113,7 @@ func (c *Client) Login(email, password string) error {
 	return nil
 }
 
-func (c *Client) DeployCluster(clusterName string) (string, error) {
-	cluster := kubedeployer.Cluster{
-		Name:  clusterName,
-		Token: "test-token-123",
-		Nodes: []kubedeployer.Node{
-			{
-				Name:     leaderNodeName,
-				Type:     kubedeployer.NodeTypeLeader,
-				CPU:      1,
-				Memory:   2 * 1024, // 2 GB
-				RootSize: 10240,    // 10 GB
-				DiskSize: 10240,    // 10 GB
-				EnvVars: map[string]string{
-					"SSH_KEY": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJ1t4Ug8EfykmJwAbYudyYYN/f7dZaVg3KGD2Pz0bd9pajAAASWYrss3h2ctCZWluM6KAt289RMNzxlNUkOMJ9WhCIxqDAwtg05h/J27qlaGCPP8BCEITwqNKsLwzmMZY1UFc+sSUyjd35d3kjtv+rzo2meaReZnUFNPisvxGoygftAE6unqNa7TKonVDS1YXzbpT8XdtCV1Y6ACx+3a82mFR07zgmY4BVOixNBy2Lzpq9KiZTz91Bmjg8dy4xUyWLiTmnye51hEBgUzPprjffZByYSb2Ag9hpNE1AdCGCli/0TbEwFn9iEroh/xmtvZRpux+L0OmO93z5Sz+RLiYXKiYVV5R5XYP8y5eYi48RY2qr82sUl5+WnKhI8nhzayO9yjPEp3aTvR1FdDDj5ocB7qKi47R8FXIuwzZf+kJ7ZYmMSG7N21zDIJrz6JGy9KMi7nX1sqy7NSqX3juAasIjx0IJsE8zv9qokZ83hgcDmTJjnI+YXimelhcHn4M52hU= omar@jarvis",
-				},
-				NodeID: 337,
-			},
-			{
-				Name:     masterNodeName,
-				Type:     kubedeployer.NodeTypeMaster,
-				CPU:      1,
-				Memory:   2 * 1024, // 2 GB
-				RootSize: 10240,    // 10 GB
-				DiskSize: 10240,    // 10 GB
-				EnvVars: map[string]string{
-					"SSH_KEY": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJ1t4Ug8EfykmJwAbYudyYYN/f7dZaVg3KGD2Pz0bd9pajAAASWYrss3h2ctCZWluM6KAt289RMNzxlNUkOMJ9WhCIxqDAwtg05h/J27qlaGCPP8BCEITwqNKsLwzmMZY1UFc+sSUyjd35d3kjtv+rzo2meaReZnUFNPisvxGoygftAE6unqNa7TKonVDS1YXzbpT8XdtCV1Y6ACx+3a82mFR07zgmY4BVOixNBy2Lzpq9KiZTz91Bmjg8dy4xUyWLiTmnye51hEBgUzPprjffZByYSb2Ag9hpNE1AdCGCli/0TbEwFn9iEroh/xmtvZRpux+L0OmO93z5Sz+RLiYXKiYVV5R5XYP8y5eYi48RY2qr82sUl5+WnKhI8nhzayO9yjPEp3aTvR1FdDDj5ocB7qKi47R8FXIuwzZf+kJ7ZYmMSG7N21zDIJrz6JGy9KMi7nX1sqy7NSqX3juAasIjx0IJsE8zv9qokZ83hgcDmTJjnI+YXimelhcHn4M52hU= omar@jarvis",
-				},
-				NodeID: 179,
-			},
-			{
-				Name:     workerNodeName,
-				Type:     kubedeployer.NodeTypeWorker,
-				CPU:      1,
-				Memory:   2 * 1024, // 2 GB
-				RootSize: 10240,    // 10 GB
-				DiskSize: 10240,    // 10 GB
-				EnvVars: map[string]string{
-					"SSH_KEY": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJ1t4Ug8EfykmJwAbYudyYYN/f7dZaVg3KGD2Pz0bd9pajAAASWYrss3h2ctCZWluM6KAt289RMNzxlNUkOMJ9WhCIxqDAwtg05h/J27qlaGCPP8BCEITwqNKsLwzmMZY1UFc+sSUyjd35d3kjtv+rzo2meaReZnUFNPisvxGoygftAE6unqNa7TKonVDS1YXzbpT8XdtCV1Y6ACx+3a82mFR07zgmY4BVOixNBy2Lzpq9KiZTz91Bmjg8dy4xUyWLiTmnye51hEBgUzPprjffZByYSb2Ag9hpNE1AdCGCli/0TbEwFn9iEroh/xmtvZRpux+L0OmO93z5Sz+RLiYXKiYVV5R5XYP8y5eYi48RY2qr82sUl5+WnKhI8nhzayO9yjPEp3aTvR1FdDDj5ocB7qKi47R8FXIuwzZf+kJ7ZYmMSG7N21zDIJrz6JGy9KMi7nX1sqy7NSqX3juAasIjx0IJsE8zv9qokZ83hgcDmTJjnI+YXimelhcHn4M52hU= omar@jarvis",
-				},
-				NodeID: 179,
-			},
-		},
-	}
-
+func (c *Client) DeployCluster(cluster kubedeployer.Cluster) (string, error) {
 	resp, err := c.makeRequest("POST", "/deployments", cluster, true)
 	if err != nil {
 		return "", err
@@ -236,65 +188,6 @@ func (c *Client) ListenToSSE(taskID string) error {
 	}
 }
 
-func (c *Client) ListenToSSEWithLogger(taskID string, logFunc func(string, ...interface{})) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/events", nil)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Cache-Control", "no-cache")
-	if c.accessToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.accessToken)
-	}
-
-	sseClient := &http.Client{Timeout: 0}
-
-	resp, err := sseClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("SSE connection failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	logFunc("SSE connection established, listening for deployment updates...")
-
-	scanner := bufio.NewScanner(resp.Body)
-	for {
-		select {
-		case <-ctx.Done():
-			logFunc("SSE connection timeout reached")
-			return nil
-		default:
-			if !scanner.Scan() {
-				if err := scanner.Err(); err != nil {
-					if ctx.Err() != nil {
-						return nil
-					}
-					return err
-				}
-				logFunc("SSE connection ended normally")
-				return nil
-			}
-
-			line := scanner.Text()
-			if strings.HasPrefix(line, "data:") {
-				data := strings.TrimPrefix(line, "data:")
-				if data != "" {
-					logFunc("SSE Update: %s", data)
-				}
-			}
-		}
-	}
-}
-
 func (c *Client) ListDeployments() ([]interface{}, error) {
 	resp, err := c.makeRequest("GET", "/deployments", nil, true)
 	if err != nil {
@@ -359,7 +252,7 @@ func (c *Client) GetKubeconfig(name string) (string, error) {
 	return string(kubeconfig), nil
 }
 
-func (c *Client) DeleteDeployment(name string) error {
+func (c *Client) DeleteCluster(name string) error {
 	resp, err := c.makeRequest("DELETE", "/deployments/"+name, nil, true)
 	if err != nil {
 		return err

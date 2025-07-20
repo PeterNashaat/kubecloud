@@ -1,49 +1,88 @@
-package main
+//go:build example
+
+package tests
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
-func TestGetters(t *testing.T) {
+func TestClient_ListDeployments(t *testing.T) {
 	client := NewClient()
 
-	err := client.Login("testuser@example.com", "testpassword123")
+	err := client.Login(testEmail, testPassword)
 	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+		t.Errorf("Login failed: %v", err)
+		return
 	}
-	t.Logf("Login successful")
+	t.Log("Login successful")
 
-	// Test listing deployments
 	deployments, err := client.ListDeployments()
 	if err != nil {
-		t.Fatalf("Failed to list deployments: %v", err)
+		t.Errorf("Failed to list deployments: %v", err)
+		return
 	}
 	t.Logf("Found %d deployments", len(deployments))
 
-	// Print deployments info
 	for i, deployment := range deployments {
 		deploymentJSON, _ := json.MarshalIndent(deployment, "", "  ")
 		t.Logf("Deployment %d: %s", i+1, string(deploymentJSON))
 	}
+}
 
-	// Test getting a specific deployment if any exist
-	if len(deployments) > 0 {
-		// Extract project name from first deployment
-		if deploymentMap, ok := deployments[0].(map[string]interface{}); ok {
-			if projectName, exists := deploymentMap["project_name"]; exists {
-				if name, ok := projectName.(string); ok {
-					deployment, err := client.GetDeployment(name)
-					if err != nil {
-						t.Logf("Failed to get deployment '%s': %v", name, err)
-					} else {
-						deploymentJSON, _ := json.MarshalIndent(deployment, "", "  ")
-						t.Logf("Retrieved deployment '%s': %s", name, string(deploymentJSON))
-					}
-				}
-			}
-		}
-	} else {
-		t.Logf("No deployments found to test individual retrieval")
+func TestClient_GetDeployment(t *testing.T) {
+	client := NewClient()
+
+	err := client.Login(testEmail, testPassword)
+	if err != nil {
+		t.Errorf("Login failed: %v", err)
+		return
 	}
+	t.Log("Login successful")
+
+	deployment, err := client.GetDeployment("my-k8s-cluster")
+	if err != nil {
+		t.Errorf("Failed to get deployment 'my-k8s-cluster': %v", err)
+		return
+	}
+
+	deploymentJSON, _ := json.MarshalIndent(deployment, "", "  ")
+	t.Logf("Retrieved deployment 'my-k8s-cluster': %s", string(deploymentJSON))
+}
+
+func TestClient_GetKubeconfig(t *testing.T) {
+	client := NewClient()
+
+	err := client.Login(testEmail, testPassword)
+	if err != nil {
+		t.Errorf("Login failed: %v", err)
+		return
+	}
+	t.Log("Login successful")
+
+	kubeconfig, err := client.GetKubeconfig("jrk8s02")
+	if err != nil {
+		t.Errorf("Failed to get kubeconfig for 'jrk8s02': %v", err)
+		return
+	}
+
+	if len(kubeconfig) == 0 {
+		t.Log("Received empty kubeconfig")
+		return
+	}
+
+	essentialKeys := []string{"apiVersion", "clusters", "contexts", "users"}
+	for _, key := range essentialKeys {
+		if !contains(kubeconfig, key) {
+			t.Errorf("Kubeconfig missing essential key: %s", key)
+		}
+	}
+
+	t.Logf("Successfully retrieved kubeconfig (size: %d bytes)", len(kubeconfig))
+	t.Log(kubeconfig)
+}
+
+func contains(text, substr string) bool {
+	return strings.Contains(text, substr)
 }

@@ -308,7 +308,7 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, wfName string, nodesNu
 		{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
 	}
 
-	for i := 0; i < int(nodesNum); i++ {
+	for i := 0; i < nodesNum; i++ {
 		stepName := fmt.Sprintf("deploy_node_%d", i) // TODO: should be cleaned
 		engine.Register(stepName, DeployNodeStep())
 		steps = append(steps, ewf.Step{Name: stepName, RetryPolicy: criticalRetryPolicy})
