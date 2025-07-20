@@ -25,6 +25,8 @@ services:
     command: go test -v ./app
     volumes:
       - ./backend:/app
+    environment: 
+      - TEST_MNEMONIC=your test mnemonic
       
   frontend:
     environment:
