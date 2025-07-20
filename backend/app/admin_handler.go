@@ -228,15 +228,15 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	systemBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 
-	if systemBalance < float64(request.Amount) {
-		Error(c, http.StatusBadRequest, fmt.Sprintf("System balance is not enough, only %v is available", systemBalance), "")
+	if systemBalanceUSD < float64(request.Amount) {
+		Error(c, http.StatusBadRequest, fmt.Sprintf("System balance is not enough, only %v$ is available", systemBalanceUSD), "")
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

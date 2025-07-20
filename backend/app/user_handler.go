@@ -32,6 +32,7 @@ type Handler struct {
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
 	gridNet         string // Network name for the grid
+	systemIdentity  substrate.Identity
 }
 
 // NewHandler create new handler
@@ -40,7 +41,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridNet string) *Handler {
+	gridNet string, systemIdentity substrate.Identity) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -53,6 +54,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		redis:           redis,
 		sseManager:      sseManager,
 		gridNet:         gridNet,
+		systemIdentity:  systemIdentity,
 	}
 }
 
@@ -605,19 +607,6 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Msg("error checking system account balance")
-		InternalServerError(c)
-		return
-	}
-
-	if systemBalanceUSD < float64(request.Amount) {
-		log.Error().Msgf("system account balance is not enough to charge user balance, system balance: %f, requested amount: %d", systemBalanceUSD, request.Amount)
-		InternalServerError(c)
-		return
-	}
-
 	paymentMethod, err := internal.CreatePaymentMethod(request.CardType, request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
@@ -648,14 +637,16 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	systemUSDBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
 	if err != nil {
-		log.Error().Err(err).Send()
+		log.Error().Err(err).Msg("error checking system account balance")
 		InternalServerError(c)
 		return
 	}
 
-	if systemUSDBalance < float64(request.Amount) {
+	responseMsg := "Balance is charged successfully"
+
+	if systemBalanceUSD < float64(request.Amount) {
 		if err = h.db.CreatePendingRecord(&models.PendingRecord{
 			UserID:    userID,
 			TFTAmount: requestedTFTs,
@@ -664,16 +655,19 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 			InternalServerError(c)
 			return
 		}
-	}
+		responseMsg = "Balance is pending to be charged, will be charged soon"
 
-	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		if err = internal.CancelPaymentIntent(intent.ID); err != nil {
-			log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
+	} else {
+		err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
+		if err != nil {
+			log.Error().Err(err).Send()
+			// TODO: should we handle it as pending too?
+			if err = internal.CancelPaymentIntent(intent.ID); err != nil {
+				log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
+			}
+			InternalServerError(c)
+			return
 		}
-		InternalServerError(c)
-		return
 	}
 
 	user.CreditCardBalance += float64(request.Amount)
@@ -685,7 +679,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusCreated, "Balance is charged successfully", ChargeBalanceResponse{
+	Success(c, http.StatusCreated, responseMsg, ChargeBalanceResponse{
 		PaymentIntentID: intent.ID,
 		NewBalance:      user.CreditCardBalance,
 	})
@@ -834,7 +828,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		}
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

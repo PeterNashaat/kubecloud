@@ -90,15 +90,9 @@ func ActivateAccount(substrateAccountID string, url string) error {
 }
 
 // TransferTFTs transfer balance to users' account
-func TransferTFTs(substrateClient *substrate.Substrate, tftBalance uint64, userMnemonic, systemMnemonic string) error {
+func TransferTFTs(substrateClient *substrate.Substrate, tftBalance uint64, userMnemonic string, systemIdentity substrate.Identity) error {
 	// Create identity of user from mnemonic
 	userIdentity, err := substrate.NewIdentityFromSr25519Phrase(userMnemonic)
-	if err != nil {
-		return err
-	}
-
-	// Create identity of system from mnemonic
-	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(systemMnemonic)
 	if err != nil {
 		return err
 	}
@@ -158,6 +152,6 @@ func FromUSDToTFT(substrateClient *substrate.Substrate, amount float64) (uint64,
 		return 0, err
 	}
 
-	tft := (amount * 1000) / (float64(price) * 1e7)
+	tft := (amount * 1e7) / (float64(price) / 1000)
 	return uint64(tft), nil
 }

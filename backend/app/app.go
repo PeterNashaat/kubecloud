@@ -105,6 +105,11 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
+	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system identity: %w", err)
+	}
+
 	sshPublicKeyBytes, err := os.ReadFile(config.SSH.PublicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SSH public key from %s: %w", config.SSH.PublicKeyPath, err)
@@ -117,7 +122,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, config.SystemAccount.Network)
+		sseManager, config.SystemAccount.Network, systemIdentity)
 
 	app := &App{
 		router:        router,

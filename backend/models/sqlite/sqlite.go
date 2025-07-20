@@ -24,7 +24,18 @@ func NewSqliteStorage(file string) (*Sqlite, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&models.User{}, &models.Voucher{}, models.Transaction{}, models.Invoice{}, models.NodeItem{}, models.UserNodes{}, &models.Notification{}, &models.SSHKey{}, &models.Cluster{})
+	err = db.AutoMigrate(
+		&models.User{},
+		&models.Voucher{},
+		models.Transaction{},
+		models.Invoice{},
+		models.NodeItem{},
+		models.UserNodes{},
+		&models.Notification{},
+		&models.SSHKey{},
+		&models.Cluster{},
+		&models.PendingRecord{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -398,13 +409,13 @@ func (s *Sqlite) ListAllPendingRecords() ([]models.PendingRecord, error) {
 
 func (s *Sqlite) ListOnlyPendingRecords() ([]models.PendingRecord, error) {
 	var pendingRecords []models.PendingRecord
-	return pendingRecords, s.db.Where("amount > transferred_amount").Find(&pendingRecords).Error
+	return pendingRecords, s.db.Where("tft_amount > transferred_tft_amount").Find(&pendingRecords).Error
 }
 
 func (s *Sqlite) UpdatePendingRecordTransferredAmount(id int, amount uint64) error {
 	return s.db.Model(&models.PendingRecord{}).
 		Where("id = ?", id).
-		UpdateColumn("transferred_amount", gorm.Expr("transferred_amount + ?", amount)).
+		UpdateColumn("transferred_tft_amount", gorm.Expr("transferred_tft_amount + ?", amount)).
 		UpdateColumn("updated_at", gorm.Expr("updated_at + ?", time.Now())).
 		Error
 }

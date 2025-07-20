@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handler) MonitorSystemBalanceAndHandleSettlement() {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(time.Duration(h.config.MonitorBalanceIntervalInHours) * time.Hour)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -45,10 +45,10 @@ func (h *Handler) settlePendingPayments(records []models.PendingRecord) error {
 			continue
 		}
 
-		amountToTransfer := record.TFTAmount - record.TransferredTFTAmount
+		amountToTransfer := (record.TFTAmount - record.TransferredTFTAmount) * 1e7
 		if systemTFTBalance < amountToTransfer {
-			amountToTransfer = systemTFTBalance
 			log.Warn().Msgf("Insufficient system balance to settle pending record ID %d", record.ID)
+			continue
 		}
 
 		if err = h.transferTFTsToUser(record.UserID, record.ID, amountToTransfer); err != nil {
@@ -66,7 +66,7 @@ func (h *Handler) transferTFTsToUser(userID, recordID int, amountToTransfer uint
 		return errors.Wrapf(err, "failed to get user for pending record ID %d", recordID)
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, amountToTransfer, h.config.SystemAccount.Mnemonic, user.Mnemonic)
+	err = internal.TransferTFTs(h.substrateClient, amountToTransfer, user.Mnemonic, h.systemIdentity)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to transfer TFTs for pending record ID %d", recordID)
 	}

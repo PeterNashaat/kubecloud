@@ -148,6 +148,11 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind invoice.governorate flag: %w", err)
 	}
 
+	// === Monitor Balance Interval In Hours ===
+	if err := bindIntFlag(rootCmd, "monitor_balance_interval_in_hours", 1, "Number of hours to monitor balance"); err != nil {
+		return fmt.Errorf("failed to bind monitor_balance_interval_in_hours flag: %w", err)
+	}
+
 	return nil
 }
 
