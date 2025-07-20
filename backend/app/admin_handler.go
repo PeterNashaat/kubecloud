@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 // GenerateVouchersInput holds all data needed when creating vouchers
@@ -92,8 +94,11 @@ func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 
 	err = h.db.DeleteUserByID(id)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("Failed to delete user")
-		InternalServerError(c)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "User not found", "")
+		} else {
+			InternalServerError(c)
+		}
 		return
 	}
 
