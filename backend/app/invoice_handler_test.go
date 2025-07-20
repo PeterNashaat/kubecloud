@@ -19,26 +19,8 @@ func TestListAllInvoicesHandler(t *testing.T) {
 	require.NoError(t, err)
 	router := app.router
 
-	adminUser := &models.User{
-		ID:       1,
-		Username: "Admin User",
-		Email:    "admin@example.com",
-		Password: []byte("securepassword"),
-		Verified: true,
-		Admin:    true,
-	}
-	nonAdminUser := &models.User{
-		ID:       2,
-		Username: "Normal User",
-		Email:    "user@example.com",
-		Password: []byte("securepassword"),
-		Verified: true,
-		Admin:    false,
-	}
-	err = app.handlers.db.RegisterUser(adminUser)
-	require.NoError(t, err)
-	err = app.handlers.db.RegisterUser(nonAdminUser)
-	require.NoError(t, err)
+	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, 0, time.Now())
+	nonAdminUser := CreateTestUser(t, app, "user@example.com", "Normal User", []byte("securepassword"), true, false, 0, time.Now())
 
 	invoice1 := &models.Invoice{
 		UserID:    adminUser.ID,
@@ -71,18 +53,20 @@ func TestListAllInvoicesHandler(t *testing.T) {
 		assert.NotNil(t, result["data"])
 		data, ok := result["data"].(map[string]interface{})
 		assert.True(t, ok)
-		invoices, ok := data["invoices"].([]interface{})
+		invoicesRaw, ok := data["invoices"]
 		assert.True(t, ok)
+		invoicesBytes, err := json.Marshal(invoicesRaw)
+		assert.NoError(t, err)
+		var invoices []models.Invoice
+		err = json.Unmarshal(invoicesBytes, &invoices)
+		assert.NoError(t, err)
+		assert.Len(t, invoices, 2)
 		var found1, found2 bool
 		for _, inv := range invoices {
-			invMap, ok := inv.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if int(invMap["user_id"].(float64)) == adminUser.ID {
+			if inv.UserID == adminUser.ID {
 				found1 = true
 			}
-			if int(invMap["user_id"].(float64)) == nonAdminUser.ID {
+			if inv.UserID == nonAdminUser.ID {
 				found2 = true
 			}
 		}
@@ -124,8 +108,13 @@ func TestListAllInvoicesHandler(t *testing.T) {
 		assert.NotNil(t, result["data"])
 		data, ok := result["data"].(map[string]interface{})
 		assert.True(t, ok)
-		invoices, ok := data["invoices"].([]interface{})
+		invoicesRaw, ok := data["invoices"]
 		assert.True(t, ok)
+		invoicesBytes, err := json.Marshal(invoicesRaw)
+		assert.NoError(t, err)
+		var invoices []models.Invoice
+		err = json.Unmarshal(invoicesBytes, &invoices)
+		assert.NoError(t, err)
 		assert.Len(t, invoices, 0)
 	})
 }
@@ -135,16 +124,7 @@ func TestListUserInvoicesHandler(t *testing.T) {
 	require.NoError(t, err)
 	router := app.router
 
-	user := &models.User{
-		ID:       1,
-		Username: "Test User",
-		Email:    "user@example.com",
-		Password: []byte("securepassword"),
-		Verified: true,
-		Admin:    false,
-	}
-	err = app.handlers.db.RegisterUser(user)
-	require.NoError(t, err)
+	user := CreateTestUser(t, app, "user@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
 
 	invoice1 := &models.Invoice{
 		UserID:    user.ID,
@@ -193,8 +173,13 @@ func TestListUserInvoicesHandler(t *testing.T) {
 		assert.NotNil(t, result["data"])
 		data, ok := result["data"].(map[string]interface{})
 		assert.True(t, ok)
-		invoices, ok := data["invoices"].([]interface{})
+		invoicesRaw, ok := data["invoices"]
 		assert.True(t, ok)
+		invoicesBytes, err := json.Marshal(invoicesRaw)
+		assert.NoError(t, err)
+		var invoices []models.Invoice
+		err = json.Unmarshal(invoicesBytes, &invoices)
+		assert.NoError(t, err)
 		assert.Len(t, invoices, 0)
 	})
 }
@@ -204,29 +189,10 @@ func TestDownloadInvoiceHandler(t *testing.T) {
 	require.NoError(t, err)
 	router := app.router
 
-	user1 := &models.User{
-		ID:       1,
-		Username: "User One",
-		Email:    "user1@example.com",
-		Password: []byte("securepassword"),
-		Verified: true,
-		Admin:    false,
-	}
-	user2 := &models.User{
-		ID:       2,
-		Username: "User Two",
-		Email:    "user2@example.com",
-		Password: []byte("securepassword"),
-		Verified: true,
-		Admin:    false,
-	}
-	err = app.handlers.db.RegisterUser(user1)
-	require.NoError(t, err)
-	err = app.handlers.db.RegisterUser(user2)
-	require.NoError(t, err)
+	user1 := CreateTestUser(t, app, "user1@example.com", "User One", []byte("securepassword"), true, false, 0, time.Now())
 
 	invoice := &models.Invoice{
-		ID: 1,
+		ID:        1,
 		UserID:    user1.ID,
 		Total:     100.0,
 		Tax:       10.0,
@@ -237,7 +203,7 @@ func TestDownloadInvoiceHandler(t *testing.T) {
 
 	t.Run("Download an invoice successfully", func(t *testing.T) {
 		token := GetAuthToken(t, app, user1.ID, user1.Email, user1.Username, false)
-		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/user/invoice/%d", invoice.ID), nil)
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/user/invoice/1"), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
@@ -271,4 +237,3 @@ func TestDownloadInvoiceHandler(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 	})
 }
-
