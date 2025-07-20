@@ -3,14 +3,17 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/models"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func SetUp(t testing.TB) (*App, error) {
@@ -29,6 +32,11 @@ func SetUp(t testing.TB) (*App, error) {
 	err := cmd.Run()
 	if err != nil {
 		return nil, err
+	}
+
+	mnemonic := os.Getenv("TEST_MNEMONIC")
+	if mnemonic == "" {
+		return nil, fmt.Errorf("TEST_MNEMONIC environment variable must be set for tests")
 	}
 
 	t.Cleanup(func() {
@@ -70,19 +78,19 @@ func SetUp(t testing.TB) (*App, error) {
   },
   "activation_service_url": "https://activation.dev.grid.tf/activation/activate",
   "system_account": {
-    "mnemonic": "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
+    "mnemonic": "%s",
     "network": "dev"
   },
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
   "firesquid_url": "https://firesquid.dev.grid.tf/graphql",
   "redis": {
-    "host": "redis-db",
+    "host": "localhost",
     "port": 6379,
     "password": "pass",
     "db": 0
   },
   "grid": {
-    "mne": "winner giant reward damage expose pulse recipe manual brand volcano dry avoid",
+    "mne": "%s",
     "net": "dev"
   },
   "deployer_workers_num": 3,
@@ -97,7 +105,7 @@ func SetUp(t testing.TB) (*App, error) {
     "public_key_path": "%s"
   }
 }
-`, dbPath, workflowPath, privateKeyPath, publicKeyPath)
+`, dbPath, mnemonic, mnemonic, workflowPath, privateKeyPath, publicKeyPath)
 
 	err = os.WriteFile(configPath, []byte(config), 0644)
 	if err != nil {
@@ -127,4 +135,20 @@ func GetAuthToken(t *testing.T, app *App, id int, email, username string, isAdmi
 	tokenPair, err := app.handlers.tokenManager.CreateTokenPair(id, username, isAdmin)
 	assert.NoError(t, err)
 	return tokenPair.AccessToken
+}
+
+// Helper to create a test user
+func CreateTestUser(t *testing.T, app *App, email, username string, hashedPassword []byte, verified, admin bool, code int, updatedAt time.Time) *models.User {
+	user := &models.User{
+		Username:  username,
+		Email:     email,
+		Password:  hashedPassword,
+		Verified:  verified,
+		Admin:     admin,
+		Code:      code,
+		UpdatedAt: updatedAt,
+	}
+	err := app.handlers.db.RegisterUser(user)
+	require.NoError(t, err)
+	return user
 }
