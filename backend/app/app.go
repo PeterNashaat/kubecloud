@@ -108,7 +108,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 
 	// create storage for workflows
-	ewfStore, err := ewf.NewSQLiteStore(config.WorkflowDBFile)
+	ewfStore, err := ewf.NewSQLiteStore(config.Database.File)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init EWF store")
 		return nil, fmt.Errorf("failed to init workflow store: %w", err)
@@ -157,6 +157,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	app.registerHandlers()
 
+	// Deprecated: using ewfEngine now
 	// app.workerManager.Start()
 
 	return app, nil

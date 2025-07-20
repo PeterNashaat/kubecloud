@@ -29,7 +29,6 @@ type Configuration struct {
 	Redis                Redis              `json:"redis" validate:"required,dive"`
 	DeployerWorkersNum   int                `json:"deployer_workers_num" default:"1"`
 	Invoice              InvoiceCompanyData `json:"invoice"`
-	WorkflowDBFile       string             `json:"workflow_db_file" validate:"required"`
 	SSH                  SSHConfig          `json:"ssh" validate:"required,dive"`
 	Debug                bool               `json:"debug"`
 }

@@ -42,17 +42,12 @@
     "password": "",
     "db": 0
   },
-  "grid": {
-    "mne": "your grid account 12-word mnemonic phrase for threefold grid deployment operations",
-    "net": "dev"
-  },
   "deployer_workers_num": 3,
   "invoice": {
     "name": "Your Company Name Ltd",
     "address": "123 Business Street, Business District, City 12345",
     "governorate": "Your State/Province/Governorate"
   },
-  "workflow_db_file": "./workflows.db",
   "ssh": {
     "private_key_path": "/home/user/.ssh/id_rsa",
     "public_key_path": "/home/user/.ssh/id_rsa.pub"
