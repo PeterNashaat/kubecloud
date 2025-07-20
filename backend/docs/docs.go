@@ -1277,7 +1277,7 @@ const docTemplate = `{
         },
         "/workflow/{workflow_id}": {
             "get": {
-                "description": "Returns the status of a workflow by its ID",
+                "description": "Returns the status of a workflow by its ID.",
                 "consumes": [
                     "application/json"
                 ],
