@@ -111,15 +111,10 @@ func (c *Client) DeleteCluster(ctx context.Context, clusterName string) error {
 }
 
 func (c *Client) RemoveClusterNode(ctx context.Context, cluster *Cluster, nodeName string) error {
-	deploymentNames := NewDeploymentNames(c.UserID, cluster.Name)
-	fullNodeName := deploymentNames.GetNodeName(nodeName)
-
 	var nodeToRemove *Node
 	var nodeIndex int
 	for i, node := range cluster.Nodes {
-		fmt.Println("full node name:", fullNodeName)
-		fmt.Println("Found node to remove:", node.Name)
-		if node.Name == fullNodeName {
+		if node.Name == nodeName {
 			nodeToRemove = &node
 			nodeIndex = i
 			break

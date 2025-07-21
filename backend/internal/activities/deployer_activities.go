@@ -47,6 +47,7 @@ func DeployNetworkStep() ewf.StepFn {
 		}
 
 		if cluster.ProjectName == "" {
+			// this is a first not a retry
 			if err := cluster.PrepareCluster(kubeClient.UserID); err != nil {
 				return fmt.Errorf("failed to prepare cluster: %w", err)
 			}
@@ -60,6 +61,38 @@ func DeployNetworkStep() ewf.StepFn {
 		}
 
 		state["cluster"] = cluster
+		return nil
+	}
+}
+
+func UpdateNetworkStep() ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		kubeClient, err := getKubeClient(state)
+		if err != nil {
+			return err
+		}
+
+		cluster, err := getCluster(state)
+		if err != nil {
+			return fmt.Errorf("failed to get cluster from state while updating network: %w", err)
+		}
+
+		node, err := getFromState[kubedeployer.Node](state, "node")
+		if err != nil {
+			return err
+		}
+
+		node.Name = kubedeployer.GetNodeName(kubeClient.UserID, cluster.Name, node.Name)
+		log.Info().Str("node_name", node.Name).Str("cluster_name", cluster.Name).Msg("Updating network for node")
+
+		cluster.Nodes = append(cluster.Nodes, node)
+
+		if err := kubeClient.DeployNetwork(ctx, &cluster); err != nil {
+			return fmt.Errorf("failed to update network: %w", err)
+		}
+
+		state["cluster"] = cluster
+		state["node"] = node
 		return nil
 	}
 }
@@ -102,7 +135,7 @@ func DeployNodesStep() ewf.StepFn {
 	}
 }
 
-func DeployNodeStep() ewf.StepFn {
+func AddNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
@@ -114,11 +147,35 @@ func DeployNodeStep() ewf.StepFn {
 			return err
 		}
 
-		// TODO: handle the update with just checking the if cluster/added_cluster
-		/* existing, err := getFromState[kubedeployer.Cluster](state, "existing_cluster")
+		node, err := getFromState[kubedeployer.Node](state, "node")
 		if err != nil {
-			log.Debug().Err(err).Msg("No existing cluster found, using current cluster state")
-		} */
+			return err
+		}
+
+		if err := node.AssignNodeIP(ctx, kubeClient.GridClient, cluster.Network.Name); err != nil {
+			return fmt.Errorf("failed to assign IP for node %s: %w", node.Name, err)
+		}
+
+		if err := kubeClient.DeployNode(ctx, &cluster, node); err != nil {
+			return fmt.Errorf("failed to deploy node %s to existing cluster: %w", node.Name, err)
+		}
+
+		state["cluster"] = cluster
+		return nil
+	}
+}
+
+func DeployNodeStep() ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		kubeClient, err := getKubeClient(state)
+		if err != nil {
+			return err
+		}
+
+		cluster, err := getCluster(state)
+		if err != nil {
+			return err
+		}
 
 		nodeIdx, ok := state["node_index"].(int)
 		if !ok {
@@ -244,48 +301,6 @@ func RemoveClusterFromDBStep() ewf.StepFn {
 	}
 }
 
-// Deprecated
-func AddDeploymentNodeStep() ewf.StepFn {
-	return func(ctx context.Context, state ewf.State) error {
-		kubeClient, err := getKubeClient(state)
-		if err != nil {
-			return err
-		}
-
-		addedCluster, ok := state["added_cluster"].(kubedeployer.Cluster)
-		if !ok {
-			return fmt.Errorf("missing or invalid 'cluster' in state")
-		}
-
-		existingCluster, ok := state["cluster"].(kubedeployer.Cluster)
-		if !ok {
-			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
-		}
-
-		if err := kubeClient.AssignNodeIPs(ctx, &addedCluster); err != nil {
-			return fmt.Errorf("failed to assign node IPs for added cluster: %w", err)
-		}
-
-		for idx, node := range addedCluster.Nodes {
-			if node.ContractID != 0 {
-				log.Info().Str("node_name", node.Name).Uint64("contract_id", node.ContractID).Msg("Node already deployed, skipping")
-				continue
-			}
-
-			// assign nodes to the existing cluster (merge)
-			if err := kubeClient.DeployNode(ctx, &existingCluster, node); err != nil {
-				return fmt.Errorf("failed to deploy node %s to existing cluster: %w", node.Name, err)
-			}
-
-			// update the added cluster with the deployed node to skip it in future deployments
-			addedCluster.Nodes[idx].ContractID = node.ContractID
-		}
-
-		state["cluster"] = existingCluster
-		return nil
-	}
-}
-
 func RemoveDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		kubeClient, err := getKubeClient(state)
@@ -293,15 +308,17 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 			return err
 		}
 
-		existingCluster, ok := state["cluster"].(kubedeployer.Cluster)
-		if !ok {
-			return fmt.Errorf("missing or invalid 'existing_cluster' in state")
+		existingCluster, err := getCluster(state)
+		if err != nil {
+			return err
 		}
 
 		nodeName, ok := state["node_name"].(string)
 		if !ok {
 			return fmt.Errorf("missing or invalid 'node_name' in state")
 		}
+
+		nodeName = kubedeployer.GetNodeName(kubeClient.UserID, existingCluster.Name, nodeName)
 
 		if err := kubeClient.RemoveClusterNode(ctx, &existingCluster, nodeName); err != nil {
 			return fmt.Errorf("failed to remove node %s from existing cluster: %w", nodeName, err)
@@ -451,7 +468,8 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 	engine.Register("deploy_nodes", DeployNodesStep())
 	engine.Register("deploy_node", DeployNodeStep())
 	engine.Register("remove_cluster", CancelDeploymentStep())
-	engine.Register("add_node", AddDeploymentNodeStep())
+	engine.Register("add_node", AddNodeStep())
+	engine.Register("update_network", UpdateNetworkStep())
 	engine.Register("remove_node", RemoveDeploymentNodeStep())
 	engine.Register("store_deployment", StoreDeploymentStep())
 	engine.Register("notify_user", NotifyUserStep())
@@ -473,14 +491,13 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 	}
 	engine.RegisterTemplate("remove_cluster", &deleteWFTemplate)
 
-	// Deprecated with the new dynamic workflow template
-	// addNodeWFTemplate := baseWFTemplate
-	// addNodeWFTemplate.Steps = []ewf.Step{
-	// 	{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
-	// 	{Name: "add_node", RetryPolicy: standardRetryPolicy},
-	// 	{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
-	// }
-	// engine.RegisterTemplate("add_node", &addNodeWFTemplate)
+	addNodeWFTemplate := BaseWFTemplate
+	addNodeWFTemplate.Steps = []ewf.Step{
+		{Name: "update_network", RetryPolicy: criticalRetryPolicy},
+		{Name: "add_node", RetryPolicy: standardRetryPolicy},
+		{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate("add_node", &addNodeWFTemplate)
 
 	removeNodeWFTemplate := BaseWFTemplate
 	removeNodeWFTemplate.Steps = []ewf.Step{

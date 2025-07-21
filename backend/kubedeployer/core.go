@@ -157,6 +157,10 @@ func GetProjectName(userID, clusterName string) string {
 	return "kc" + userID + clusterName
 }
 
+func GetNodeName(userID, clusterName, nodeName string) string {
+	return GetProjectName(userID, clusterName) + nodeName
+}
+
 // PrepareCluster prepares the cluster by setting the names and ensuring a leader node exists
 func (c *Cluster) PrepareCluster(userID string) error {
 	projectName := GetProjectName(userID, c.Name)

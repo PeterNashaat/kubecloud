@@ -434,28 +434,30 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		return
 	}
 
-	existingCluster, err := h.db.GetClusterByName(config.UserID, cluster.Name)
+	projectName := kubedeployer.GetProjectName(config.UserID, cluster.Name)
+	existingCluster, err := h.db.GetClusterByName(config.UserID, projectName)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", config.UserID).Str("deployment_name", cluster.Name).Msg("Failed to find deployment")
 		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
 		return
 	}
 
-	// Create the workflow template
-	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID) // TODO: should be cleaned
-	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, wfName, len(cluster.Nodes))
+	cl, err := existingCluster.GetClusterResult()
+	if err != nil {
+		log.Error().Err(err).Int("cluster_id", existingCluster.ID).Msg("Failed to deserialize cluster result")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
+		return
+	}
 
-	// get the workflow
-	wf, err := h.ewfEngine.NewWorkflow(wfName)
+	wf, err := h.ewfEngine.NewWorkflow("add_node")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
 	}
 
 	wf.State = ewf.State{
-		"config":           config,
-		"existing_cluster": existingCluster,
-		"cluster":          cluster,
+		"config":  config,
+		"cluster": cl,
+		"node":    cluster.Nodes[0],
 	}
 
 	h.ewfEngine.RunAsync(c, wf)
