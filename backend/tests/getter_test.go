@@ -41,7 +41,7 @@ func TestClient_GetDeployment(t *testing.T) {
 	}
 	t.Log("Login successful")
 
-	deployment, err := client.GetDeployment("my-k8s-cluster")
+	deployment, err := client.GetDeployment("mycluster")
 	if err != nil {
 		t.Errorf("Failed to get deployment 'my-k8s-cluster': %v", err)
 		return
@@ -61,9 +61,9 @@ func TestClient_GetKubeconfig(t *testing.T) {
 	}
 	t.Log("Login successful")
 
-	kubeconfig, err := client.GetKubeconfig("jrk8s02")
+	kubeconfig, err := client.GetKubeconfig("mycluster")
 	if err != nil {
-		t.Errorf("Failed to get kubeconfig for 'jrk8s02': %v", err)
+		t.Errorf("Failed to get kubeconfig for 'mycluster': %v", err)
 		return
 	}
 
