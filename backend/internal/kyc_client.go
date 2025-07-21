@@ -130,12 +130,9 @@ func (c *KYCClient) CreateSponsorship(ctx context.Context, sponsorAddress string
 }
 
 // IsUserVerified checks if a user is verified (directly or via sponsorship) by calling the tf-kyc-verifier API
-func (c *KYCClient) IsUserVerified(ctx context.Context, sponseeAddress string, sponseeKeyPair subkey.KeyPair) (bool, error) {
+func (c *KYCClient) IsUserVerified(ctx context.Context, sponseeAddress string) (bool, error) {
 	if strings.TrimSpace(sponseeAddress) == "" {
 		return false, fmt.Errorf("sponsee address is empty")
-	}
-	if sponseeKeyPair == nil {
-		return false, fmt.Errorf("sponsee keypair is nil")
 	}
 	url := fmt.Sprintf("%s/api/v1/status?client_id=%s", c.APIURL, sponseeAddress)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

@@ -19,6 +19,7 @@ import (
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"gorm.io/gorm"
 
+	"github.com/vedhavyas/go-subkey"
 	"github.com/vedhavyas/go-subkey/sr25519"
 )
 
@@ -36,6 +37,8 @@ type Handler struct {
 	sseManager      *internal.SSEManager
 	gridNet         string // Network name for the grid
 	kycClient       *internal.KYCClient
+	sponsorKeyPair  subkey.KeyPair
+	sponsorAddress  string
 }
 
 // NewHandler create new handler
@@ -44,7 +47,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridNet string, kycClient *internal.KYCClient) *Handler {
+	gridNet string, kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string) *Handler {
 
 	return &Handler{
 		tokenManager:    tokenManager,
@@ -59,6 +62,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		sseManager:      sseManager,
 		gridNet:         gridNet,
 		kycClient:       kycClient,
+		sponsorKeyPair:  sponsorKeyPair,
+		sponsorAddress:  sponsorAddress,
 	}
 }
 
@@ -146,17 +151,7 @@ func (h *Handler) createKYCSponsorship(ctx context.Context, mnemonic string) err
 		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
 	}
 
-	// Create sponsor keypair from system account
-	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(h.config.SystemAccount.Mnemonic, "")
-	if err != nil {
-		return fmt.Errorf("failed to create sponsor keypair from system account: %w", err)
-	}
-	sponsorAddress, err := sponsorKeyPair.SS58Address(internal.SS58AddressFormat)
-	if err != nil {
-		return fmt.Errorf("failed to derive sponsor SS58 address: %w", err)
-	}
-
-	if err := h.kycClient.CreateSponsorship(ctx, sponsorAddress, sponsorKeyPair, sponseeAddress, sponseeKeyPair); err != nil {
+	if err := h.kycClient.CreateSponsorship(ctx, h.sponsorAddress, h.sponsorKeyPair, sponseeAddress, sponseeKeyPair); err != nil {
 		return fmt.Errorf("failed to create KYC sponsorship: %w", err)
 	}
 
@@ -409,24 +404,12 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	}
 
 	// Check KYC verification status without blocking login
-	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create keypair for KYC verification check")
-		InternalServerError(c)
-		return
-	}
-
-	sponseeAddress, err := sponseeKeyPair.SS58Address(internal.SS58AddressFormat)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get SS58 address for KYC verification check")
-		InternalServerError(c)
-		return
-	}
-
-	sponsored, err := h.kycClient.IsUserVerified(context.Background(), sponseeAddress, sponseeKeyPair)
+	sponsored, err := h.kycClient.IsUserVerified(c.Request.Context(), user.AccountAddress)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to check KYC verification status")
-	} else if user.Sponsored != sponsored {
+		return
+	}
+	if user.Sponsored != sponsored {
 		user.Sponsored = sponsored
 		if err := h.db.UpdateUserByID(&user); err != nil {
 			log.Error().Err(err).Msg("failed to update user sponsorship status")
