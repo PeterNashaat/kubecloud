@@ -23,7 +23,7 @@ func (n *Node) AssignNodeIP(ctx context.Context, gridClient deployer.TFPluginCli
 	return nil
 }
 
-func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node) error {
+func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node, masterPubKey string) error {
 	log.Debug().Msgf("Deploying node %s in cluster %s", node.Name, cluster.Name)
 	var leaderIP string
 	if node.Type == NodeTypeLeader {
@@ -44,7 +44,7 @@ func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node) er
 		cluster.Network.Name,
 		leaderIP,
 		cluster.Token,
-		c.masterPubKey,
+		masterPubKey,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create VM for node: %v", err)

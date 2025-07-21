@@ -34,6 +34,11 @@ func isWorkloadAlreadyDeployedError(err error) bool {
 
 func DeployNetworkStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
 			return err
@@ -46,7 +51,7 @@ func DeployNetworkStep() ewf.StepFn {
 
 		if cluster.ProjectName == "" {
 			// this is a first not a retry
-			if err := cluster.PrepareCluster(kubeClient.UserID); err != nil {
+			if err := cluster.PrepareCluster(config.UserID); err != nil {
 				return fmt.Errorf("failed to prepare cluster: %w", err)
 			}
 		}
@@ -65,6 +70,11 @@ func DeployNetworkStep() ewf.StepFn {
 
 func UpdateNetworkStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
 			return err
@@ -80,7 +90,7 @@ func UpdateNetworkStep() ewf.StepFn {
 			return err
 		}
 
-		node.Name = kubedeployer.GetNodeName(kubeClient.UserID, cluster.Name, node.Name)
+		node.Name = kubedeployer.GetNodeName(config.UserID, cluster.Name, node.Name)
 		cluster.Nodes = append(cluster.Nodes, node)
 
 		if err := kubeClient.DeployNetwork(ctx, &cluster); err != nil {
@@ -95,6 +105,11 @@ func UpdateNetworkStep() ewf.StepFn {
 
 func AddNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
 			return err
@@ -114,7 +129,7 @@ func AddNodeStep() ewf.StepFn {
 			return fmt.Errorf("failed to assign IP for node %s: %w", node.Name, err)
 		}
 
-		if err := kubeClient.DeployNode(ctx, &cluster, node); err != nil {
+		if err := kubeClient.DeployNode(ctx, &cluster, node, config.SSHPublicKey); err != nil {
 			return fmt.Errorf("failed to deploy node %s to existing cluster: %w", node.Name, err)
 		}
 
@@ -125,6 +140,11 @@ func AddNodeStep() ewf.StepFn {
 
 func DeployNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
 			return err
@@ -146,7 +166,7 @@ func DeployNodeStep() ewf.StepFn {
 		}
 		cluster.Nodes[nodeIdx].IP = node.IP
 
-		if err := kubeClient.DeployNode(ctx, &cluster, node); err != nil {
+		if err := kubeClient.DeployNode(ctx, &cluster, node, config.SSHPublicKey); err != nil {
 			if isWorkloadAlreadyDeployedError(err) {
 				return ewf.ErrFailWorkflowNow
 			}
@@ -236,6 +256,11 @@ func RemoveClusterFromDBStep() ewf.StepFn {
 
 func RemoveDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
 			return err
@@ -251,7 +276,7 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 			return fmt.Errorf("missing or invalid 'node_name' in state")
 		}
 
-		nodeName = kubedeployer.GetNodeName(kubeClient.UserID, existingCluster.Name, nodeName)
+		nodeName = kubedeployer.GetNodeName(config.UserID, existingCluster.Name, nodeName)
 
 		if err := kubeClient.RemoveNode(ctx, &existingCluster, nodeName); err != nil {
 			return fmt.Errorf("failed to remove node %s from existing cluster: %w", nodeName, err)
@@ -309,7 +334,7 @@ func SetupClient(ctx context.Context, wf *ewf.Workflow) {
 		return
 	}
 
-	kubeClient, err := kubedeployer.NewClient(ctx, config.Mnemonic, config.Network, config.SSHPublicKey, config.UserID)
+	kubeClient, err := kubedeployer.NewClient(config.Mnemonic, config.Network)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create kubeclient")
 		return

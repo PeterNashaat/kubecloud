@@ -1,22 +1,16 @@
 package kubedeployer
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
 type Client struct {
-	ctx          context.Context
-	GridClient   deployer.TFPluginClient
-	gridNet      string
-	mnemonic     string
-	masterPubKey string
-	UserID       string
+	GridClient deployer.TFPluginClient
 }
 
-func NewClient(ctx context.Context, mnemonic, gridNet, masterPubKey, userID string) (*Client, error) {
+func NewClient(mnemonic, gridNet string) (*Client, error) {
 	tfplugin, err := deployer.NewTFPluginClient(
 		mnemonic,
 		deployer.WithNetwork(gridNet),
@@ -26,12 +20,7 @@ func NewClient(ctx context.Context, mnemonic, gridNet, masterPubKey, userID stri
 	}
 
 	return &Client{
-		ctx:          ctx,
-		GridClient:   tfplugin,
-		gridNet:      gridNet,
-		mnemonic:     mnemonic,
-		masterPubKey: masterPubKey,
-		UserID:       userID,
+		GridClient: tfplugin,
 	}, nil
 }
 
