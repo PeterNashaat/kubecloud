@@ -46,8 +46,10 @@ func DeployNetworkStep() ewf.StepFn {
 			return err
 		}
 
-		if err := cluster.PrepareCluster(kubeClient.UserID); err != nil {
-			return fmt.Errorf("failed to prepare cluster: %w", err)
+		if cluster.ProjectName == "" {
+			if err := cluster.PrepareCluster(kubeClient.UserID); err != nil {
+				return fmt.Errorf("failed to prepare cluster: %w", err)
+			}
 		}
 
 		if err := kubeClient.DeployNetwork(ctx, &cluster); err != nil {
@@ -112,18 +114,24 @@ func DeployNodeStep() ewf.StepFn {
 			return err
 		}
 
+		// TODO: handle the update with just checking the if cluster/added_cluster
+		/* existing, err := getFromState[kubedeployer.Cluster](state, "existing_cluster")
+		if err != nil {
+			log.Debug().Err(err).Msg("No existing cluster found, using current cluster state")
+		} */
+
 		nodeIdx, ok := state["node_index"].(int)
 		if !ok {
 			nodeIdx = 0
 		}
-
 		node := cluster.Nodes[nodeIdx]
 
 		if err := node.AssignNodeIP(ctx, kubeClient.GridClient, cluster.Network.Name); err != nil {
 			return fmt.Errorf("failed to assign node IPs: %w", err)
 		}
-		// TODO: update cluster with the assigned IP
 		cluster.Nodes[nodeIdx].IP = node.IP
+
+		log.Debug().Msgf("Fetched cluster before deploying node: %+v", cluster)
 
 		if err := kubeClient.DeployNode(ctx, &cluster, node); err != nil {
 			if isWorkloadAlreadyDeployedError(err) {
@@ -236,6 +244,7 @@ func RemoveClusterFromDBStep() ewf.StepFn {
 	}
 }
 
+// Deprecated
 func AddDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		kubeClient, err := getKubeClient(state)
@@ -351,7 +360,6 @@ func SetupClient(ctx context.Context, wf *ewf.Workflow) {
 		return
 	}
 
-	log.Warn().Str("user_id", config.UserID).Str("workflow_name", wf.Name).Msg("Setting up kubeclient for workflow")
 	kubeClient, err := kubedeployer.NewClient(ctx, config.Mnemonic, config.Network, config.SSHPublicKey, config.UserID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create kubeclient")
@@ -419,7 +427,6 @@ var BaseWFTemplate = ewf.WorkflowTemplate{
 		SetupClient,
 	},
 	AfterWorkflowHooks: []ewf.AfterWorkflowHook{
-		// TODO: should notify user either failed/succeeded
 		NotifyUser,
 		CloseClient,
 	},
@@ -448,21 +455,25 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 	engine.Register("remove_node", RemoveDeploymentNodeStep())
 	engine.Register("store_deployment", StoreDeploymentStep())
 	engine.Register("notify_user", NotifyUserStep())
+	engine.Register("remove_cluster_from_db", RemoveClusterFromDBStep())
 
-	deployWFTemplate := BaseWFTemplate
-	deployWFTemplate.Steps = []ewf.Step{
-		{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
-		{Name: "deploy_nodes", RetryPolicy: criticalRetryPolicy},
-		{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
-	}
-	engine.RegisterTemplate("deploy_cluster", &deployWFTemplate)
+	// Deprecated with the new dynamic workflow template
+	// deployWFTemplate := BaseWFTemplate
+	// deployWFTemplate.Steps = []ewf.Step{
+	// 	{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
+	// 	{Name: "deploy_nodes", RetryPolicy: criticalRetryPolicy},
+	// 	{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+	// }
+	// engine.RegisterTemplate("deploy_cluster", &deployWFTemplate)
 
 	deleteWFTemplate := BaseWFTemplate
 	deleteWFTemplate.Steps = []ewf.Step{
 		{Name: "remove_cluster", RetryPolicy: standardRetryPolicy},
+		{Name: "remove_cluster_from_db", RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate("remove_cluster", &deleteWFTemplate)
 
+	// Deprecated with the new dynamic workflow template
 	// addNodeWFTemplate := baseWFTemplate
 	// addNodeWFTemplate.Steps = []ewf.Step{
 	// 	{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
@@ -471,12 +482,12 @@ func registerDeploymentActivities(engine *ewf.Engine) {
 	// }
 	// engine.RegisterTemplate("add_node", &addNodeWFTemplate)
 
-	// removeNodeWFTemplate := baseWFTemplate
-	// removeNodeWFTemplate.Steps = []ewf.Step{
-	// 	{Name: "remove_node", RetryPolicy: standardRetryPolicy},
-	// 	{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
-	// }
-	// engine.RegisterTemplate("remove_node", &removeNodeWFTemplate)
+	removeNodeWFTemplate := BaseWFTemplate
+	removeNodeWFTemplate.Steps = []ewf.Step{
+		{Name: "remove_node", RetryPolicy: standardRetryPolicy},
+		{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate("remove_node", &removeNodeWFTemplate)
 }
 
 // Helper functions for state management

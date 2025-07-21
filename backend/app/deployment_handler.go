@@ -453,9 +453,9 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 	}
 
 	wf.State = ewf.State{
-		"config":        config,
-		"added_cluster": cluster,
-		"cluster":       existingCluster,
+		"config":           config,
+		"existing_cluster": existingCluster,
+		"cluster":          cluster,
 	}
 
 	h.ewfEngine.RunAsync(c, wf)
