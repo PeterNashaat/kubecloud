@@ -51,7 +51,7 @@ func (s *EWFGormStore) LoadWorkflowByName(ctx context.Context, name string) (*ew
 	}
 
 	var workflow ewf.Workflow
-	err := json.Unmarshal(gormWorkflow.Data, &workflow )
+	err := json.Unmarshal(gormWorkflow.Data, &workflow)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal workflow: %w", err)
 	}
@@ -63,11 +63,11 @@ func (s *EWFGormStore) LoadWorkflowByUUID(ctx context.Context, uuid string) (*ew
 	if err := s.db.WithContext(ctx).Where("uuid = ?", uuid).First(&gormWorkflow).Error; err != nil {
 		return nil, err
 	}
-    var workflow ewf.Workflow
-    if err := json.Unmarshal(gormWorkflow.Data, &workflow); err != nil {
-        return nil, fmt.Errorf("failed to unmarshal workflow: %w", err)
-    }
-    return &workflow, nil
+	var workflow ewf.Workflow
+	if err := json.Unmarshal(gormWorkflow.Data, &workflow); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal workflow: %w", err)
+	}
+	return &workflow, nil
 }
 
 func (s *EWFGormStore) ListWorkflowUUIDsByStatus(ctx context.Context, status ewf.WorkflowStatus) ([]string, error) {
