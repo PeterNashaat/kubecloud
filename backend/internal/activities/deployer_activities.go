@@ -58,7 +58,7 @@ func DeployNetworkStep() ewf.StepFn {
 
 		if err := kubeClient.DeployNetwork(ctx, &cluster); err != nil {
 			if isWorkloadAlreadyDeployedError(err) {
-				return ewf.ErrFailWorkflowNow // TODO: more context
+				return fmt.Errorf("network already deployed for cluster %s: %w", cluster.Name, ewf.ErrFailWorkflowNow)
 			}
 			return fmt.Errorf("failed to deploy network: %w", err)
 		}
@@ -168,7 +168,7 @@ func DeployNodeStep() ewf.StepFn {
 
 		if err := kubeClient.DeployNode(ctx, &cluster, node, config.SSHPublicKey); err != nil {
 			if isWorkloadAlreadyDeployedError(err) {
-				return ewf.ErrFailWorkflowNow
+				return fmt.Errorf("node already deployed for cluster %s: %w", cluster.Name, ewf.ErrFailWorkflowNow)
 			}
 		}
 
