@@ -3,7 +3,6 @@ module kubecloud
 go 1.24.3
 
 require (
-	github.com/google/uuid v1.6.0
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.11.0
@@ -21,6 +20,7 @@ require (
 	github.com/threefoldtech/zosbase v0.1.10
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/xmonader/ewf v0.0.0-20250716190554-ee315eb0c024
+	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 	gorm.io/gorm v1.30.0
 )
 
@@ -56,6 +56,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/gtank/merlin v0.1.1 // indirect
@@ -102,7 +103,6 @@ require (
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
-	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect

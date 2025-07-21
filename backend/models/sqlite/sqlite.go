@@ -348,9 +348,10 @@ func (s *Sqlite) GetSSHKeyByID(sshKeyID int, userID int) (models.SSHKey, error) 
 }
 
 // CreateCluster creates a new cluster in the database
-func (s *Sqlite) CreateCluster(cluster *models.Cluster) error {
+func (s *Sqlite) CreateCluster(userID string, cluster *models.Cluster) error {
 	cluster.CreatedAt = time.Now()
 	cluster.UpdatedAt = time.Now()
+	cluster.UserID = userID
 	return s.db.Create(cluster).Error
 }
 

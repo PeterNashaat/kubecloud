@@ -42,10 +42,6 @@
     "password": "",
     "db": 0
   },
-  "grid": {
-    "mne": "your grid account 12-word mnemonic phrase for threefold grid deployment operations",
-    "net": "dev"
-  },
   "deployer_workers_num": 3,
   "invoice": {
     "name": "Your Company Name Ltd",
@@ -55,5 +51,6 @@
   "ssh": {
     "private_key_path": "/home/user/.ssh/id_rsa",
     "public_key_path": "/home/user/.ssh/id_rsa.pub"
-  }
+  },
+  "debug": false
 }

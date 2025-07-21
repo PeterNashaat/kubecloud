@@ -98,17 +98,13 @@ func NewApp(config internal.Configuration) (*App, error) {
 	gridClient, err := deployer.NewTFPluginClient(
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
-		// TODO: remove this after testing
-		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
-		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
 	// create storage for workflows
-	ewfStore, err := ewf.NewSQLiteStore(config.WorkflowDBFile)
+	ewfStore, err := ewf.NewSQLiteStore(config.Database.File)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init EWF store")
 		return nil, fmt.Errorf("failed to init workflow store: %w", err)
@@ -133,7 +129,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, ewfEngine, config.SystemAccount.Network)
+		sseManager, ewfEngine, config.SystemAccount.Network, sshPublicKey)
 
 	app := &App{
 		router:        router,
@@ -157,10 +153,10 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	app.registerHandlers()
 
-	app.workerManager.Start()
+	// Deprecated: using ewfEngine now
+	// app.workerManager.Start()
 
 	return app, nil
-
 }
 
 // registerHandlers registers all routes
@@ -228,20 +224,16 @@ func (app *App) registerHandlers() {
 
 			deploymentGroup := deployerGroup.Group("/deployments")
 			{
-				deploymentGroup.POST("", app.handlers.HandleAsyncDeploy)
+				deploymentGroup.POST("", app.handlers.HandleDeployCluster)
 				deploymentGroup.GET("", app.handlers.HandleListDeployments)
 				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
 				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
-				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteDeployment)
+				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteCluster)
 
 				// Node management routes
-				deploymentGroup.POST("/:name/nodes", app.handlers.HandleAddNodeToDeployment)
-				deploymentGroup.DELETE("/:name/nodes/:node_name", app.handlers.HandleRemoveNodeFromDeployment)
+				deploymentGroup.POST("/:name/nodes", app.handlers.HandleAddNode)
+				deploymentGroup.DELETE("/:name/nodes/:node_name", app.handlers.HandleRemoveNode)
 			}
-
-			// TODO: Task routes
-			// deployerGroup.GET("/tasks", app.handlers.ListUserTasksHandler)
-			// deployerGroup.GET("/tasks/:task_id", app.handlers.GetTaskStatusHandler)
 
 			// Notification routes
 			deployerGroup.GET("/notifications", app.handlers.GetNotificationsHandler)

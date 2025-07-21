@@ -36,6 +36,7 @@ type Handler struct {
 	sseManager      *internal.SSEManager
 	ewfEngine       *ewf.Engine
 	gridNet         string // Network name for the grid
+	sshPublicKey    string // SSH public key loaded at startup
 }
 
 // NewHandler create new handler
@@ -44,6 +45,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine, gridNet string,
+	sshPublicKey string,
 ) *Handler {
 	return &Handler{
 		tokenManager:    tokenManager,
@@ -58,6 +60,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		sseManager:      sseManager,
 		ewfEngine:       ewfEngine,
 		gridNet:         gridNet,
+		sshPublicKey:    sshPublicKey,
 	}
 }
 
