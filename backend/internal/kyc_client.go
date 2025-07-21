@@ -7,37 +7,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 	"github.com/vedhavyas/go-subkey"
 )
 
 type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
-}
-
-// RetryableHTTPClient wraps an httpClient and adds retry logic.
-type RetryableHTTPClient struct {
-	Client     httpClient
-	MaxRetries int
-	Wait       time.Duration
-}
-
-func (r *RetryableHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	var resp *http.Response
-	var err error
-	for i := 0; i < r.MaxRetries; i++ {
-		resp, err = r.Client.Do(req)
-		if err == nil && resp.StatusCode < 500 {
-			return resp, nil
-		}
-		if resp != nil {
-			resp.Body.Close()
-		}
-		time.Sleep(r.Wait)
-	}
-	return resp, err
 }
 
 // KYCClient holds configuration for tf-kyc-verifier API client
@@ -47,19 +26,17 @@ type KYCClient struct {
 	httpClient      httpClient
 }
 
-// NewKYCClient creates a new KYCClient instance. If no httpClient is provided, uses http.Client with a timeout. Always wraps with retry logic.
-func NewKYCClient(apiURL, challengeDomain string, clients ...httpClient) *KYCClient {
-	var client httpClient
-	if len(clients) > 0 && clients[0] != nil {
-		client = clients[0]
-	} else {
-		client = &http.Client{Timeout: 10 * time.Second}
+// NewKYCClient creates a new KYCClient instance. If client is nil, creates a retryable client with default settings.
+func NewKYCClient(apiURL, challengeDomain string, client httpClient) *KYCClient {
+	if client == nil {
+		retryClient := retryablehttp.NewClient()
+		retryClient.RetryMax = 3
+		retryClient.RetryWaitMin = 500 * time.Millisecond
+		retryClient.RetryWaitMax = 2 * time.Second
+		retryClient.Logger = nil              // Disable default logger
+		client = retryClient.StandardClient() // Get *http.Client that does retries
 	}
-	client = &RetryableHTTPClient{
-		Client:     client,
-		MaxRetries: 3,
-		Wait:       500 * time.Millisecond,
-	}
+
 	return &KYCClient{
 		APIURL:          apiURL,
 		ChallengeDomain: challengeDomain,
@@ -84,13 +61,13 @@ func signMessage(kr subkey.KeyPair, message string) (string, error) {
 
 // CreateSponsorship creates a sponsorship between sponsor and sponsee addresses
 func (c *KYCClient) CreateSponsorship(ctx context.Context, sponsorAddress string, sponsorKeyPair subkey.KeyPair, sponseeAddress string, sponseeKeyPair subkey.KeyPair) error {
-	if sponsorAddress == "" {
+	if strings.TrimSpace(sponsorAddress) == "" {
 		return fmt.Errorf("sponsor address is empty")
 	}
 	if sponsorKeyPair == nil {
 		return fmt.Errorf("sponsor keypair is nil")
 	}
-	if sponseeAddress == "" {
+	if strings.TrimSpace(sponseeAddress) == "" {
 		return fmt.Errorf("sponsee address is empty")
 	}
 	if sponseeKeyPair == nil {
@@ -154,7 +131,7 @@ func (c *KYCClient) CreateSponsorship(ctx context.Context, sponsorAddress string
 
 // IsUserVerified checks if a user is verified (directly or via sponsorship) by calling the tf-kyc-verifier API
 func (c *KYCClient) IsUserVerified(ctx context.Context, sponseeAddress string, sponseeKeyPair subkey.KeyPair) (bool, error) {
-	if sponseeAddress == "" {
+	if strings.TrimSpace(sponseeAddress) == "" {
 		return false, fmt.Errorf("sponsee address is empty")
 	}
 	if sponseeKeyPair == nil {

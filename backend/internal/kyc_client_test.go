@@ -33,7 +33,7 @@ func TestIsUserVerified(t *testing.T) {
 		t.Fatalf("failed to create test keypair: %v", err)
 	}
 
-	client := NewKYCClient(ts.URL, "testdomain")
+	client := NewKYCClient(ts.URL, "testdomain", nil)
 
 	verified, err := client.IsUserVerified(context.Background(), "dummyaddress", kp)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestIsUserVerified_Non200Status(t *testing.T) {
 		t.Fatalf("failed to create test keypair: %v", err)
 	}
 
-	client := NewKYCClient(ts.URL, "testdomain")
+	client := NewKYCClient(ts.URL, "testdomain", nil)
 	verified, err := client.IsUserVerified(context.Background(), "dummyaddress", kp)
 	if err == nil {
 		t.Errorf("expected error for non-200 status")
@@ -94,7 +94,7 @@ func TestIsUserVerified_MalformedJSON(t *testing.T) {
 		t.Fatalf("failed to create test keypair: %v", err)
 	}
 
-	client := NewKYCClient(ts.URL, "testdomain")
+	client := NewKYCClient(ts.URL, "testdomain", nil)
 	verified, err := client.IsUserVerified(context.Background(), "dummyaddress", kp)
 	if err == nil {
 		t.Errorf("expected error for malformed JSON")
@@ -120,7 +120,7 @@ func TestIsUserVerified_MissingStatusField(t *testing.T) {
 		t.Fatalf("failed to create test keypair: %v", err)
 	}
 
-	client := NewKYCClient(ts.URL, "testdomain")
+	client := NewKYCClient(ts.URL, "testdomain", nil)
 	verified, err := client.IsUserVerified(context.Background(), "dummyaddress", kp)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -130,7 +130,7 @@ func TestIsUserVerified_MissingStatusField(t *testing.T) {
 	}
 }
 
-func TestCreateSponsorship_Success(t *testing.T) {
+func TestCreateSponsorship(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/sponsorships" {
 			w.WriteHeader(http.StatusNotFound)
@@ -146,7 +146,7 @@ func TestCreateSponsorship_Success(t *testing.T) {
 	// Use dummy keypairs
 	phrase := "bottom drive obey lake curtain smoke basket hold race lonely fit walk"
 	kp, _ := sr25519.Scheme{}.FromPhrase(phrase, "")
-	client := NewKYCClient(ts.URL, "testdomain")
+	client := NewKYCClient(ts.URL, "testdomain", nil)
 	err := client.CreateSponsorship(context.Background(), "sponsor", kp, "sponsee", kp)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -164,7 +164,7 @@ func TestCreateSponsorship_Non201(t *testing.T) {
 
 	phrase := "bottom drive obey lake curtain smoke basket hold race lonely fit walk"
 	kp, _ := sr25519.Scheme{}.FromPhrase(phrase, "")
-	client := NewKYCClient(ts.URL, "testdomain")
+	client := NewKYCClient(ts.URL, "testdomain", nil)
 	err := client.CreateSponsorship(context.Background(), "sponsor", kp, "sponsee", kp)
 	if err == nil {
 		t.Errorf("expected error for non-201 response")

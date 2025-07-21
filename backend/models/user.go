@@ -19,7 +19,7 @@ type User struct {
 	SSHKey            string    `json:"ssh_key"`
 	Debt              float64   `json:"debt"`
 	Sponsored         bool      `json:"sponsored"`
-	Address           string    `json:"address" gorm:"column:address"`
+	AccountAddress    string    `json:"account_address" gorm:"column:address"`
 }
 
 // SSHKey represents an SSH key for a user
