@@ -11,9 +11,6 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
 
-// Simple IP tracking - just store used IPs during a single deployment session
-var deploymentIPTracker = make(map[string][]byte) // "network:nodeID" -> []usedHostIDs (third octet of IP)
-
 func getRandomMyceliumNetSeed() (string, error) {
 	key := make([]byte, MYC_NET_SEED_LEN)
 	_, err := rand.Read(key)
@@ -34,21 +31,16 @@ func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, net
 		return "", errors.Wrapf(err, "failed to get used IPs for node %d", nodeID)
 	}
 
-	trackerKey := fmt.Sprintf("%s:%d", networkName, nodeID)
-	sessionUsedIPs := deploymentIPTracker[trackerKey]
-	allUsedIPs := append(usedHostIDs, sessionUsedIPs...)
-
 	// skip 0, 1, and 255 as they are reserved
 	for hostID := byte(2); hostID < 255; hostID++ {
 		used := false
-		for _, usedID := range allUsedIPs {
+		for _, usedID := range usedHostIDs {
 			if usedID == hostID {
 				used = true
 				break
 			}
 		}
 		if !used {
-			deploymentIPTracker[trackerKey] = append(deploymentIPTracker[trackerKey], hostID)
 			vmIP := make(net.IP, len(ip.To4()))
 			copy(vmIP, ip.To4())
 			vmIP[3] = hostID
