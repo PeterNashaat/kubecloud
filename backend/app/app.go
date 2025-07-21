@@ -38,6 +38,7 @@ type App struct {
 	workerManager *internal.WorkerManager
 	gridClient    deployer.TFPluginClient
 	appCancel     context.CancelFunc
+	ctx           context.Context
 }
 
 // NewApp create new instance of the app with all configs
@@ -111,13 +112,19 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	_, appCancel := context.WithCancel(context.Background())
+	ctx, appCancel := context.WithCancel(context.Background())
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
 
+	// Initialize KYC client
+	kycClient := internal.NewKYCClient(
+		config.KYCVerifierAPIURL,
+		config.KYCChallengeDomain,
+	)
+
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, config.SystemAccount.Network)
+		sseManager, config.SystemAccount.Network, kycClient)
 
 	app := &App{
 		router:        router,
@@ -129,6 +136,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		workerManager: workerManager,
 		appCancel:     appCancel,
 		gridClient:    gridClient,
+		ctx:           ctx,
 	}
 
 	app.registerHandlers()

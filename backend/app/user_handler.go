@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -34,6 +35,7 @@ type Handler struct {
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
 	gridNet         string // Network name for the grid
+	kycClient       *internal.KYCClient
 }
 
 // NewHandler create new handler
@@ -42,7 +44,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridNet string) *Handler {
+	gridNet string, kycClient *internal.KYCClient) *Handler {
+
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -55,6 +58,7 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		redis:           redis,
 		sseManager:      sseManager,
 		gridNet:         gridNet,
+		kycClient:       kycClient,
 	}
 }
 
@@ -132,84 +136,37 @@ type SSHKeyInput struct {
 }
 
 // KYC sponsorship helpers
-func (h *Handler) refreshUserVerification(user *models.User) error {
-	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
-	if err != nil {
-		return fmt.Errorf("failed to create keypair for verification refresh: %w", err)
-	}
-	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
-	if err != nil {
-		return fmt.Errorf("failed to get SS58 address for verification refresh: %w", err)
-	}
-
-	kycClient, err := internal.NewKYCClient(
-		h.config.KYCVerifierAPIURL,
-		"", // sponsor address not needed for verification
-		"", // sponsor phrase not needed for verification
-		h.config.KYCChallengeDomain,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize KYC client: %w", err)
-	}
-
-	sponsored, err := kycClient.IsUserVerified(sponseeAddress, sponseeKeyPair)
-	if err != nil {
-		user.Sponsored = false
-		h.db.UpdateUserByID(user)
-		return fmt.Errorf("failed to check KYC sponsorship: %w", err)
-	}
-	user.Sponsored = sponsored
-	if err := h.db.UpdateUserByID(user); err != nil {
-		return fmt.Errorf("failed to update user sponsorship flag: %w", err)
-	}
-	log.Info().Msgf("[KYC] Refreshed sponsorship for user %s: %v", user.Email, user.Sponsored)
-	return nil
-}
-
 func (h *Handler) createKYCSponsorship(mnemonic string) error {
+	if h.kycClient == nil {
+		return fmt.Errorf("KYC client is not initialized")
+	}
+
 	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
 	if err != nil {
 		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
 	}
-	sponseeAddress, err := sponseeKeyPair.SS58Address(42)
+	sponseeAddress, err := sponseeKeyPair.SS58Address(internal.SS58AddressFormat)
 	if err != nil {
 		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
 	}
 
-	sponsorPhrase := h.config.SystemAccount.Mnemonic // Use system account mnemonic as sponsor
-	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(sponsorPhrase, "")
+	// Create sponsor keypair from system account
+	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(h.config.SystemAccount.Mnemonic, "")
 	if err != nil {
-		return fmt.Errorf("failed to create sponsor keypair from phrase: %w", err)
+		return fmt.Errorf("failed to create sponsor keypair from system account: %w", err)
 	}
-	sponsorAddress, err := sponsorKeyPair.SS58Address(42)
+	sponsorAddress, err := sponsorKeyPair.SS58Address(internal.SS58AddressFormat)
 	if err != nil {
-		return fmt.Errorf("failed to get sponsor address from phrase: %w", err)
+		return fmt.Errorf("failed to derive sponsor SS58 address: %w", err)
 	}
 
-	kycClient, err := internal.NewKYCClient(
-		h.config.KYCVerifierAPIURL,
-		sponsorAddress,
-		sponsorPhrase,
-		h.config.KYCChallengeDomain,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize KYC client: %w", err)
+	if err := h.kycClient.CreateSponsorship(context.Background(), sponsorAddress, sponsorKeyPair, sponseeAddress, sponseeKeyPair); err != nil {
+		return fmt.Errorf("failed to create KYC sponsorship: %w", err)
 	}
-	return kycClient.CreateSponsorship(sponseeAddress, sponseeKeyPair)
+
+	return nil
 }
 
-// @Summary Register a user
-// @Description Registers a new user to the system
-// @Tags users
-// @ID register-user
-// @Accept json
-// @Produce json
-// @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse
-// @Failure 400 {object} APIResponse "Invalid request format"
-// @Failure 409 {object} APIResponse "User already registered"
-// @Failure 500 {object} APIResponse
-// @Router /user/register [post]
 // RegisterHandler registers user to the system
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
@@ -301,7 +258,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 			InternalServerError(c)
 			return
 		}
-		sponseeAddress, err := sponseeKeyPair.SS58Address(42)
+		sponseeAddress, err := sponseeKeyPair.SS58Address(internal.SS58AddressFormat)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to get SS58 address")
 			InternalServerError(c)
@@ -321,10 +278,13 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 			InternalServerError(c)
 			return
 		}
-		// Refresh and cache verification status
-		if err := h.refreshUserVerification(&user); err != nil {
-			log.Error().Err(err).Msg("failed to refresh user verification after registration")
-			// Not fatal for registration, just log
+
+		// Set sponsored to true after successful sponsorship creation
+		user.Sponsored = true
+		if err := h.db.UpdateUserByID(&user); err != nil {
+			log.Error().Err(err).Msg("failed to update user sponsorship status")
+			InternalServerError(c)
+			return
 		}
 	}
 
@@ -447,14 +407,25 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		return
 	}
 
-	// refresh sponsorship status on login
-	if err := h.refreshUserVerification(&user); err != nil {
-		log.Error().Err(err).Msg("failed to refresh user sponsorship on login")
-	}
-
-	if !user.Sponsored {
-		Error(c, http.StatusForbidden, "KYC not completed", "Please complete KYC sponsorship.")
-		return
+	// Check KYC verification status without blocking login
+	if h.kycClient != nil {
+		sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(user.Mnemonic, "")
+		if err == nil { // Only proceed if we can create the keypair
+			sponseeAddress, err := sponseeKeyPair.SS58Address(internal.SS58AddressFormat)
+			if err == nil { // Only proceed if we can get the address
+				if sponsored, err := h.kycClient.IsUserVerified(context.Background(), sponseeAddress, sponseeKeyPair); err == nil {
+					// Only update if verification check was successful
+					if user.Sponsored != sponsored {
+						user.Sponsored = sponsored
+						if err := h.db.UpdateUserByID(&user); err != nil {
+							log.Error().Err(err).Msg("failed to update user sponsorship status")
+						}
+					}
+				} else {
+					log.Error().Err(err).Msg("failed to check KYC verification status")
+				}
+			}
+		}
 	}
 
 	// create token pairs

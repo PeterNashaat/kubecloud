@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,35 +11,60 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/vedhavyas/go-subkey"
-	"github.com/vedhavyas/go-subkey/sr25519"
 )
+
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// RetryableHTTPClient wraps an httpClient and adds retry logic.
+type RetryableHTTPClient struct {
+	Client     httpClient
+	MaxRetries int
+	Wait       time.Duration
+}
+
+func (r *RetryableHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	for i := 0; i < r.MaxRetries; i++ {
+		resp, err = r.Client.Do(req)
+		if err == nil && resp.StatusCode < 500 {
+			return resp, nil
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(r.Wait)
+	}
+	return resp, err
+}
 
 // KYCClient holds configuration for tf-kyc-verifier API client
 type KYCClient struct {
 	APIURL          string
-	SponsorAddress  string
-	SponsorKeyPair  subkey.KeyPair
 	ChallengeDomain string
-	HTTPClient      *http.Client
+	httpClient      httpClient
 }
 
-// NewKYCClient creates a new KYCClient instance
-func NewKYCClient(apiURL, sponsorAddress, sponsorPhrase, challengeDomain string) (*KYCClient, error) {
-	var kr subkey.KeyPair
-	var err error
-	if sponsorPhrase != "" {
-		kr, err = sr25519.Scheme{}.FromPhrase(sponsorPhrase, "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create sponsor keypair: %w", err)
-		}
+// NewKYCClient creates a new KYCClient instance. If no httpClient is provided, uses http.Client with a timeout. Always wraps with retry logic.
+func NewKYCClient(apiURL, challengeDomain string, clients ...httpClient) *KYCClient {
+	var client httpClient
+	if len(clients) > 0 && clients[0] != nil {
+		client = clients[0]
+	} else {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	client = &RetryableHTTPClient{
+		Client:     client,
+		MaxRetries: 3,
+		Wait:       500 * time.Millisecond,
 	}
 	return &KYCClient{
 		APIURL:          apiURL,
-		SponsorAddress:  sponsorAddress,
-		SponsorKeyPair:  kr,
 		ChallengeDomain: challengeDomain,
-		HTTPClient:      &http.Client{Timeout: 10 * time.Second},
-	}, nil
+		httpClient:      client,
+	}
 }
 
 // createChallengeMessage creates the challenge message string
@@ -57,13 +83,26 @@ func signMessage(kr subkey.KeyPair, message string) (string, error) {
 }
 
 // CreateSponsorship creates a sponsorship between sponsor and sponsee addresses
-func (c *KYCClient) CreateSponsorship(sponseeAddress string, sponseeKeyPair subkey.KeyPair) error {
+func (c *KYCClient) CreateSponsorship(ctx context.Context, sponsorAddress string, sponsorKeyPair subkey.KeyPair, sponseeAddress string, sponseeKeyPair subkey.KeyPair) error {
+	if sponsorAddress == "" {
+		return fmt.Errorf("sponsor address is empty")
+	}
+	if sponsorKeyPair == nil {
+		return fmt.Errorf("sponsor keypair is nil")
+	}
+	if sponseeAddress == "" {
+		return fmt.Errorf("sponsee address is empty")
+	}
+	if sponseeKeyPair == nil {
+		return fmt.Errorf("sponsee keypair is nil")
+	}
+
 	// Create challenge messages
 	sponsorChallenge := c.createChallengeMessage()
 	sponseeChallenge := c.createChallengeMessage()
 
 	// Sign challenges
-	sponsorSignature, err := signMessage(c.SponsorKeyPair, sponsorChallenge)
+	sponsorSignature, err := signMessage(sponsorKeyPair, sponsorChallenge)
 	if err != nil {
 		return fmt.Errorf("failed to sign sponsor challenge: %w", err)
 	}
@@ -73,19 +112,19 @@ func (c *KYCClient) CreateSponsorship(sponseeAddress string, sponseeKeyPair subk
 	}
 
 	// Debug logs for troubleshooting
-	log.Debug().Msgf("KYC Sponsorship Debug: sponsorAddress=%s, sponseeAddress=%s", c.SponsorAddress, sponseeAddress)
+	log.Debug().Msgf("KYC Sponsorship Debug: sponsorAddress=%s, sponseeAddress=%s", sponsorAddress, sponseeAddress)
 	log.Debug().Msgf("KYC Sponsorship Debug: sponsorChallenge=%s, sponseeChallenge=%s", sponsorChallenge, sponseeChallenge)
 	log.Debug().Msgf("KYC Sponsorship Debug: sponsorSignature=%s, sponseeSignature=%s", sponsorSignature, sponseeSignature)
 
 	// Prepare HTTP request
 	url := fmt.Sprintf("%s/api/v1/sponsorships", c.APIURL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer([]byte{}))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("creating HTTP request to %s: %w", url, err)
 	}
 
 	// Set required headers
-	req.Header.Set("X-Client-ID", c.SponsorAddress)
+	req.Header.Set("X-Client-ID", sponsorAddress)
 	req.Header.Set("X-Sponsee-ID", sponseeAddress)
 	req.Header.Set("X-Challenge", hex.EncodeToString([]byte(sponsorChallenge)))
 	req.Header.Set("X-Sponsee-Challenge", hex.EncodeToString([]byte(sponseeChallenge)))
@@ -93,7 +132,7 @@ func (c *KYCClient) CreateSponsorship(sponseeAddress string, sponseeKeyPair subk
 	req.Header.Set("X-Sponsee-Signature", sponseeSignature)
 
 	// Send request
-	resp, err := c.HTTPClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send sponsorship request: %w", err)
 	}
@@ -109,14 +148,24 @@ func (c *KYCClient) CreateSponsorship(sponseeAddress string, sponseeKeyPair subk
 		return fmt.Errorf("sponsorship creation failed with status: %s and response: %s", resp.Status, bodyBytes.String())
 	}
 
-	log.Info().Msgf("Sponsorship created successfully between sponsor %s and sponsee %s", c.SponsorAddress, sponseeAddress)
+	log.Info().Msgf("Sponsorship created successfully between sponsor %s and sponsee %s", sponsorAddress, sponseeAddress)
 	return nil
 }
 
 // IsUserVerified checks if a user is verified (directly or via sponsorship) by calling the tf-kyc-verifier API
-func (c *KYCClient) IsUserVerified(address string, keyPair subkey.KeyPair) (bool, error) {
-	url := fmt.Sprintf("%s/api/v1/status?client_id=%s", c.APIURL, address)
-	resp, err := c.HTTPClient.Get(url)
+func (c *KYCClient) IsUserVerified(ctx context.Context, sponseeAddress string, sponseeKeyPair subkey.KeyPair) (bool, error) {
+	if sponseeAddress == "" {
+		return false, fmt.Errorf("sponsee address is empty")
+	}
+	if sponseeKeyPair == nil {
+		return false, fmt.Errorf("sponsee keypair is nil")
+	}
+	url := fmt.Sprintf("%s/api/v1/status?client_id=%s", c.APIURL, sponseeAddress)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return false, err
 	}
