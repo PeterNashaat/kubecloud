@@ -40,7 +40,7 @@ type DB interface {
 	GetUnreadNotificationCount(userID string) (int64, error)
 	DeleteNotification(notificationID uint, userID string) error
 	// Cluster methods
-	CreateCluster(cluster *Cluster) error
+	CreateCluster(userID string, cluster *Cluster) error
 	ListUserClusters(userID string) ([]Cluster, error)
 	GetClusterByName(userID string, projectName string) (Cluster, error)
 	UpdateCluster(cluster *Cluster) error

@@ -350,9 +350,10 @@ func (s *GormDB) GetSSHKeyByID(sshKeyID int, userID int) (SSHKey, error) {
 }
 
 // CreateCluster creates a new cluster in the database
-func (s *GormDB) CreateCluster(cluster *Cluster) error {
+func (s *GormDB) CreateCluster(userID string, cluster *Cluster) error {
 	cluster.CreatedAt = time.Now()
 	cluster.UpdatedAt = time.Now()
+	cluster.UserID = userID
 	return s.db.Create(cluster).Error
 }
 
