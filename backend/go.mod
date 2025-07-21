@@ -8,7 +8,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
-	github.com/signintech/gopdf v0.32.0
+	github.com/signintech/gopdf v0.33.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stripe/stripe-go/v82 v82.2.1
