@@ -313,13 +313,6 @@ func (h *Handler) getClientConfig(c *gin.Context) (activities.ClientConfig, erro
 	}
 	userIDStr := fmt.Sprintf("%v", userID)
 
-	// TODO: load it at startup instead
-	sshPublicKeyBytes, err := os.ReadFile(h.config.SSH.PublicKeyPath)
-	if err != nil {
-		return activities.ClientConfig{}, fmt.Errorf("failed to read SSH public key: %v", err)
-	}
-	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
-
 	userIDInt, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		return activities.ClientConfig{}, fmt.Errorf("failed to parse user ID: %v", err)
@@ -331,7 +324,7 @@ func (h *Handler) getClientConfig(c *gin.Context) (activities.ClientConfig, erro
 	}
 
 	return activities.ClientConfig{
-		SSHPublicKey: sshPublicKey,
+		SSHPublicKey: h.sshPublicKey,
 		Mnemonic:     user.Mnemonic,
 		UserID:       userIDStr,
 		Network:      h.config.SystemAccount.Network,
