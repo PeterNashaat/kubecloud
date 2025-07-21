@@ -46,5 +46,6 @@ type DB interface {
 	CreatePendingRecord(record *PendingRecord) error
 	ListAllPendingRecords() ([]PendingRecord, error)
 	ListOnlyPendingRecords() ([]PendingRecord, error)
+	ListUserPendingRecords(userID int) ([]PendingRecord, error)
 	UpdatePendingRecordTransferredAmount(id int, amount uint64) error
 }

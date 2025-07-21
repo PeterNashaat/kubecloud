@@ -412,6 +412,11 @@ func (s *Sqlite) ListOnlyPendingRecords() ([]models.PendingRecord, error) {
 	return pendingRecords, s.db.Where("tft_amount > transferred_tft_amount").Find(&pendingRecords).Error
 }
 
+func (s *Sqlite) ListUserPendingRecords(userID int) ([]models.PendingRecord, error) {
+	var pendingRecords []models.PendingRecord
+	return pendingRecords, s.db.Where("user_id = ?", userID).Find(&pendingRecords).Error
+}
+
 func (s *Sqlite) UpdatePendingRecordTransferredAmount(id int, amount uint64) error {
 	return s.db.Model(&models.PendingRecord{}).
 		Where("id = ?", id).

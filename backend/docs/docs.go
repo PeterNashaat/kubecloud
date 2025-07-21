@@ -704,6 +704,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns user pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List user pending records",
+                "operationId": "list-user-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.PendingRecord"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user/redeem/{voucher_code}": {
             "put": {
                 "description": "Redeems a voucher for the user",
@@ -1627,16 +1665,16 @@ const docTemplate = `{
         "models.PendingRecord": {
             "type": "object",
             "properties": {
-                "amount": {
-                    "type": "integer"
-                },
                 "created_at": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "transferred_amount": {
+                "tft_amount": {
+                    "type": "integer"
+                },
+                "transferred_tft_amount": {
                     "type": "integer"
                 },
                 "updated_at": {

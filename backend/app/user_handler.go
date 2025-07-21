@@ -964,3 +964,29 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 
 	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
 }
+
+// @Summary List user pending records
+// @Description Returns user pending records in the system
+// @Tags users
+// @ID list-user-pending-records
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.PendingRecord
+// @Failure 500 {object} APIResponse
+// @Security BearerAuth
+// @Router /user/pending-records [get]
+// ListUserPendingRecordsHandler returns user pending records in the system
+func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
+		"pending_records": pendingRecords,
+	})
+}

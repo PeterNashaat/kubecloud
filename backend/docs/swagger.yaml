@@ -210,13 +210,13 @@ definitions:
     type: object
   models.PendingRecord:
     properties:
-      amount:
-        type: integer
       created_at:
         type: string
       id:
         type: integer
-      transferred_amount:
+      tft_amount:
+        type: integer
+      transferred_tft_amount:
         type: integer
       updated_at:
         type: string
@@ -753,6 +753,30 @@ paths:
       summary: Unreserve node
       tags:
       - nodes
+  /user/pending-records:
+    get:
+      consumes:
+      - application/json
+      description: Returns user pending records in the system
+      operationId: list-user-pending-records
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.PendingRecord'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List user pending records
+      tags:
+      - users
   /user/redeem/{voucher_code}:
     put:
       description: Redeems a voucher for the user
