@@ -19,10 +19,9 @@ import (
 
 // Response represents the response structure for deployment requests
 type Response struct {
-	TaskID    string    `json:"task_id"`
-	Status    string    `json:"status"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+	WorkflowID string `json:"task_id"`
+	Status     string `json:"status"`
+	Message    string `json:"message"`
 }
 
 func (h *Handler) HandleListDeployments(c *gin.Context) {
@@ -374,10 +373,9 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 	h.ewfEngine.RunAsync(c, wf)
 
 	c.JSON(http.StatusAccepted, Response{
-		TaskID:    wf.UUID,
-		Status:    string(wf.Status),
-		Message:   "Deployment workflow started successfully",
-		CreatedAt: wf.CreatedAt,
+		WorkflowID: wf.UUID,
+		Status:     string(wf.Status),
+		Message:    "Deployment workflow started successfully",
 	})
 }
 
@@ -400,7 +398,7 @@ func (h *Handler) HandleDeleteCluster(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("remove_cluster")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowDeleteCluster)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
@@ -414,10 +412,9 @@ func (h *Handler) HandleDeleteCluster(c *gin.Context) {
 	h.ewfEngine.RunAsync(c, wf)
 
 	c.JSON(http.StatusOK, Response{
-		TaskID:    wf.UUID,
-		Status:    string(wf.Status),
-		Message:   "Deployment deletion workflow started successfully",
-		CreatedAt: wf.CreatedAt,
+		WorkflowID: wf.UUID,
+		Status:     string(wf.Status),
+		Message:    "Deployment deletion workflow started successfully",
 	})
 }
 
@@ -448,7 +445,7 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("add_node")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowAddNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
@@ -463,10 +460,9 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 	h.ewfEngine.RunAsync(c, wf)
 
 	c.JSON(http.StatusAccepted, Response{
-		TaskID:    wf.UUID,
-		Status:    string(wf.Status),
-		Message:   "Node addition workflow started successfully",
-		CreatedAt: wf.CreatedAt,
+		WorkflowID: wf.UUID,
+		Status:     string(wf.Status),
+		Message:    "Node addition workflow started successfully",
 	})
 }
 
@@ -505,7 +501,7 @@ func (h *Handler) HandleRemoveNode(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("remove_node")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRemoveNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
@@ -520,9 +516,8 @@ func (h *Handler) HandleRemoveNode(c *gin.Context) {
 	h.ewfEngine.RunAsync(c, wf)
 
 	c.JSON(http.StatusOK, Response{
-		TaskID:    wf.UUID,
-		Status:    string(wf.Status),
-		Message:   "Node removal workflow started successfully",
-		CreatedAt: wf.CreatedAt,
+		WorkflowID: wf.UUID,
+		Status:     string(wf.Status),
+		Message:    "Node removal workflow started successfully",
 	})
 }

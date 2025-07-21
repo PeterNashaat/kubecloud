@@ -8,6 +8,9 @@ const (
 	WorkflowRedeemVoucher    = "redeem-voucher"
 	WorkflowReserveNode      = "reserve-node"
 	WorkflowUnreserveNode    = "unreserve-node"
+	WorkflowDeleteCluster    = "delete-cluster"
+	WorkflowAddNode          = "add-node"
+	WorkflowRemoveNode       = "remove-node"
 
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"
@@ -24,4 +27,12 @@ const (
 	StepReserveNode             = "reserve_node"
 	StepUnreserveNode           = "unreserve-node"
 	StepUpdateCreditedBalance   = "update-credited-balance"
+	StepRemoveNode              = "remove-node"
+	StepStoreDeployment         = "store-deployment"
+	StepAddNode                 = "add-node"
+	StepUpdateNetwork           = "update-network"
+	StepRemoveCluster           = "remove-cluster"
+	StepRemoveClusterFromDB     = "remove-cluster-from-db"
+	StepDeployNode              = "deploy-node"
+	StepDeployNetwork           = "deploy-network"
 )

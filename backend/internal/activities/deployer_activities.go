@@ -264,7 +264,7 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 
 func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, wfName string, nodesNum int) {
 	steps := []ewf.Step{
-		{Name: "deploy_network", RetryPolicy: criticalRetryPolicy},
+		{Name: StepDeployNetwork, RetryPolicy: criticalRetryPolicy},
 	}
 
 	for i := 0; i < nodesNum; i++ {
@@ -273,7 +273,7 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, wfName string, nodesNu
 		steps = append(steps, ewf.Step{Name: stepName, RetryPolicy: criticalRetryPolicy})
 	}
 
-	steps = append(steps, ewf.Step{Name: "store_deployment", RetryPolicy: standardRetryPolicy})
+	steps = append(steps, ewf.Step{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy})
 
 	workflow := BaseWFTemplate
 	workflow.Steps = steps
@@ -395,36 +395,36 @@ var BaseWFTemplate = ewf.WorkflowTemplate{
 }
 
 func registerDeploymentActivities(engine *ewf.Engine) {
-	engine.Register("deploy_network", DeployNetworkStep())
-	engine.Register("deploy_node", DeployNodeStep())
-	engine.Register("remove_cluster", CancelDeploymentStep())
-	engine.Register("add_node", AddNodeStep())
-	engine.Register("update_network", UpdateNetworkStep())
-	engine.Register("remove_node", RemoveDeploymentNodeStep())
-	engine.Register("store_deployment", StoreDeploymentStep())
-	engine.Register("remove_cluster_from_db", RemoveClusterFromDBStep())
+	engine.Register(StepDeployNetwork, DeployNetworkStep())
+	engine.Register(StepDeployNode, DeployNodeStep())
+	engine.Register(StepRemoveCluster, CancelDeploymentStep())
+	engine.Register(StepAddNode, AddNodeStep())
+	engine.Register(StepUpdateNetwork, UpdateNetworkStep())
+	engine.Register(StepRemoveNode, RemoveDeploymentNodeStep())
+	engine.Register(StepStoreDeployment, StoreDeploymentStep())
+	engine.Register(StepRemoveClusterFromDB, RemoveClusterFromDBStep())
 
 	deleteWFTemplate := BaseWFTemplate
 	deleteWFTemplate.Steps = []ewf.Step{
-		{Name: "remove_cluster", RetryPolicy: standardRetryPolicy},
-		{Name: "remove_cluster_from_db", RetryPolicy: standardRetryPolicy},
+		{Name: StepRemoveCluster, RetryPolicy: standardRetryPolicy},
+		{Name: StepRemoveClusterFromDB, RetryPolicy: standardRetryPolicy},
 	}
-	engine.RegisterTemplate("remove_cluster", &deleteWFTemplate)
+	engine.RegisterTemplate(WorkflowDeleteCluster, &deleteWFTemplate)
 
 	addNodeWFTemplate := BaseWFTemplate
 	addNodeWFTemplate.Steps = []ewf.Step{
-		{Name: "update_network", RetryPolicy: criticalRetryPolicy},
-		{Name: "add_node", RetryPolicy: standardRetryPolicy},
-		{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+		{Name: StepUpdateNetwork, RetryPolicy: criticalRetryPolicy},
+		{Name: StepAddNode, RetryPolicy: standardRetryPolicy},
+		{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
-	engine.RegisterTemplate("add_node", &addNodeWFTemplate)
+	engine.RegisterTemplate(WorkflowAddNode, &addNodeWFTemplate)
 
 	removeNodeWFTemplate := BaseWFTemplate
 	removeNodeWFTemplate.Steps = []ewf.Step{
-		{Name: "remove_node", RetryPolicy: standardRetryPolicy},
-		{Name: "store_deployment", RetryPolicy: standardRetryPolicy},
+		{Name: StepRemoveNode, RetryPolicy: standardRetryPolicy},
+		{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
-	engine.RegisterTemplate("remove_node", &removeNodeWFTemplate)
+	engine.RegisterTemplate(WorkflowRemoveNode, &removeNodeWFTemplate)
 }
 
 func getFromState[T any](state ewf.State, key string) (T, error) {

@@ -130,7 +130,7 @@ func (c *Client) DeployCluster(cluster kubedeployer.Cluster) (string, error) {
 		return "", err
 	}
 
-	return deployResp.TaskID, nil
+	return deployResp.WorkflowID, nil
 }
 
 func (c *Client) ListenToSSE(taskID string) error {

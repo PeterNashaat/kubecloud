@@ -148,11 +148,6 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind invoice.governorate flag: %w", err)
 	}
 
-	// === Workflow DB File ===
-	if err := bindStringFlag(rootCmd, "workflow_db_file", "", "Workflow database file path"); err != nil {
-		return fmt.Errorf("failed to bind workflow_db_file flag: %w", err)
-	}
-
 	// === Debug ===
 	if err := bindBoolFlag(rootCmd, "debug", false, "Enable debug logging"); err != nil {
 		return fmt.Errorf("failed to bind debug flag: %w", err)
