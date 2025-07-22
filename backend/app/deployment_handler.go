@@ -116,6 +116,7 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 	}
 
 	id := fmt.Sprintf("%v", userID)
+	projectName = kubedeployer.GetProjectName(id, projectName)
 	cluster, err := h.db.GetClusterByName(id, projectName)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Failed to get cluster")
