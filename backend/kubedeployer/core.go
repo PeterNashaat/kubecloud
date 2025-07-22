@@ -63,6 +63,7 @@ func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node, ma
 		return fmt.Errorf("failed to get node from deployment: %v", err)
 	}
 	res.OriginalName = node.OriginalName
+	res.Type = node.Type
 
 	// used to handling adding new nodes or updating existing ones
 	updated := false

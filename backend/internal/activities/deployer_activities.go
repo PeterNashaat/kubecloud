@@ -124,6 +124,7 @@ func AddNodeStep() ewf.StepFn {
 		if err != nil {
 			return err
 		}
+		node.OriginalName = node.Name
 
 		if err := node.AssignNodeIP(ctx, kubeClient.GridClient, cluster.Network.Name); err != nil {
 			return fmt.Errorf("failed to assign IP for node %s: %w", node.Name, err)
