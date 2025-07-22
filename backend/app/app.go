@@ -223,8 +223,8 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/balance", app.handlers.GetUserBalance)
 				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
 				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
-				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
-				authGroup.GET("/pending-records/", app.handlers.ListUserPendingRecordsHandler)
+				authGroup.GET("/invoice", app.handlers.ListUserInvoicesHandler)
+				authGroup.GET("/pending-records", app.handlers.ListUserPendingRecordsHandler)
 				// SSH Key management
 				authGroup.GET("/ssh-keys", app.handlers.ListSSHKeysHandler)
 				authGroup.POST("/ssh-keys", app.handlers.AddSSHKeyHandler)

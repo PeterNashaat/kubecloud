@@ -32,6 +32,12 @@ type CreditUserResponse struct {
 	Memo   string `json:"memo"`
 }
 
+type PendingRecordsResponse struct {
+	models.PendingRecord
+	USDAmount            float64 `json:"usd_amount"`
+	TransferredUSDAmount float64 `json:"transferred_usd_amount"`
+}
+
 // @Summary Get all users
 // @Description Returns a list of all users
 // @Tags admin
@@ -279,7 +285,7 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 // @ID list-pending-records
 // @Accept json
 // @Produce json
-// @Success 200 {array} models.PendingRecord
+// @Success 200 {array} PendingRecordsResponse
 // @Failure 500 {object} APIResponse
 // @Security AdminMiddleware
 // @Router /pending-records [get]
@@ -292,7 +298,30 @@ func (h *Handler) ListPendingRecordsHandler(c *gin.Context) {
 		return
 	}
 
+	var pendingRecordsResponse []PendingRecordsResponse
+	for _, record := range pendingRecords {
+		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd amount")
+			InternalServerError(c)
+			return
+		}
+
+		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
+			InternalServerError(c)
+			return
+		}
+
+		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
+			PendingRecord:        record,
+			USDAmount:            usdAmount,
+			TransferredUSDAmount: usdTransferredAmount,
+		})
+	}
+
 	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
-		"pending_records": pendingRecords,
+		"pending_records": pendingRecordsResponse,
 	})
 }

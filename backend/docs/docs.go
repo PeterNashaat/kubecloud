@@ -140,7 +140,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.PendingRecord"
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
                             }
                         }
                     },
@@ -729,7 +729,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.PendingRecord"
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
                             }
                         }
                     },
@@ -1497,6 +1497,36 @@ const docTemplate = `{
                 }
             }
         },
+        "app.PendingRecordsResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "tft_amount": {
+                    "description": "TFTs are multiplied by 1e7",
+                    "type": "integer"
+                },
+                "transferred_tft_amount": {
+                    "type": "integer"
+                },
+                "transferred_usd_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "usd_amount": {
+                    "type": "number"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "app.RefreshTokenInput": {
             "type": "object",
             "required": [
@@ -1659,29 +1689,6 @@ const docTemplate = `{
                 },
                 "rent_created_at": {
                     "type": "string"
-                }
-            }
-        },
-        "models.PendingRecord": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "tft_amount": {
-                    "type": "integer"
-                },
-                "transferred_tft_amount": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
                 }
             }
         },
