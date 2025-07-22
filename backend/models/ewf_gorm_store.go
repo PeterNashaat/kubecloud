@@ -13,7 +13,7 @@ type EWFGormStore struct {
 	db *gorm.DB
 }
 
-type GormWorkflowStruct struct {
+type gormWorkflowRecord struct {
 	UUID   string `gorm:"primaryKey;column:uuid"`
 	Name   string `gorm:"column:name;not null;index"`
 	Status string `gorm:"column:status;not null;index"`
@@ -25,7 +25,7 @@ func NewGormStore(db *gorm.DB) *EWFGormStore {
 }
 
 func (s *EWFGormStore) Setup() error {
-	return s.db.AutoMigrate(&GormWorkflowStruct{})
+	return s.db.AutoMigrate(&gormWorkflowRecord{})
 }
 
 func (s *EWFGormStore) SaveWorkflow(ctx context.Context, workflow *ewf.Workflow) error {
@@ -34,7 +34,7 @@ func (s *EWFGormStore) SaveWorkflow(ctx context.Context, workflow *ewf.Workflow)
 		return fmt.Errorf("failed to marshal workflow: %w", err)
 	}
 
-	gormWorkflow := GormWorkflowStruct{
+	gormWorkflow := gormWorkflowRecord{
 		UUID:   workflow.UUID,
 		Name:   workflow.Name,
 		Status: string(workflow.Status),
@@ -45,7 +45,7 @@ func (s *EWFGormStore) SaveWorkflow(ctx context.Context, workflow *ewf.Workflow)
 }
 
 func (s *EWFGormStore) LoadWorkflowByName(ctx context.Context, name string) (*ewf.Workflow, error) {
-	var gormWorkflow GormWorkflowStruct
+	var gormWorkflow gormWorkflowRecord
 	if err := s.db.WithContext(ctx).Where("name = ?", name).First(&gormWorkflow).Error; err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (s *EWFGormStore) LoadWorkflowByName(ctx context.Context, name string) (*ew
 }
 
 func (s *EWFGormStore) LoadWorkflowByUUID(ctx context.Context, uuid string) (*ewf.Workflow, error) {
-	var gormWorkflow GormWorkflowStruct
+	var gormWorkflow gormWorkflowRecord
 	if err := s.db.WithContext(ctx).Where("uuid = ?", uuid).First(&gormWorkflow).Error; err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (s *EWFGormStore) LoadWorkflowByUUID(ctx context.Context, uuid string) (*ew
 func (s *EWFGormStore) ListWorkflowUUIDsByStatus(ctx context.Context, status ewf.WorkflowStatus) ([]string, error) {
 	var uuids []string
 	err := s.db.WithContext(ctx).
-		Model(&GormWorkflowStruct{}).
+		Model(&gormWorkflowRecord{}).
 		Where("status = ?", status).
 		Pluck("uuid", &uuids).
 		Error
