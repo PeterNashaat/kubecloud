@@ -38,8 +38,9 @@ type Node struct {
 	Entrypoint string `json:"entrypoint,omitempty"`
 
 	// Computed
-	IP          string `json:"ip,omitempty"`
-	MyceliumIP  string `json:"mycelium_ip,omitempty"`
-	PlanetaryIP string `json:"planetary_ip,omitempty"`
-	ContractID  uint64 `json:"contract_id,omitempty"`
+	IP           string `json:"ip,omitempty"`
+	MyceliumIP   string `json:"mycelium_ip,omitempty"`
+	PlanetaryIP  string `json:"planetary_ip,omitempty"`
+	ContractID   uint64 `json:"contract_id,omitempty"`
+	OriginalName string `json:"original_name,omitempty"`
 }

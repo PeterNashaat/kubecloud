@@ -62,6 +62,7 @@ func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node, ma
 		log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to extract node from deployment")
 		return fmt.Errorf("failed to get node from deployment: %v", err)
 	}
+	res.OriginalName = node.OriginalName
 
 	// used to handling adding new nodes or updating existing ones
 	updated := false
