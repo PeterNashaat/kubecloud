@@ -230,7 +230,6 @@ function prevStep() {
 }
 
 const clusterPayload = computed<Cluster>(() => {
-  const networkName = clusterNetworkName.value || `${clusterName.value}_network`;
   const token = clusterToken.value;
 
   function buildNode(vm: VM, type: 'master' | 'worker'): ClusterNode {
@@ -257,7 +256,6 @@ const clusterPayload = computed<Cluster>(() => {
 
   return {
     name: clusterName.value,
-    network: networkName,
     token: token,
     nodes: nodes,
   };

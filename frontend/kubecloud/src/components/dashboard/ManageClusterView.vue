@@ -34,7 +34,7 @@
             <div class="modern-cluster-info">
               <div class="cluster-info-grid">
                 <div class="info-label">Project Name</div>
-                <div>{{ cluster.project_name || '-' }}</div>
+                <div>{{ cluster.cluster.name || '-' }}</div>
                 <div class="info-label">vCPU</div>
                 <div>{{ totalVcpu }}</div>
                 <div class="info-label">Created</div>
@@ -69,7 +69,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="node in filteredNodes" :key="node.node_id">
-                    <td>{{ node.name }}</td>
+                    <td>{{ node.original_name }}</td>
                     <td>{{ node.type }}</td>
                     <td>{{ node.cpu }}</td>
                     <td>{{ node.memory }} MB</td>
@@ -152,7 +152,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
-import { useNotificationStore } from '../../stores/notifications'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
 
 import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
@@ -177,14 +176,13 @@ function getClusterUsedResources(nodeId: number) {
 const router = useRouter()
 const route = useRoute()
 const clusterStore = useClusterStore()
-const notificationStore = useNotificationStore()
 
 const loading = ref(true)
 const notFound = ref(false)
 
 const projectName = computed(() => route.params.id?.toString() || '')
 const cluster = computed(() =>
-  clusterStore.clusters.find(c => c.project_name === projectName.value)
+  clusterStore.clusters.find(c => c.cluster.name === projectName.value)
 )
 
 const filteredNodes = computed(() => {
@@ -264,8 +262,10 @@ const deletingCluster = ref(false)
 async function confirmDelete() {
   deletingCluster.value = true
   showDeleteModal.value = false
+  
   if (cluster.value) {
-    await clusterStore.deleteCluster(cluster.value.project_name)
+    console.log("cluster.value.cluster.name", cluster.value.cluster.name);
+    await clusterStore.deleteCluster(cluster.value.cluster.name)
     router.push('/dashboard/clusters')
   }
   deletingCluster.value = false
@@ -364,28 +364,16 @@ watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
   }
 });
 
-async function addNode(payload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
-  const node = availableNodes.value.find(n => n.nodeId === payload.nodeId);
-  if (!node) return;
-  if (payload.vcpu <= 0 || payload.ram <= 0 || payload.storage <= 0) {
-    addFormError.value = 'All resources must be greater than 0.';
-    return;
-  }
-  if (payload.vcpu > getAvailableCPU(node) || payload.ram > getAvailableRAM(node) || payload.storage > getAvailableStorage(node)) {
-    addFormError.value = 'Requested resources exceed available.';
+async function addNode(payload: any) {
+  // Accepts a cluster payload with a nodes array
+  if (!payload || !payload.name || !Array.isArray(payload.nodes) || payload.nodes.length === 0) {
+    addFormError.value = 'Invalid node payload.';
     return;
   }
   addNodeLoading.value = true;
   addFormError.value = '';
   try {
-    if (!cluster.value?.cluster?.name) throw new Error('Cluster name missing');
-    await addNodeToDeployment(cluster.value.cluster.name, {
-      nodeId: node.nodeId,
-      role: payload.role,
-      vcpu: payload.vcpu,
-      ram: payload.ram,
-      storage: payload.storage
-    });
+    await addNodeToDeployment(payload.name, payload);
     await fetchRentedNodes();
     await clusterStore.fetchClusters();
     // Update editNodes with the latest nodes from the refreshed cluster

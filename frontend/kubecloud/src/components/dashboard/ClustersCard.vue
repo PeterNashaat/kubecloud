@@ -47,13 +47,13 @@
         <tbody>
           <tr v-for="cluster in paginatedClusters" :key="cluster.id">
             <td class="cluster-name-cell">
-              <span class="cluster-name">{{ cluster.project_name }}</span>
+              <span class="cluster-name">{{ cluster.cluster.name }}</span>
             </td>
             <td>{{ Array.isArray(cluster.cluster.nodes) ? cluster.cluster.nodes.length : (typeof cluster.cluster.nodes === 'number' ? cluster.cluster.nodes : 0) }}</td>
             <td>{{ formatDate(cluster.created_at) }}</td>
             <td>
-              <v-btn icon size="small" class="mr-1" @click="viewCluster(cluster.project_name)"><v-icon icon="mdi-eye-outline" /></v-btn>
-              <v-btn icon size="small" class="ml-1" color="error" @click="deleteCluster(cluster.project_name)"><v-icon icon="mdi-delete-outline" /></v-btn>
+              <v-btn icon size="small" class="mr-1" @click="viewCluster(cluster.cluster.name)"><v-icon icon="mdi-eye-outline" /></v-btn>
+              <v-btn icon size="small" class="ml-1" color="error" @click="deleteCluster(cluster.cluster.name)"><v-icon icon="mdi-delete-outline" /></v-btn>
             </td>
           </tr>
         </tbody>

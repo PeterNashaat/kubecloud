@@ -25,7 +25,7 @@
             </thead>
             <tbody>
               <tr v-for="node in editNodesWithStorage" :key="node.name">
-                <td>{{ node.name }}</td>
+                <td>{{ node.original_name }}</td>
                 <td>{{ node.type }}</td>
                 <td>{{ node.cpu ?? node.vcpu }}</td>
                 <td>{{ node.memory ?? node.ram }} MB</td>
@@ -33,7 +33,7 @@
                 <td>{{ node.ip || '-' }}</td>
                 <td>{{ node.contract_id || '-' }}</td>
                 <td>
-                  <v-btn @click="removeNode(node.name)"><v-icon>mdi-delete</v-icon></v-btn>
+                  <v-btn @click="removeNode(node.original_name)"><v-icon>mdi-delete</v-icon></v-btn>
                 </td>
               </tr>
             </tbody>
@@ -42,6 +42,7 @@
         </div>
         <div v-else-if="editTab === 'add'">
           <div class="add-form-wrapper">
+            <v-text-field v-model="addFormName" label="Name" class="polished-input" />
             <v-text-field v-model.number="addFormVcpu" label="vCPU" type="number" min="1" class="polished-input" />
             <v-text-field v-model.number="addFormRam" label="RAM (MB)" type="number" min="1" class="polished-input" />
             <v-text-field v-model.number="addFormStorage" label="Storage (MB)" type="number" min="1" class="polished-input" />
@@ -59,15 +60,15 @@
                   <div class="chip-row">
                     <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getAvailableCPU(item.raw) }} vCPU
+                      {{ getNodeAvailableCPU(item.raw) }} vCPU
                     </v-chip>
                     <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getAvailableRAM(item.raw) }} MB RAM
+                      {{ getNodeAvailableRAM(item.raw) }} MB RAM
                     </v-chip>
                     <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getAvailableStorage(item.raw) }} MB Disk
+                      {{ getNodeAvailableStorage(item.raw) }} MB Disk
                     </v-chip>
                     <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
@@ -85,15 +86,15 @@
                   <div class="chip-row">
                     <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getAvailableCPU(item.raw) }} vCPU
+                      {{ getNodeAvailableCPU(item.raw) }} vCPU
                     </v-chip>
                     <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getAvailableRAM(item.raw) }} MB RAM
+                      {{ getNodeAvailableRAM(item.raw) }} MB RAM
                     </v-chip>
                     <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getAvailableStorage(item.raw) }} MB Disk
+                      {{ getNodeAvailableStorage(item.raw) }} MB Disk
                     </v-chip>
                     <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
@@ -138,7 +139,7 @@ const props = defineProps<{
   canAssignToNode: boolean,
   addNodeLoading: boolean
 }>();
-const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated']);
+const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated', 'remove-node']);
 const dialog = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val)
@@ -152,7 +153,6 @@ const editNodesWithStorage = computed(() =>
     storage: (node.root_size || 0) + (node.disk_size || 0) + (node.storage || 0)
   }))
 );
-function closeDialog() { emit('update:modelValue', false); }
 function removeNode(nodeName: string) {
   emit('remove-node', nodeName);
 }
@@ -163,6 +163,7 @@ const addFormVcpu = ref(1);
 const addFormRam = ref(1);
 const addFormStorage = ref(1);
 const addFormError = ref('');
+const addFormName = ref('');
 const addFormNode = computed<RentedNode | undefined>(() => (props.availableNodes || []).find((n: RentedNode) => n.nodeId === addFormNodeId.value));
 const canAssignToNode = computed(() => {
   const node = addFormNode.value;
@@ -171,9 +172,9 @@ const canAssignToNode = computed(() => {
     addFormVcpu.value > 0 &&
     addFormRam.value > 0 &&
     addFormStorage.value > 0 &&
-    addFormVcpu.value <= getAvailableCPU(node) &&
-    addFormRam.value <= getAvailableRAM(node) &&
-    addFormStorage.value <= getAvailableStorage(node)
+    addFormVcpu.value <= getNodeAvailableCPU(node) &&
+    addFormRam.value <= getNodeAvailableRAM(node) &&
+    addFormStorage.value <= getNodeAvailableStorage(node)
   );
 });
 watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
@@ -183,9 +184,9 @@ watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
     return;
   }
   if (
-    addFormVcpu.value > getAvailableCPU(node) ||
-    addFormRam.value > getAvailableRAM(node) ||
-    addFormStorage.value > getAvailableStorage(node)
+    addFormVcpu.value > getNodeAvailableCPU(node) ||
+    addFormRam.value > getNodeAvailableRAM(node) ||
+    addFormStorage.value > getNodeAvailableStorage(node)
   ) {
     addFormError.value = 'Requested resources exceed available for the selected node.';
   } else {
@@ -194,13 +195,43 @@ watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
 });
 function confirmAddForm() {
   emit('add-node', {
-    nodeId: addFormNodeId.value,
-    role: addFormRole.value,
-    vcpu: addFormVcpu.value,
-    ram: addFormRam.value,
-    storage: addFormStorage.value
+    name: props.cluster.cluster.name,
+    token: '', // If you have a token, use it here
+    nodes: [
+      {
+        name: addFormName.value,
+        type: addFormRole.value, // 'master' | 'worker'
+        node_id: addFormNodeId.value, // backend expects node_id
+        cpu: addFormVcpu.value,
+        memory: addFormRam.value, // already MB
+        root_size: 2, // MB
+        disk_size: addFormStorage.value, // already MB
+        env_vars: {}, // Add env_vars if needed, empty for now
+      }
+    ]
   });
   editTab.value = 'list';
+}
+// Helper to get resources already assigned to a node in this cluster
+function getClusterUsedResources(nodeId: number) {
+  // All values in MB
+  return (editNodes.value || []).filter((n: any) => n.node_id === nodeId).reduce((acc: { cpu: number, memory: number, storage: number }, n: any) => {
+    acc.cpu += n.cpu || 0;
+    acc.memory += n.memory || 0; // already MB
+    acc.storage += (n.root_size || 0) + (n.disk_size || 0); // already MB
+    return acc;
+  }, { cpu: 0, memory: 0, storage: 0 });
+}
+function getNodeAvailableCPU(node: RentedNode) {
+  return Math.max(getAvailableCPU(node) - getClusterUsedResources(node.nodeId).cpu, 0);
+}
+function getNodeAvailableRAM(node: RentedNode) {
+  // getAvailableRAM returns GB, convert to MB
+  return Math.max((getAvailableRAM(node) * 1024) - getClusterUsedResources(node.nodeId).memory, 0);
+}
+function getNodeAvailableStorage(node: RentedNode) {
+  // getAvailableStorage returns GB, convert to MB
+  return Math.max((getAvailableStorage(node) * 1024) - getClusterUsedResources(node.nodeId).storage, 0);
 }
 // Ensure every node has a 'name' property for v-select display
 const availableNodesWithName = computed(() =>
@@ -210,79 +241,3 @@ const availableNodesWithName = computed(() =>
   }) as RentedNode & { name: string })
 );
 </script>
-
-<style scoped>
-.add-form-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2rem 1rem 1rem 1rem;
-  background: var(--color-surface-2, #23243a);
-  border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  min-width: 350px;
-  max-width: 40rem;
-  margin: 0 auto;
-}
-.add-node-btn {
-  font-weight: 600;
-  font-size: 1.1rem;
-  min-width: 120px;
-  margin-right: 1rem;
-}
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.spec-chip {
-  background: var(--color-surface-2, #23243a);
-  color: var(--color-text, #cfd2fa);
-  border-radius: 8px;
-  padding: 0.2rem 0.7rem;
-  font-size: 0.95rem;
-}
-.node-id {
-  font-weight: 600;
-  color: var(--color-text);
-  font-size: 0.98em;
-}
-.node-dropdown-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.2rem 0.5rem;
-}
-.node-option-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 0.5rem 0.7rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.polished-input {
-  width: 100%;
-  margin-bottom: 0.7rem;
-}
-.add-form-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  width: 100%;
-}
-.polished-error {
-  font-size: 1.05rem;
-  font-weight: 500;
-  color: #ff6b6b !important;
-  background: #2d1a1a !important;
-  border-radius: 8px;
-  margin-bottom: 0.7rem;
-}
-.empty-list {
-  color: #888;
-  font-style: italic;
-  margin-bottom: 0.5rem;
-}
-</style> 
