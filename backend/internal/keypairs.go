@@ -14,25 +14,29 @@ const (
 	SS58AddressFormat = 42
 )
 
-// KeyPairFromMnemonic derives a keypair and SS58 address from a mnemonic
-func KeyPairFromMnemonic(mnemonic string) (subkey.KeyPair, string, error) {
+// validateMnemonic checks if the mnemonic is non-empty and at least 12 words
+func validateMnemonic(mnemonic string) error {
 	mnemonic = strings.TrimSpace(mnemonic)
 	if mnemonic == "" {
-		return nil, "", errors.New("mnemonic cannot be empty")
+		return errors.New("mnemonic cannot be empty")
 	}
 	words := strings.Fields(mnemonic)
 	if len(words) < 12 {
-		return nil, "", errors.New("mnemonic must be at least 12 words")
+		return errors.New("mnemonic must be at least 12 words")
 	}
-	keyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	return nil
+}
+
+// KeyPairFromMnemonic derives a keypair from a mnemonic
+func KeyPairFromMnemonic(mnemonic string) (subkey.KeyPair, error) {
+	if err := validateMnemonic(mnemonic); err != nil {
+		return nil, err
+	}
+	keyPair, err := sr25519.Scheme{}.FromPhrase(strings.TrimSpace(mnemonic), "")
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	address, err := AccountAddressFromKeypair(keyPair)
-	if err != nil {
-		return nil, "", err
-	}
-	return keyPair, address, nil
+	return keyPair, nil
 }
 
 // AccountAddressFromKeypair returns the SS58 address for a given keypair
@@ -42,7 +46,7 @@ func AccountAddressFromKeypair(keyPair subkey.KeyPair) (string, error) {
 
 // AccountFromMnemonic returns the SS58 address from a mnemonic
 func AccountFromMnemonic(mnemonic string) (string, error) {
-	keyPair, _, err := KeyPairFromMnemonic(mnemonic)
+	keyPair, err := KeyPairFromMnemonic(mnemonic)
 	if err != nil {
 		return "", err
 	}

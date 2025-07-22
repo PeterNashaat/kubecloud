@@ -141,7 +141,7 @@ type SSHKeyInput struct {
 
 // KYC sponsorship helpers
 func (h *Handler) createKYCSponsorship(ctx context.Context, mnemonic string) error {
-	sponseeKeyPair, _, err := internal.KeyPairFromMnemonic(mnemonic)
+	sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
 	if err != nil {
 		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
 	}
@@ -254,7 +254,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		user.Mnemonic = mnemonic
 		user.StripeCustomerID = customer.ID
 		// Set user.AccountAddress from mnemonic
-		sponseeKeyPair, _, err := internal.KeyPairFromMnemonic(mnemonic)
+		sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to create keypair for SS58 address")
 			InternalServerError(c)

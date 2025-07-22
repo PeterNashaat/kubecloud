@@ -114,10 +114,15 @@ func NewApp(config internal.Configuration) (*App, error) {
 	_, appCancel := context.WithCancel(context.Background())
 
 	// Derive sponsor (system) account SS58 address once
-	sponsorKeyPair, sponsorAddress, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
+	sponsorKeyPair, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
 	if err != nil {
 		appCancel()
-		return nil, fmt.Errorf("failed to create sponsor keypair and address from system account: %w", err)
+		return nil, fmt.Errorf("failed to create sponsor keypair from system account: %w", err)
+	}
+	sponsorAddress, err := internal.AccountAddressFromKeypair(sponsorKeyPair)
+	if err != nil {
+		appCancel()
+		return nil, fmt.Errorf("failed to create sponsor address from keypair: %w", err)
 	}
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
