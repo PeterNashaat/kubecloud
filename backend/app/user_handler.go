@@ -817,6 +817,8 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
+	responseMsg := "Voucher is redeemed successfully"
+
 	if systemUSDBalance < float64(voucher.Value) {
 		if err = h.db.CreatePendingRecord(&models.PendingRecord{
 			UserID:    userID,
@@ -826,16 +828,17 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 			InternalServerError(c)
 			return
 		}
+		responseMsg = "Balance is pending to be charged, will be charged soon"
+	} else {
+		err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
+		if err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
-	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
+	Success(c, http.StatusOK, responseMsg, nil)
 }
 
 // @Summary List user SSH keys
