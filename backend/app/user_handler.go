@@ -20,7 +20,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/vedhavyas/go-subkey"
-	"github.com/vedhavyas/go-subkey/sr25519"
 )
 
 // Handler struct holds configs for all handlers
@@ -142,11 +141,11 @@ type SSHKeyInput struct {
 
 // KYC sponsorship helpers
 func (h *Handler) createKYCSponsorship(ctx context.Context, mnemonic string) error {
-	sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	sponseeKeyPair, _, err := internal.KeyPairFromMnemonic(mnemonic)
 	if err != nil {
 		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
 	}
-	sponseeAddress, err := sponseeKeyPair.SS58Address(internal.SS58AddressFormat)
+	sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
 	if err != nil {
 		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
 	}
@@ -255,13 +254,13 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		user.Mnemonic = mnemonic
 		user.StripeCustomerID = customer.ID
 		// Set user.AccountAddress from mnemonic
-		sponseeKeyPair, err := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+		sponseeKeyPair, _, err := internal.KeyPairFromMnemonic(mnemonic)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to create keypair for SS58 address")
 			InternalServerError(c)
 			return
 		}
-		sponseeAddress, err := sponseeKeyPair.SS58Address(internal.SS58AddressFormat)
+		sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to get SS58 address")
 			InternalServerError(c)
