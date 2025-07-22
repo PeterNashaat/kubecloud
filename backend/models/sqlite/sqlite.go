@@ -421,6 +421,6 @@ func (s *Sqlite) UpdatePendingRecordTransferredAmount(id int, amount uint64) err
 	return s.db.Model(&models.PendingRecord{}).
 		Where("id = ?", id).
 		UpdateColumn("transferred_tft_amount", gorm.Expr("transferred_tft_amount + ?", amount)).
-		UpdateColumn("updated_at", gorm.Expr("updated_at + ?", time.Now())).
+		UpdateColumn("updated_at", gorm.Expr("?", time.Now())).
 		Error
 }

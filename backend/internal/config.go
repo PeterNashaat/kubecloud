@@ -31,6 +31,10 @@ type Configuration struct {
 	Invoice                       InvoiceCompanyData `json:"invoice"`
 	SSH                           SSHConfig          `json:"ssh" validate:"required,dive"`
 	MonitorBalanceIntervalInHours int                `json:"monitor_balance_interval_in_hours" validate:"required,gt=0"`
+
+	// KYC Verifier config
+	KYCVerifierAPIURL  string `json:"kyc_verifier_api_url" validate:"required,url"`
+	KYCChallengeDomain string `json:"kyc_challenge_domain" validate:"required"`
 }
 
 type SSHConfig struct {

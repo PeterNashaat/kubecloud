@@ -118,11 +118,40 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	_, appCancel := context.WithCancel(context.Background())
 
+	// Derive sponsor (system) account SS58 address once
+	sponsorKeyPair, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
+	if err != nil {
+		appCancel()
+		return nil, fmt.Errorf("failed to create sponsor keypair from system account: %w", err)
+	}
+	sponsorAddress, err := internal.AccountAddressFromKeypair(sponsorKeyPair)
+	if err != nil {
+		appCancel()
+		return nil, fmt.Errorf("failed to create sponsor address from keypair: %w", err)
+	}
+
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
+
+	// Validate KYC configuration
+	if strings.TrimSpace(config.KYCVerifierAPIURL) == "" {
+		appCancel()
+		return nil, fmt.Errorf("KYC verifier API URL is required")
+	}
+	if strings.TrimSpace(config.KYCChallengeDomain) == "" {
+		appCancel()
+		return nil, fmt.Errorf("KYC challenge domain is required")
+	}
+
+	// Initialize KYC client
+	kycClient := internal.NewKYCClient(
+		config.KYCVerifierAPIURL,
+		config.KYCChallengeDomain,
+		nil, // Use default http.Client
+	)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, config.SystemAccount.Network, systemIdentity)
+		sseManager, config.SystemAccount.Network, systemIdentity, kycClient, sponsorKeyPair, sponsorAddress)
 
 	app := &App{
 		router:        router,

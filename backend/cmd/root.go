@@ -153,6 +153,14 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind monitor_balance_interval_in_hours flag: %w", err)
 	}
 
+	// === KYC Verifier ===
+	if err := bindStringFlag(rootCmd, "kyc_verifier_api_url", "", "KYC verifier API URL"); err != nil {
+		return fmt.Errorf("failed to bind kyc_verifier_api_url flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "kyc_challenge_domain", "", "KYC challenge domain"); err != nil {
+		return fmt.Errorf("failed to bind kyc_challenge_domain flag: %w", err)
+	}
+
 	return nil
 }
 

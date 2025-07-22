@@ -45,7 +45,7 @@ func (h *Handler) settlePendingPayments(records []models.PendingRecord) error {
 			continue
 		}
 
-		amountToTransfer := (record.TFTAmount - record.TransferredTFTAmount) * 1e7
+		amountToTransfer := record.TFTAmount - record.TransferredTFTAmount
 		if systemTFTBalance < amountToTransfer {
 			log.Warn().Msgf("Insufficient system balance to settle pending record ID %d", record.ID)
 			continue

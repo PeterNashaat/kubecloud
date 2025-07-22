@@ -515,7 +515,7 @@ const docTemplate = `{
         },
         "/user/login": {
             "post": {
-                "description": "Logs a user into the system",
+                "description": "Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.",
                 "consumes": [
                     "application/json"
                 ],
@@ -525,7 +525,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Login user",
+                "summary": "Login user (KYC verification checked)",
                 "operationId": "login-user",
                 "parameters": [
                     {
@@ -845,7 +845,7 @@ const docTemplate = `{
         },
         "/user/register": {
             "post": {
-                "description": "Registers a new user to the system",
+                "description": "Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.",
                 "consumes": [
                     "application/json"
                 ],
@@ -855,7 +855,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Register a user",
+                "summary": "Register user (with KYC sponsorship)",
                 "operationId": "register-user",
                 "parameters": [
                     {
@@ -870,13 +870,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Verification code sent successfully",
                         "schema": {
                             "$ref": "#/definitions/app.RegisterResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request format",
+                        "description": "Invalid request format or validation error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -1725,6 +1725,9 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
+                "account_address": {
+                    "type": "string"
+                },
                 "admin": {
                     "type": "boolean"
                 },
@@ -1753,6 +1756,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "sponsored": {
+                    "type": "boolean"
                 },
                 "ssh_key": {
                     "type": "string"

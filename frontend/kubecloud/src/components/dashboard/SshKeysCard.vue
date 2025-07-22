@@ -10,7 +10,14 @@
         Add SSH Key
       </v-btn>
     </div>
-    <div class="ssh-keys-list">
+    <div v-if="sshKeys.length === 0" class="ssh-keys-empty">
+      <div class="empty-card">
+        <v-icon icon="mdi-key" size="38" color="primary" class="empty-icon mb-3"></v-icon>
+        <div class="empty-title">No SSH Keys Added</div>
+        <div class="empty-desc">SSH keys are required to access your deployed clusters securely.<br>Add your first SSH key to get started.</div>
+      </div>
+    </div>
+    <div v-else class="ssh-keys-list">
       <div v-for="key in sshKeys" :key="key.ID" class="ssh-key-item">
         <div class="ssh-key-content">
           <div class="ssh-key-info">
@@ -259,6 +266,42 @@ onMounted(fetchSshKeys)
   font-weight: var(--font-weight-medium);
   height: 44px;
   min-width: 180px;
+}
+.ssh-keys-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 260px;
+  width: 100%;
+}
+.empty-card {
+  background: var(--color-surface-1, #18192b);
+  border: 1.5px solid var(--color-border, #334155);
+  border-radius: 16px;
+  padding: 2.5rem 2rem 2rem 2rem;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 420px;
+  width: 100%;
+}
+.empty-icon {
+  margin-bottom: 0.5rem;
+}
+.empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text, #cfd2fa);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+.empty-desc {
+  color: var(--color-text-muted, #7c7fa5);
+  font-size: 1.05rem;
+  text-align: center;
+  margin-bottom: 1.2rem;
+  line-height: 1.5;
 }
 @media (max-width: 960px) {
   .ssh-key-content {
