@@ -4,12 +4,12 @@
     "port": "8080"
   },
   "database": {
-    "file": "./kubecloud.db"
+    "file": "./users.db"
   },
-  "token": {
-    "secret": "your-jwt-secret-key-here-make-it-long-and-secure-at-least-32-characters",
+  "jwt_token": {
+    "secret": "your-jwt-secret-key-here-make-it-long-and-secure",
     "access_token_expiry_minutes": 15,
-    "refresh_token_expiry_hours": 24
+    "refresh_token_expiry_hours": 25
   },
   "admins": [
     "admin@example.com",
@@ -17,7 +17,7 @@
   ],
   "mailSender": {
     "email": "noreply@example.com",
-    "sendgrid_key": "SG.your-sendgrid-api-key-here",
+    "sendgrid_key": "your-sendgrid-api-key-here",
     "timeout": 30
   },
   "currency": "USD",
@@ -26,8 +26,8 @@
   "gridproxy_url": "https://gridproxy.grid.tf",
   "tfchain_url": "wss://tfchain.grid.tf/ws",
   "terms_and_conditions": {
-    "document_link": "https://example.com/terms-and-conditions",
-    "document_hash": "sha256:your_document_hash_here"
+    "document_link": "https://example.com/terms",
+    "document_hash": "sha256:example_hash_here"
   },
   "activation_service_url": "https://activation.grid.tf",
   "graphql_url": "https://graphql.grid.tf/graphql",
@@ -42,18 +42,16 @@
     "password": "",
     "db": 0
   },
-  "grid": {
-    "mne": "your grid account 12-word mnemonic phrase for threefold grid deployment operations",
-    "net": "dev"
-  },
   "deployer_workers_num": 3,
   "invoice": {
-    "name": "Your Company Name Ltd",
-    "address": "123 Business Street, Business District, City 12345",
-    "governorate": "Your State/Province/Governorate"
+    "name": "Your Company Name",
+    "address": "123 Business Street, City",
+    "governorate": "Your Governorate"
   },
   "ssh": {
     "private_key_path": "/home/user/.ssh/id_rsa",
     "public_key_path": "/home/user/.ssh/id_rsa.pub"
-  }
+  },
+  "kyc_verifier_api_url": "kyc-url",
+  "kyc_challenge_domain": "kyc-domain"
 }
