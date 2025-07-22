@@ -14,15 +14,20 @@ const (
 	SS58AddressFormat = 42
 )
 
+var (
+	errMnemonicEmpty    = errors.New("mnemonic cannot be empty")
+	errMnemonicTooShort = errors.New("mnemonic must be at least 12 words")
+)
+
 // validateMnemonic checks if the mnemonic is non-empty and at least 12 words
 func validateMnemonic(mnemonic string) error {
 	mnemonic = strings.TrimSpace(mnemonic)
 	if mnemonic == "" {
-		return errors.New("mnemonic cannot be empty")
+		return errMnemonicEmpty
 	}
 	words := strings.Fields(mnemonic)
 	if len(words) < 12 {
-		return errors.New("mnemonic must be at least 12 words")
+		return errMnemonicTooShort
 	}
 	return nil
 }
