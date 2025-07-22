@@ -15,7 +15,6 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
-	"github.com/vedhavyas/go-subkey/sr25519"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -115,15 +114,10 @@ func NewApp(config internal.Configuration) (*App, error) {
 	_, appCancel := context.WithCancel(context.Background())
 
 	// Derive sponsor (system) account SS58 address once
-	sponsorKeyPair, err := sr25519.Scheme{}.FromPhrase(config.SystemAccount.Mnemonic, "")
+	sponsorKeyPair, sponsorAddress, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
 	if err != nil {
 		appCancel()
-		return nil, fmt.Errorf("failed to create sponsor keypair from system account: %w", err)
-	}
-	sponsorAddress, err := sponsorKeyPair.SS58Address(internal.SS58AddressFormat)
-	if err != nil {
-		appCancel()
-		return nil, fmt.Errorf("failed to derive sponsor SS58 address: %w", err)
+		return nil, fmt.Errorf("failed to create sponsor keypair and address from system account: %w", err)
 	}
 
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
