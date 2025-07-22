@@ -17,8 +17,8 @@ require (
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.5
 	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20250703093252-e7500b106618
-	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.9-0.20250707084605-fd852df30b94
-	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250707084605-fd852df30b94
+	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.9-0.20250714083056-4943cdc054d8
+	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250714083056-4943cdc054d8
 	github.com/threefoldtech/zosbase v0.1.10
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/vedhavyas/go-subkey v1.0.3
@@ -88,7 +88,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.9-0.20250707084605-fd852df30b94 // indirect
+	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.9-0.20250714083056-4943cdc054d8 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852 // indirect

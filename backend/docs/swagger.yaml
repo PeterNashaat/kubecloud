@@ -98,6 +98,26 @@ definitions:
     - email
     - password
     type: object
+  app.PendingRecordsResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      tft_amount:
+        description: TFTs are multiplied by 1e7
+        type: integer
+      transferred_tft_amount:
+        type: integer
+      transferred_usd_amount:
+        type: number
+      updated_at:
+        type: string
+      usd_amount:
+        type: number
+      user_id:
+        type: integer
+    type: object
   app.RefreshTokenInput:
     properties:
       refresh_token:
@@ -124,14 +144,11 @@ definitions:
         maxLength: 64
         minLength: 8
         type: string
-      ssh_key:
-        type: string
     required:
     - confirm_password
     - email
     - name
     - password
-    - ssh_key
     type: object
   app.RegisterResponse:
     properties:
@@ -139,6 +156,16 @@ definitions:
         type: string
       timeout:
         type: string
+    type: object
+  app.SSHKeyInput:
+    properties:
+      name:
+        type: string
+      public_key:
+        type: string
+    required:
+    - name
+    - public_key
     type: object
   app.UserBalanceResponse:
     properties:
@@ -201,8 +228,33 @@ definitions:
       rent_created_at:
         type: string
     type: object
+  models.SSHKey:
+    properties:
+      created_at:
+        type: string
+      id:
+        description: Primary key
+        type: integer
+      name:
+        description: Unique name per user
+        type: string
+      public_key:
+        description: Unique public key per user
+        type: string
+      updated_at:
+        type: string
+      userID:
+        description: User owner
+        type: integer
+    required:
+    - name
+    - public_key
+    - userID
+    type: object
   models.User:
     properties:
+      account_address:
+        type: string
       admin:
         type: boolean
       code:
@@ -223,6 +275,8 @@ definitions:
         items:
           type: integer
         type: array
+      sponsored:
+        type: boolean
       ssh_key:
         type: string
       stripe_customer_id:
@@ -325,6 +379,30 @@ paths:
       summary: List nodes
       tags:
       - nodes
+  /pending-records:
+    get:
+      consumes:
+      - application/json
+      description: Returns all pending records in the system
+      operationId: list-pending-records
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/app.PendingRecordsResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
+      summary: List pending records
+      tags:
+      - admin
   /user:
     get:
       description: Retrieves all data of the user
@@ -565,7 +643,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Logs a user into the system
+      description: Logs a user in. Checks KYC verification status and updates user
+        sponsorship status if needed. Login is not blocked by KYC errors.
       operationId: login-user
       parameters:
       - description: Login Input
@@ -593,7 +672,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/app.APIResponse'
-      summary: Login user
+      summary: Login user (KYC verification checked)
       tags:
       - users
   /user/nodes:
@@ -684,6 +763,30 @@ paths:
       summary: Unreserve node
       tags:
       - nodes
+  /user/pending-records:
+    get:
+      consumes:
+      - application/json
+      description: Returns user pending records in the system
+      operationId: list-user-pending-records
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/app.PendingRecordsResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List user pending records
+      tags:
+      - users
   /user/redeem/{voucher_code}:
     put:
       description: Redeems a voucher for the user
@@ -755,7 +858,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Registers a new user to the system
+      description: Registers a new user, sets up blockchain account, and creates KYC
+        sponsorship. Sends verification code to email.
       operationId: register-user
       parameters:
       - description: Register Input
@@ -768,11 +872,11 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Verification code sent successfully
           schema:
             $ref: '#/definitions/app.RegisterResponse'
         "400":
-          description: Invalid request format
+          description: Invalid request format or validation error
           schema:
             $ref: '#/definitions/app.APIResponse'
         "409":
@@ -783,7 +887,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/app.APIResponse'
-      summary: Register a user
+      summary: Register user (with KYC sponsorship)
       tags:
       - users
   /user/register/verify:
@@ -815,6 +919,110 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Verify registration code
+      tags:
+      - users
+  /user/ssh-keys:
+    get:
+      consumes:
+      - application/json
+      description: Lists all SSH keys for the authenticated user
+      operationId: list-ssh-keys
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SSHKey'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List user SSH keys
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Adds a new SSH key for the authenticated user
+      operationId: add-ssh-key
+      parameters:
+      - description: SSH Key Input
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app.SSHKeyInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.SSHKey'
+        "400":
+          description: Invalid request format
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Add SSH key
+      tags:
+      - users
+  /user/ssh-keys/{ssh_key_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an SSH key for the authenticated user
+      operationId: delete-ssh-key
+      parameters:
+      - description: SSH Key ID
+        in: path
+        name: ssh_key_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "400":
+          description: Invalid SSH key ID
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: SSH key not found
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete SSH key
       tags:
       - users
   /users:

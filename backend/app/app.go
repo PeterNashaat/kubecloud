@@ -105,6 +105,11 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
+	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system identity: %w", err)
+	}
+
 	sshPublicKeyBytes, err := os.ReadFile(config.SSH.PublicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SSH public key from %s: %w", config.SSH.PublicKeyPath, err)
@@ -146,7 +151,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, config.SystemAccount.Network, kycClient, sponsorKeyPair, sponsorAddress)
+		sseManager, config.SystemAccount.Network, systemIdentity, kycClient, sponsorKeyPair, sponsorAddress)
 
 	app := &App{
 		router:        router,
@@ -186,6 +191,7 @@ func (app *App) registerHandlers() {
 			}
 
 			adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
+			adminGroup.GET("/pending-records", app.handlers.ListPendingRecordsHandler)
 
 			vouchersGroup := adminGroup.Group("/vouchers")
 			{
@@ -217,7 +223,8 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/balance", app.handlers.GetUserBalance)
 				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
 				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
-				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
+				authGroup.GET("/invoice", app.handlers.ListUserInvoicesHandler)
+				authGroup.GET("/pending-records", app.handlers.ListUserPendingRecordsHandler)
 				// SSH Key management
 				authGroup.GET("/ssh-keys", app.handlers.ListSSHKeysHandler)
 				authGroup.POST("/ssh-keys", app.handlers.AddSSHKeyHandler)
@@ -262,6 +269,7 @@ func (app *App) registerHandlers() {
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
 	go app.handlers.TrackUserDebt(app.gridClient)
+	go app.handlers.MonitorSystemBalanceAndHandleSettlement()
 }
 
 // Run starts the server

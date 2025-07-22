@@ -19,7 +19,10 @@ var resetPassTemplate []byte
 var welcomeMail []byte
 
 //go:embed templates/signup.html
-var signupTemplate []byte
+var signUpTemplate []byte
+
+//go:embed templates/pending_record_notification.html
+var notifyPaymentRecordsMail []byte
 
 // MailService struct hods all functionalities of mail service
 type MailService struct {
@@ -94,7 +97,7 @@ func (service *MailService) WelcomeMailContent(username, host string) (string, s
 // SignUpMailContent gets the email content for sign up
 func (service *MailService) SignUpMailContent(code int, timeout int, username, host string) (string, string) {
 	subject := "Welcome to KubeCloud 🎉"
-	body := string(signupTemplate)
+	body := string(signUpTemplate)
 
 	body = strings.ReplaceAll(body, "-code-", fmt.Sprint(code))
 	body = strings.ReplaceAll(body, "-time-", fmt.Sprint(timeout))
@@ -104,8 +107,18 @@ func (service *MailService) SignUpMailContent(code int, timeout int, username, h
 	return subject, body
 }
 
-func (service *MailService) InvoiceMailContent(invoiceTotal float64, currency string, invoiceID int) (string, string) {
+// NotifyAdminsMailContent gets the content for notifying admins
+func (service *MailService) NotifyAdminsMailContent(recordsNumber int, host string) (string, string) {
+	subject := "There're pending payment requests for you to settle"
+	body := string(notifyPaymentRecordsMail)
 
+	body = strings.ReplaceAll(body, "-records-", fmt.Sprint(recordsNumber))
+	body = strings.ReplaceAll(body, "-host-", host)
+
+	return subject, body
+}
+
+func (service *MailService) InvoiceMailContent(invoiceTotal float64, currency string, invoiceID int) (string, string) {
 	mailBody := "We hope this message finds you well.\n"
 	mailBody += fmt.Sprintf("Our records show that there is an outstanding invoice for %v %s associated with your account (%d). ", invoiceTotal, currency, invoiceID)
 

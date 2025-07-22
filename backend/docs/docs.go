@@ -115,6 +115,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "AdminMiddleware": []
+                    }
+                ],
+                "description": "Returns all pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List pending records",
+                "operationId": "list-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user": {
             "get": {
                 "description": "Retrieves all data of the user",
@@ -477,7 +515,7 @@ const docTemplate = `{
         },
         "/user/login": {
             "post": {
-                "description": "Logs a user into the system",
+                "description": "Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.",
                 "consumes": [
                     "application/json"
                 ],
@@ -487,7 +525,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Login user",
+                "summary": "Login user (KYC verification checked)",
                 "operationId": "login-user",
                 "parameters": [
                     {
@@ -666,6 +704,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns user pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List user pending records",
+                "operationId": "list-user-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user/redeem/{voucher_code}": {
             "put": {
                 "description": "Redeems a voucher for the user",
@@ -769,7 +845,7 @@ const docTemplate = `{
         },
         "/user/register": {
             "post": {
-                "description": "Registers a new user to the system",
+                "description": "Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.",
                 "consumes": [
                     "application/json"
                 ],
@@ -779,7 +855,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Register a user",
+                "summary": "Register user (with KYC sponsorship)",
                 "operationId": "register-user",
                 "parameters": [
                     {
@@ -794,13 +870,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Verification code sent successfully",
                         "schema": {
                             "$ref": "#/definitions/app.RegisterResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request format",
+                        "description": "Invalid request format or validation error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -854,6 +930,168 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid request format or verification failed",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/ssh-keys": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists all SSH keys for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List user SSH keys",
+                "operationId": "list-ssh-keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SSHKey"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a new SSH key for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Add SSH key",
+                "operationId": "add-ssh-key",
+                "parameters": [
+                    {
+                        "description": "SSH Key Input",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app.SSHKeyInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.SSHKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/ssh-keys/{ssh_key_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes an SSH key for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Delete SSH key",
+                "operationId": "delete-ssh-key",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "SSH Key ID",
+                        "name": "ssh_key_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid SSH key ID",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "SSH key not found",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -1259,6 +1497,36 @@ const docTemplate = `{
                 }
             }
         },
+        "app.PendingRecordsResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "tft_amount": {
+                    "description": "TFTs are multiplied by 1e7",
+                    "type": "integer"
+                },
+                "transferred_tft_amount": {
+                    "type": "integer"
+                },
+                "transferred_usd_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "usd_amount": {
+                    "type": "number"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "app.RefreshTokenInput": {
             "type": "object",
             "required": [
@@ -1284,8 +1552,7 @@ const docTemplate = `{
                 "confirm_password",
                 "email",
                 "name",
-                "password",
-                "ssh_key"
+                "password"
             ],
             "properties": {
                 "confirm_password": {
@@ -1303,9 +1570,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 64,
                     "minLength": 8
-                },
-                "ssh_key": {
-                    "type": "string"
                 }
             }
         },
@@ -1316,6 +1580,21 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "timeout": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.SSHKeyInput": {
+            "type": "object",
+            "required": [
+                "name",
+                "public_key"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "public_key": {
                     "type": "string"
                 }
             }
@@ -1413,6 +1692,38 @@ const docTemplate = `{
                 }
             }
         },
+        "models.SSHKey": {
+            "type": "object",
+            "required": [
+                "name",
+                "public_key",
+                "userID"
+            ],
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Primary key",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Unique name per user",
+                    "type": "string"
+                },
+                "public_key": {
+                    "description": "Unique public key per user",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "User owner",
+                    "type": "integer"
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "required": [
@@ -1421,6 +1732,9 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
+                "account_address": {
+                    "type": "string"
+                },
                 "admin": {
                     "type": "boolean"
                 },
@@ -1449,6 +1763,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "sponsored": {
+                    "type": "boolean"
                 },
                 "ssh_key": {
                     "type": "string"
