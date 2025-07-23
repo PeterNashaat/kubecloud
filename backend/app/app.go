@@ -149,6 +149,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		app.db,
 		app.handlers.mailService,
 		app.handlers.substrateClient,
+		app.sseManager,
 	)
 
 	app.registerHandlers()
@@ -255,6 +256,7 @@ func (app *App) StartBackgroundWorkers() {
 // Run starts the server
 func (app *App) Run() error {
 	app.StartBackgroundWorkers()
+	log.Info().Msg("resumeing running workflows")
 	app.handlers.ewfEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", app.config.Server.Port),
