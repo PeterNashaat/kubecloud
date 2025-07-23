@@ -127,7 +127,12 @@ export class UserService {
 
   // Charge balance
   async chargeBalance(data: ChargeBalanceRequest) {
-    return api.post('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
+    const response = await api.post<ApiResponse<ChargeBalanceResponse>>('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      throw new Error('Charge failed')
+    }
   }
 
   // Create a PaymentIntent (to be implemented)
