@@ -22,5 +22,5 @@ type NodeItem struct {
 	ContractID    uint64    `json:"contract_id"`
 	RentCreatedAt time.Time `json:"rent_created_at"`
 	PeriodInHours float64   `json:"period"`
-	Cost          float64   `json:"cost"`
+	Cost          float64   `json:"cost"` // in millicent
 }

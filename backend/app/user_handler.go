@@ -108,9 +108,9 @@ type ChangePasswordInput struct {
 
 // ChargeBalanceInput struct holds required data to charge users' balance
 type ChargeBalanceInput struct {
-	CardType     string `json:"card_type" binding:"required"`
-	PaymentToken string `json:"payment_method_id" binding:"required"`
-	Amount       uint64 `json:"amount" binding:"required"`
+	CardType     string  `json:"card_type" binding:"required"`
+	PaymentToken string  `json:"payment_method_id" binding:"required"`
+	Amount       float64 `json:"amount" binding:"required"`
 }
 
 // RegisterResponse struct holds data returned when user registers
@@ -697,14 +697,15 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(request.Amount))
+	requestAmountUSDMillicent := internal.FromUSDToUSDMillicent(request.Amount)
+	requestedTFTs, err := internal.FromUSDMillicentToTFT(h.substrateClient, requestAmountUSDMillicent)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 
-	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	systemBalanceUSDMillicent, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Msg("error checking system account balance")
 		InternalServerError(c)
@@ -713,7 +714,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 	responseMsg := "Balance is charged successfully"
 
-	if systemBalanceUSD < float64(request.Amount) {
+	if systemBalanceUSDMillicent < requestAmountUSDMillicent {
 		if err = h.db.CreatePendingRecord(&models.PendingRecord{
 			UserID:    userID,
 			TFTAmount: requestedTFTs,
@@ -737,7 +738,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		}
 	}
 
-	user.CreditCardBalance += float64(request.Amount)
+	user.CreditCardBalance += requestAmountUSDMillicent
 
 	err = h.db.UpdateUserByID(&user)
 	if err != nil {
@@ -748,7 +749,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 	Success(c, http.StatusCreated, responseMsg, ChargeBalanceResponse{
 		PaymentIntentID: intent.ID,
-		NewBalance:      user.CreditCardBalance,
+		NewBalance:      internal.FromUSDMilliCentToUSD(user.CreditCardBalance),
 	})
 }
 
@@ -796,14 +797,16 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
+
+	usdMillicentBalance, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 	}
+
 	Success(c, http.StatusOK, "Balance is fetched", UserBalanceResponse{
-		BalanceUSD: usdBalance,
-		DebtUSD:    user.Debt,
+		BalanceUSD: internal.FromUSDMilliCentToUSD(usdMillicentBalance),
+		DebtUSD:    internal.FromUSDMilliCentToUSD(user.Debt),
 	})
 }
 
@@ -862,7 +865,9 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	user.CreditedBalance += voucher.Value
+	voucherValueUSDMillicent := internal.FromUSDToUSDMillicent(voucher.Value)
+
+	user.CreditedBalance += voucherValueUSDMillicent
 	err = h.db.UpdateUserByID(&user)
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -870,14 +875,14 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(voucher.Value))
+	requestedTFTs, err := internal.FromUSDMillicentToTFT(h.substrateClient, voucherValueUSDMillicent)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 
-	systemUSDBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	systemUSDMillicentBalance, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, h.config.SystemAccount.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -886,7 +891,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 
 	responseMsg := "Voucher is redeemed successfully"
 
-	if systemUSDBalance < float64(voucher.Value) {
+	if systemUSDMillicentBalance < voucherValueUSDMillicent {
 		if err = h.db.CreatePendingRecord(&models.PendingRecord{
 			UserID:    userID,
 			TFTAmount: requestedTFTs,
@@ -1058,14 +1063,14 @@ func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
 
 	var pendingRecordsResponse []PendingRecordsResponse
 	for _, record := range pendingRecords {
-		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		usdMillicentAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, record.TFTAmount)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to convert tft to usd amount")
 			InternalServerError(c)
 			return
 		}
 
-		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		usdMillicentTransferredAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, record.TransferredTFTAmount)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
 			InternalServerError(c)
@@ -1074,8 +1079,8 @@ func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
 
 		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
 			PendingRecord:        record,
-			USDAmount:            usdAmount,
-			TransferredUSDAmount: usdTransferredAmount,
+			USDAmount:            internal.FromUSDMilliCentToUSD(usdMillicentAmount),
+			TransferredUSDAmount: internal.FromUSDMilliCentToUSD(usdMillicentTransferredAmount),
 		})
 	}
 

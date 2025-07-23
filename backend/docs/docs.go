@@ -1398,7 +1398,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "amount": {
-                    "type": "integer"
+                    "type": "number"
                 },
                 "card_type": {
                     "type": "string"
@@ -1427,7 +1427,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "amount": {
-                    "type": "integer"
+                    "type": "number"
                 },
                 "memo": {
                     "type": "string",
@@ -1440,7 +1440,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "integer"
+                    "type": "number"
                 },
                 "memo": {
                     "type": "string"
@@ -1673,6 +1673,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "cost": {
+                    "description": "in millicent",
                     "type": "number"
                 },
                 "id": {
@@ -1742,15 +1743,16 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "credit_card_balance": {
-                    "description": "money from credit card",
-                    "type": "number"
+                    "description": "millicent, money from credit card",
+                    "type": "integer"
                 },
                 "credited_balance": {
-                    "description": "manually added by admin or from vouchers",
-                    "type": "number"
+                    "description": "millicent, manually added by admin or from vouchers",
+                    "type": "integer"
                 },
                 "debt": {
-                    "type": "number"
+                    "description": "millicent",
+                    "type": "integer"
                 },
                 "email": {
                     "type": "string"
