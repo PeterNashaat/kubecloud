@@ -1,8 +1,7 @@
 <template>
   <div class="auth-view">
-    <div class="auth-background"></div>
     <LoadingComponent v-if="loading" fullPage message="Creating account..." />
-    <div v-else class="auth-content fade-in">
+    <div  class="auth-content fade-in">
       <div class="auth-header">
         <h1 class="auth-title">Create Account</h1>
         <p class="auth-subtitle">Join KubeCloud and start your journey</p>

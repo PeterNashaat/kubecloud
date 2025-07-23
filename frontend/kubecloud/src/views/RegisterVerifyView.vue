@@ -33,6 +33,8 @@
           block
           size="large"
           variant="outlined"
+          :loading="loading"
+          :disabled="resending"
         >
           <v-icon icon="mdi-check-circle" class="mr-2"></v-icon>
           Verify
@@ -40,7 +42,7 @@
       </v-form>
       <div class="auth-footer">
         <span class="auth-footer-text">Didn't receive a code?</span>
-        <v-btn variant="outlined" color="white" @click="resendCode">Resend Code</v-btn>
+        <v-btn variant="outlined" color="white" :disabled="loading" :loading="resending" @click="resendCode">Resend Code</v-btn>
       </div>
     </div>
   </div>
@@ -67,6 +69,8 @@ const errors = reactive({
   email: '',
   code: ''
 })
+const loading = ref(false)
+const resending = ref(false)
 
 const clearErrors = () => {
   errors.email = ''
@@ -83,21 +87,35 @@ const handleVerify = async () => {
     errors.code = 'Verification code is required'
     return
   }
-    await userStore.verifyCode(form.email, Number(form.code))
-    router.push('/')
+  try {
+    loading.value = true
+    await authService.verifyCode({ email: form.email, code: Number(form.code) })
+    loading.value = false
+    router.push('/sign-in')
+  } catch (error) {
+    loading.value = false
+    notificationStore.showNotification('Verification failed', 'error')
+  }
 }
 
 const resendCode = async () => {
+  resending.value = true
   if (!form.email) {
     errors.email = 'Email is required to resend code'
     return
   }
+  try {
     await authService.register({
       name: 'User',
       email: form.email,
       password: 'temporary',
       confirm_password: 'temporary'
     })
+  } catch (error) {
+    notificationStore.showNotification('Resend failed please try again', 'error')
+  } finally {
+    resending.value = false
+  }
 }
 
 onMounted(() => {
