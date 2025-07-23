@@ -1,3 +1,4 @@
+import { WorkflowStatus } from '@/types/ewf'
 import { useNotificationStore } from '../stores/notifications'
 import { useUserStore } from '../stores/user'
 import { useRouter } from 'vue-router'
@@ -281,3 +282,58 @@ export function listenToEvents(taskId: string, onMessage: (data: any) => void) {
   };
   return eventSource;
 } 
+export async function getWorkflowStatus(workflowID: string): Promise<ApiResponse<{ data: WorkflowStatus }>> {
+  return api.get(`/v1/workflow/${workflowID}`, { requiresAuth: false, showNotifications: false })
+}
+
+
+
+export function createWorkflowStatusChecker(workflowID: string, options?: {
+  interval?: number;
+  maxAttempts?: number;
+}): {
+  status: Promise<WorkflowStatus>;
+  cancel: () => void;
+} {
+  const interval = options?.interval ?? 3000;
+  const maxAttempts = options?.maxAttempts ?? 10;
+
+  let attempts = 0;
+  let intervalId: NodeJS.Timeout;
+  let rejectFn: (reason?: any) => void;
+
+  const statusPromise = new Promise<WorkflowStatus>((resolve, reject) => {
+    rejectFn = reject;
+
+    const check = async () => {
+      try {
+        attempts++;
+        const result = await getWorkflowStatus(workflowID);
+        const status= result.data.data;
+
+        if (status === WorkflowStatus.StatusCompleted || status === WorkflowStatus.StatusFailed) {
+          clearInterval(intervalId);
+          resolve(status);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(intervalId);
+          resolve(status);
+        }
+      } catch (error) {
+        clearInterval(intervalId);
+        reject(error);
+      }
+    };
+
+    intervalId = setInterval(check, interval);
+  });
+
+  const cancel = () => {
+    clearInterval(intervalId);
+    rejectFn?.('Polling canceled.');
+  };
+
+  return { status: statusPromise, cancel };
+}
+
+
+
