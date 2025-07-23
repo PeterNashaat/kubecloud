@@ -33,7 +33,7 @@ func isWorkloadAlreadyDeployedError(err error) bool {
 }
 
 func ensureClient(state ewf.State) {
-	kubeClient, err := getKubeClient(state)
+	_, err := getKubeClient(state)
 	if err == nil {
 		log.Debug().Msg("Kubeclient already exists in state, skipping creation")
 		return
@@ -50,7 +50,7 @@ func ensureClient(state ewf.State) {
 		return
 	}
 
-	kubeClient, err = kubedeployer.NewClient(config.Mnemonic, config.Network)
+	kubeClient, err := kubedeployer.NewClient(config.Mnemonic, config.Network)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create kubeclient")
 		return
