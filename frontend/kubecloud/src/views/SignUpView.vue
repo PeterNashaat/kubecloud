@@ -1,7 +1,8 @@
 <template>
   <div class="auth-view">
     <div class="auth-background"></div>
-    <div class="auth-content fade-in">
+    <LoadingComponent v-if="loading" fullPage message="Creating account..." />
+    <div v-else class="auth-content fade-in">
       <div class="auth-header">
         <h1 class="auth-title">Create Account</h1>
         <p class="auth-subtitle">Join KubeCloud and start your journey</p>
@@ -92,11 +93,12 @@ import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
 import { useUserStore } from '../stores/user'
 import { validateForm, VALIDATION_RULES } from '../utils/validation'
+import LoadingComponent from '../components/LoadingComponent.vue'
 
 const router = useRouter()
 const notificationStore = useNotificationStore()
 const userStore = useUserStore()
-
+const loading = ref(false)
 const form = reactive({
   name: '',
   email: '',
@@ -184,7 +186,7 @@ const handleSignUp = async () => {
     // Don't show generic notification - inline errors are already shown
     return
   }
-
+  loading.value = true
   try {
     await userStore.register({
       name: form.name,
@@ -193,11 +195,15 @@ const handleSignUp = async () => {
       confirmPassword: form.confirmPassword
     })
     
+   
+
     // Redirect to verify page on success
     router.push({ path: '/register/verify', query: { email: form.email } })
   } catch (error) {
     // Error handling is done in the auth service
     console.error('Sign up error:', error)
+  } finally {
+    loading.value = false
   }
 }
 

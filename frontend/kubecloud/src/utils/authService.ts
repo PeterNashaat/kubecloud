@@ -1,4 +1,5 @@
-import { api } from './api'
+import { WorkflowStatus } from '@/types/ewf'
+import { api, createWorkflowStatusChecker } from './api'
 
 // Types for auth requests and responses
 export interface RegisterRequest {
@@ -8,14 +9,20 @@ export interface RegisterRequest {
   confirm_password: string
 }
 
-export interface RegisterResponse {
+interface WorkflowResponse {
+  workflow_id: string
+}
+export interface RegisterResponse extends WorkflowResponse {
   email: string
-  timeout: string
 }
 
 export interface VerifyCodeRequest {
   email: string
   code: number
+}
+
+export interface VerifyCodeResponse extends WorkflowResponse {
+  email: string
 }
 
 export interface LoginRequest {
@@ -94,25 +101,32 @@ export class AuthService {
   }
 
   // Register a new user
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
+  async register(data: RegisterRequest): Promise<void> {
     const response = await api.post<ApiResponse<RegisterResponse>>('/v1/user/register', data, {
       showNotifications: true,
       loadingMessage: 'Creating your account...',
-      successMessage: 'Verification code sent to your email!',
       errorMessage: 'Registration failed',
       timeout: 60000
     })
-    return response.data.data
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      throw new Error('Registration failed')
+    }
+    
   }
 
   // Verify registration code
-  async verifyCode(data: VerifyCodeRequest): Promise<LoginResponse> {
-    const response = await api.post<ApiResponse<LoginResponse>>('/v1/user/register/verify', data, {
+  async verifyCode(data: VerifyCodeRequest): Promise<void> {
+    const response = await api.post<ApiResponse<VerifyCodeResponse>>('/v1/user/register/verify', data, {
       showNotifications: true,
-      successMessage: 'Account verified successfully!',
       errorMessage: 'Verification failed'
     })
-    return response.data.data
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      throw new Error('Verification failed')
+    }
   }
 
   // Login user
