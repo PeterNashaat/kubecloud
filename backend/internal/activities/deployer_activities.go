@@ -33,8 +33,8 @@ func ensureClient(state ewf.State) {
 		return
 	}
 
-	// Use the statemanager to ensure client
-	err = statemanager.EnsureClient(state, config)
+	// Use the statemanager to get or create client
+	_, err = statemanager.GetKubeClient(state, config)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to ensure kubeclient")
 		return

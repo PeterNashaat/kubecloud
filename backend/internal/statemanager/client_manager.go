@@ -9,21 +9,51 @@ import (
 	"github.com/xmonader/ewf"
 )
 
+// ClientConfig represents the configuration needed to create a kubeclient
+type ClientConfig struct {
+	SSHPublicKey string `json:"ssh_public_key"`
+	Mnemonic     string `json:"mnemonic"`
+	UserID       string `json:"user_id"`
+	Network      string `json:"network"`
+}
+
+// ValidateConfig validates the client configuration
+func ValidateConfig(config ClientConfig) error {
+	if config.Mnemonic == "" {
+		return fmt.Errorf("missing mnemonic in config")
+	}
+	if config.Network == "" {
+		return fmt.Errorf("missing network in config")
+	}
+	if config.SSHPublicKey == "" {
+		return fmt.Errorf("missing SSH public key in config")
+	}
+	if config.UserID == "" {
+		return fmt.Errorf("missing user ID in config")
+	}
+
+	return nil
+}
+
 // GetKubeClient retrieves or creates a kubeclient with proper state management
 func GetKubeClient(state ewf.State, config ClientConfig) (*kubedeployer.Client, error) {
 	// Try to get existing kubeclient from state
 	if value, ok := state["kubeclient"]; ok {
 		if client, ok := value.(*kubedeployer.Client); ok && client != nil {
-			log.Debug().Msg("Using existing kubeclient from state")
+			log.Debug().Msg("Reusing existing kubeclient from state")
 			return client, nil
 		}
+		// If we found an invalid client, remove it from state
+		delete(state, "kubeclient")
+		log.Warn().Msg("Removed invalid kubeclient from state")
 	}
 
-	// If no existing client or it's invalid, create a fresh one
+	// Validate configuration before creating client
 	if err := ValidateConfig(config); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
+	// Create new client
 	kubeClient, err := kubedeployer.NewClient(config.Mnemonic, config.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubeclient: %w", err)
@@ -36,63 +66,38 @@ func GetKubeClient(state ewf.State, config ClientConfig) (*kubedeployer.Client, 
 
 	// Store the new client in state for reuse
 	state["kubeclient"] = kubeClient
-
-	// Save the GridClient state for restart safety
 	SaveGridClientState(state, kubeClient)
 
 	log.Debug().Msg("Created and stored fresh kubeclient")
 	return kubeClient, nil
 }
 
-// ClientConfig represents the configuration needed to create a kubeclient
-type ClientConfig struct {
-	SSHPublicKey string `json:"ssh_public_key"`
-	Mnemonic     string `json:"mnemonic"`
-	UserID       string `json:"user_id"`
-	Network      string `json:"network"`
+// GetExistingKubeClient returns an existing kubeclient from state without creating a new one
+func GetExistingKubeClient(state ewf.State) (*kubedeployer.Client, error) {
+	value, ok := state["kubeclient"]
+	if !ok {
+		return nil, fmt.Errorf("no kubeclient found in state")
+	}
+
+	client, ok := value.(*kubedeployer.Client)
+	if !ok || client == nil {
+		return nil, fmt.Errorf("invalid kubeclient in state")
+	}
+
+	return client, nil
 }
 
-// ValidateConfig validates the client configuration
-func ValidateConfig(config ClientConfig) error {
-	if config.SSHPublicKey == "" {
-		return fmt.Errorf("missing SSH public key in config")
-	}
-	if config.Mnemonic == "" {
-		return fmt.Errorf("missing mnemonic in config")
-	}
-	if config.UserID == "" {
-		return fmt.Errorf("missing user ID in config")
-	}
-	if config.Network == "" {
-		return fmt.Errorf("missing network in config")
-	}
-	return nil
-}
-
-// EnsureClient ensures a kubeclient is available and ready for use
-func EnsureClient(state ewf.State, config ClientConfig) error {
-	// Get or create kubeclient (this will handle state restoration)
-	_, err := GetKubeClient(state, config)
-	if err != nil {
-		return fmt.Errorf("failed to ensure kubeclient: %w", err)
+// CloseClient properly closes a kubeclient and cleans up state
+func CloseClient(state ewf.State, kubeClient *kubedeployer.Client) error {
+	if kubeClient == nil {
+		log.Debug().Msg("No kubeclient to close")
+		return nil
 	}
 
-	log.Debug().Msg("Kubeclient ensured and ready for use")
-	return nil
-}
-
-// SaveClientStateAfterOperation saves the GridClient state after a deployment operation
-func SaveClientStateAfterOperation(state ewf.State, kubeClient *kubedeployer.Client) {
 	SaveGridClientState(state, kubeClient)
-}
+	kubeClient.Close()
+	delete(state, "kubeclient")
 
-// CloseClient properly closes a kubeclient and saves final state
-func CloseClient(state ewf.State, kubeClient *kubedeployer.Client) {
-	if kubeClient != nil {
-		// Save final GridClient state before closing
-		SaveGridClientState(state, kubeClient)
-		kubeClient.Close()
-		delete(state, "kubeclient")
-		log.Debug().Msg("Closed kubeclient and cleaned up state")
-	}
+	log.Debug().Msg("Closed kubeclient and cleaned up state")
+	return nil
 }
