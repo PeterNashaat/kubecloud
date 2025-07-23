@@ -149,7 +149,7 @@ func (c *Cluster) PrepareCluster(userID string) error {
 
 	hasLeader := false
 	for idx, node := range c.Nodes {
-		c.Nodes[idx].OriginalName = node.Name
+		c.Nodes[idx].OriginalName = node.Name // Safe, cause it checks if projectName is not empty
 		c.Nodes[idx].Name = projectName + node.Name
 		if node.Type == NodeTypeLeader {
 			hasLeader = true

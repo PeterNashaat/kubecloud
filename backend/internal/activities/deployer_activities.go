@@ -32,8 +32,37 @@ func isWorkloadAlreadyDeployedError(err error) bool {
 	return strings.Contains(errMsg, "exists: conflict")
 }
 
+func ensureClient(state ewf.State) {
+	kubeClient, err := getKubeClient(state)
+	if err == nil {
+		log.Debug().Msg("Kubeclient already exists in state, skipping creation")
+		return
+	}
+
+	config, err := getConfig(state)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get config from state")
+		return
+	}
+
+	if err := validateConfig(config); err != nil {
+		log.Error().Err(err).Msg("Invalid configuration")
+		return
+	}
+
+	kubeClient, err = kubedeployer.NewClient(config.Mnemonic, config.Network)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create kubeclient")
+		return
+	}
+
+	state["kubeclient"] = kubeClient
+}
+
 func DeployNetworkStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
 		config, err := getConfig(state)
 		if err != nil {
 			return fmt.Errorf("failed to get config from state: %w", err)
@@ -70,6 +99,8 @@ func DeployNetworkStep() ewf.StepFn {
 
 func UpdateNetworkStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
 		config, err := getConfig(state)
 		if err != nil {
 			return fmt.Errorf("failed to get config from state: %w", err)
@@ -90,7 +121,7 @@ func UpdateNetworkStep() ewf.StepFn {
 			return err
 		}
 
-		node.Name = kubedeployer.GetNodeName(config.UserID, cluster.Name, node.Name)
+		node.Name = kubedeployer.GetNodeName(config.UserID, cluster.Name, node.OriginalName)
 		cluster.Nodes = append(cluster.Nodes, node)
 
 		if err := kubeClient.DeployNetwork(ctx, &cluster); err != nil {
@@ -105,6 +136,8 @@ func UpdateNetworkStep() ewf.StepFn {
 
 func AddNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
 		config, err := getConfig(state)
 		if err != nil {
 			return fmt.Errorf("failed to get config from state: %w", err)
@@ -124,7 +157,6 @@ func AddNodeStep() ewf.StepFn {
 		if err != nil {
 			return err
 		}
-		node.OriginalName = node.Name
 
 		if err := node.AssignNodeIP(ctx, kubeClient.GridClient, cluster.Network.Name); err != nil {
 			return fmt.Errorf("failed to assign IP for node %s: %w", node.Name, err)
@@ -141,6 +173,8 @@ func AddNodeStep() ewf.StepFn {
 
 func DeployNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
 		config, err := getConfig(state)
 		if err != nil {
 			return fmt.Errorf("failed to get config from state: %w", err)
@@ -217,6 +251,8 @@ func StoreDeploymentStep() ewf.StepFn {
 
 func CancelDeploymentStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
 		kubeClient, err := getKubeClient(state)
 		if err != nil {
 			return err
@@ -257,6 +293,8 @@ func RemoveClusterFromDBStep() ewf.StepFn {
 
 func RemoveDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
 		config, err := getConfig(state)
 		if err != nil {
 			return fmt.Errorf("failed to get config from state: %w", err)
@@ -323,6 +361,7 @@ func validateConfig(config ClientConfig) error {
 	return nil
 }
 
+// DEPRECATED: each setup uses ensureClient now
 func SetupClient(ctx context.Context, wf *ewf.Workflow) {
 	config, ok := wf.State["config"].(ClientConfig)
 	if !ok {
@@ -398,7 +437,7 @@ var BaseWFTemplate = ewf.WorkflowTemplate{
 		func(ctx context.Context, w *ewf.Workflow) {
 			log.Info().Str("workflow_name", w.Name).Msg("Starting workflow")
 		},
-		SetupClient,
+		// SetupClient,
 	},
 	AfterWorkflowHooks: []ewf.AfterWorkflowHook{
 		NotifyUser,

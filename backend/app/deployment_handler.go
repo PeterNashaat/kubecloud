@@ -446,6 +446,9 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		return
 	}
 
+	// TODO: find a better place for this
+	cluster.Nodes[0].OriginalName = cluster.Nodes[0].Name
+
 	wf.State = ewf.State{
 		"config":  config,
 		"cluster": cl,
