@@ -9,11 +9,9 @@ export interface RegisterRequest {
   confirm_password: string
 }
 
-interface WorkflowResponse {
-  workflow_id: string
-}
-export interface RegisterResponse extends WorkflowResponse {
+export interface RegisterResponse {
   email: string
+  workflow_id: string
 }
 
 export interface VerifyCodeRequest {
@@ -21,8 +19,9 @@ export interface VerifyCodeRequest {
   code: number
 }
 
-export interface VerifyCodeResponse extends WorkflowResponse {
+export interface VerifyCodeResponse {
   email: string
+  workflow_id: string
 }
 
 export interface LoginRequest {
