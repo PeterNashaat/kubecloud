@@ -207,8 +207,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Balance is charged successfully",
+                    "202": {
+                        "description": "workflow_id: string, email: string",
                         "schema": {
                             "$ref": "#/definitions/app.ChargeBalanceResponse"
                         }
@@ -226,7 +226,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -595,14 +595,20 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
+                            "$ref": "#/definitions/app.UnreserveNodeResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User is not found",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -645,14 +651,20 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
+                            "$ref": "#/definitions/app.ReserveNodeResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No nodes are available for rent.",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -688,13 +700,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "202": {
-                        "description": "Voucher redeemed successfully",
+                        "description": "workflow_id: string, voucher_code: string, amount: float64, email: string",
                         "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
+                            "$ref": "#/definitions/app.RedeemVoucherResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid voucher code or already redeemed",
+                        "description": "Invalid voucher code, already redeemed, or expired",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -706,7 +718,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -794,9 +806,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "workflow_id: string, email: string",
                         "schema": {
-                            "$ref": "#/definitions/app.RegisterResponse"
+                            "$ref": "#/definitions/app.RegisterUserResponse"
                         }
                     },
                     "400": {
@@ -812,7 +824,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -846,10 +858,10 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "202": {
+                        "description": "workflow_id: string, email: string",
                         "schema": {
-                            "$ref": "#/definitions/internal.TokenPair"
+                            "$ref": "#/definitions/app.RegisterUserResponse"
                         }
                     },
                     "400": {
@@ -1386,10 +1398,10 @@ const docTemplate = `{
         "app.ChargeBalanceResponse": {
             "type": "object",
             "properties": {
-                "new_balance": {
-                    "type": "number"
+                "email": {
+                    "type": "string"
                 },
-                "payment_intent_id": {
+                "workflow_id": {
                     "type": "string"
                 }
             }
@@ -1472,6 +1484,23 @@ const docTemplate = `{
                 }
             }
         },
+        "app.RedeemVoucherResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "voucher_code": {
+                    "type": "string"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
         "app.RefreshTokenInput": {
             "type": "object",
             "required": [
@@ -1529,6 +1558,31 @@ const docTemplate = `{
                 }
             }
         },
+        "app.RegisterUserResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.ReserveNodeResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "node_id": {
+                    "type": "integer"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
         "app.SSHKeyInput": {
             "type": "object",
             "required": [
@@ -1540,6 +1594,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "public_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.UnreserveNodeResponse": {
+            "type": "object",
+            "properties": {
+                "contract_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "workflow_id": {
                     "type": "string"
                 }
             }

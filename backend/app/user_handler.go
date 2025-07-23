@@ -119,10 +119,10 @@ type RefreshTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// chargeBalanceResponse struct holds the response data after charging balance
+// ChargeBalanceResponse holds the response for charging user balance
 type ChargeBalanceResponse struct {
-	PaymentIntentID string  `json:"payment_intent_id"`
-	NewBalance      float64 `json:"new_balance"`
+	WorkflowID string `json:"workflow_id"`
+	Email      string `json:"email"`
 }
 
 // UserBalanceResponse struct holds the response data for user balance
@@ -137,6 +137,20 @@ type SSHKeyInput struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
+// RegisterUserResponse holds the response for user registration
+type RegisterUserResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	Email      string `json:"email"`
+}
+
+// RedeemVoucherResponse holds the response for redeeming a voucher
+type RedeemVoucherResponse struct {
+	WorkflowID  string  `json:"workflow_id"`
+	VoucherCode string  `json:"voucher_code"`
+	Amount      float64 `json:"amount"`
+	Email       string  `json:"email"`
+}
+
 // @Summary Register a user
 // @Description Registers a new user to the system
 // @Tags users
@@ -144,12 +158,11 @@ type SSHKeyInput struct {
 // @Accept json
 // @Produce json
 // @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse
+// @Success 201 {object} RegisterUserResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format"
 // @Failure 409 {object} APIResponse "User already registered"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/register [post]
-// RegisterHandler registers user to the system
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
 
@@ -190,9 +203,9 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow id.", gin.H{
-		"workflow_id": wf.UUID,
-		"email":       request.Email,
+	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow id.", RegisterUserResponse{
+		WorkflowID: wf.UUID,
+		Email:      request.Email,
 	})
 
 }
@@ -204,11 +217,10 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body VerifyCodeInput true "Verify Code Input"
-// @Success 201 {object} internal.TokenPair
+// @Success 202 {object} RegisterUserResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format or verification failed"
 // @Failure 500 {object} APIResponse
 // @Router /user/register/verify [post]
-// VerifyRegisterCode verifies email when signing up
 func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	var request VerifyCodeInput
 
@@ -256,9 +268,9 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "verification in progress", map[string]interface{}{
-		"workflow_id": wf.UUID,
-		"email":       user.Email,
+	Success(c, http.StatusCreated, "verification in progress", RegisterUserResponse{
+		WorkflowID: wf.UUID,
+		Email:      user.Email,
 	})
 }
 
@@ -527,12 +539,11 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body ChargeBalanceInput true "Charge Balance Input"
-// @Success 201 {object} ChargeBalanceResponse "Balance is charged successfully"
+// @Success 202 {object} ChargeBalanceResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format or amount"
 // @Failure 404 {object} APIResponse "User is not found"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/balance/charge [post]
-// ChargeBalance charges the user's balance
 func (h *Handler) ChargeBalance(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -600,9 +611,9 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", map[string]interface{}{
-		"workflow_id": wf.UUID,
-		"email":       user.Email,
+	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", ChargeBalanceResponse{
+		WorkflowID: wf.UUID,
+		Email:      user.Email,
 	})
 }
 
@@ -667,12 +678,11 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 // @ID redeem-voucher
 // @Param voucher_code path string true "Voucher Code"
 // @Produce json
-// @Success 202 {object} APIResponse "Voucher redeemed successfully"
-// @Failure 400 {object} APIResponse "Invalid voucher code or already redeemed"
+// @Success 202 {object} RedeemVoucherResponse "workflow_id: string, voucher_code: string, amount: float64, email: string"
+// @Failure 400 {object} APIResponse "Invalid voucher code, already redeemed, or expired"
 // @Failure 404 {object} APIResponse "User or voucher are not found"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/redeem/{voucher_code} [put]
-// RedeemVoucherHandler redeems a voucher for the user
 func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	voucherCodeParam := c.Param("voucher_code")
 	if voucherCodeParam == "" {
@@ -728,11 +738,11 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusOK, "Voucher is redeemed successfully. Money transfer in progress.", map[string]interface{}{
-		"workflow_id":  wf.UUID,
-		"voucher_code": voucher.Code,
-		"amount":       voucher.Value,
-		"email":        user.Email,
+	Success(c, http.StatusOK, "Voucher is redeemed successfully. Money transfer in progress.", RedeemVoucherResponse{
+		WorkflowID:  wf.UUID,
+		VoucherCode: voucher.Code,
+		Amount:      voucher.Value,
+		Email:       user.Email,
 	})
 }
 
