@@ -24,16 +24,16 @@ type ListNodesResponse struct {
 
 // ReserveNodeResponse holds the response for reserve node response
 type ReserveNodeResponse struct {
-    WorkflowID string `json:"workflow_id"`
-    NodeID     uint32 `json:"node_id"`
-    Email      string `json:"email"`
+	WorkflowID string `json:"workflow_id"`
+	NodeID     uint32 `json:"node_id"`
+	Email      string `json:"email"`
 }
 
 // UnreserveNodeResponse holds the response for unreserve node response
 type UnreserveNodeResponse struct {
-    WorkflowID string `json:"workflow_id"`
-    ContractID uint32 `json:"contract_id"`
-    Email      string `json:"email"`
+	WorkflowID string `json:"workflow_id"`
+	ContractID uint32 `json:"contract_id"`
+	Email      string `json:"email"`
 }
 
 // @Summary List nodes
