@@ -1,5 +1,7 @@
-import { api } from './api'
+import { WorkflowStatus } from '@/types/ewf'
+import { api, createWorkflowStatusChecker } from './api'
 import type { ApiResponse } from './authService'
+import type { ChargeBalanceResponse } from './stripeService'
 
 export interface ReserveNodeRequest {
   // Add any required fields if needed
@@ -9,6 +11,13 @@ export interface ChargeBalanceRequest {
   card_type: string
   payment_method_id: string
   amount: number
+}
+
+export interface RedeemVoucherResponse {
+  amount: number,
+  email: string,
+  voucher_code: string,
+  workflow_id: string
 }
 
 export interface Node {
@@ -162,12 +171,16 @@ export class UserService {
 
   // Redeem a voucher
   async redeemVoucher(voucherCode: string): Promise<any> {
-    return api.put(`/v1/user/redeem/${voucherCode}`, {}, {
+    const res = await api.put<ApiResponse<RedeemVoucherResponse>>(`/v1/user/redeem/${voucherCode}`, {}, {
       requiresAuth: true,
       showNotifications: true,
-      successMessage: 'Voucher redeemed successfully',
       errorMessage: 'Failed to redeem voucher'
     })
+    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { interval: 6000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      throw new Error('Voucher redemption failed')
+    }
   }
 
   // Fetch the user's current balance
