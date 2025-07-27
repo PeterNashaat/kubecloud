@@ -252,7 +252,7 @@ function confirmAddForm() {
         node_id: addFormNodeId.value, // backend expects node_id
         cpu: addFormVcpu.value,
         memory: addFormRam.value, // already MB
-        root_size: 2, // MB
+        root_size: 25 * 1024, // MB
         disk_size: addFormStorage.value, // already MB
         env_vars: sshKeyObj ? { SSH_KEY: sshKeyObj.public_key } : {},
       }
