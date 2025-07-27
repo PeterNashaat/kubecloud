@@ -261,6 +261,10 @@ const clusterPayload = computed<Cluster>(() => {
   };
 });
 
+function goBack() {
+  router.push('/');
+}
+
 async function onDeployCluster() {
   deploying.value = true;
   try {
@@ -275,6 +279,7 @@ async function onDeployCluster() {
     // Optionally handle error
   } finally {
     deploying.value = false;
+    goBack();
   }
 }
 
