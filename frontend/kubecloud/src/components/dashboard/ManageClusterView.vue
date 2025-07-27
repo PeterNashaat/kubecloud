@@ -264,9 +264,8 @@ async function confirmDelete() {
   showDeleteModal.value = false
   
   if (cluster.value) {
-    console.log("cluster.value.cluster.name", cluster.value.cluster.name);
     await clusterStore.deleteCluster(cluster.value.cluster.name)
-    router.push('/dashboard/clusters')
+    goBack()
   }
   deletingCluster.value = false
 }

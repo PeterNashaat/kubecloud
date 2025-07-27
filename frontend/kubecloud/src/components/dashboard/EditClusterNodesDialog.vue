@@ -108,6 +108,32 @@
               </template>
             </v-select>
             <v-select v-model="addFormRole" :items="['master', 'worker']" label="Role" class="polished-input" />
+            <div class="ssh-key-section" style="margin-top: 1.5rem; width: 100%;">
+              <label class="ssh-key-label">SSH Key</label>
+              <div v-if="sshKeysLoading" class="mb-2"><v-progress-circular indeterminate size="24" color="primary" /></div>
+              <v-chip-group
+                v-else
+                v-model="addFormSshKey"
+                :multiple="false"
+                column
+                class="mb-2"
+              >
+                <v-chip
+                  v-for="key in sshKeys"
+                  :key="key.ID"
+                  :value="key.ID"
+                  color="primary"
+                  class="ma-1"
+                  variant="elevated"
+                >
+                  {{ key.name }}
+                </v-chip>
+              </v-chip-group>
+              <div v-if="!sshKeysLoading && sshKeys.length === 0" class="ssh-alert">
+                <v-icon color="error" class="mr-1">mdi-alert-circle</v-icon>
+                <span>No SSH keys found. Please add one in your dashboard.</span>
+              </div>
+            </div>
             <div v-if="addFormError" class="polished-error">{{ addFormError }}</div>
           </div>
         </div>
@@ -123,10 +149,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
 import type { RentedNode } from '../../composables/useNodeManagement';
 import BaseDialogCard from './BaseDialogCard.vue';
+import { userService } from '../../utils/userService';
 
 const props = defineProps<{
   modelValue: boolean,
@@ -137,7 +164,8 @@ const props = defineProps<{
   addFormError: string,
   addFormNode: RentedNode | undefined,
   canAssignToNode: boolean,
-  addNodeLoading: boolean
+  addNodeLoading: boolean,
+  availableSshKeys: any[]
 }>();
 const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated', 'remove-node']);
 const dialog = computed({
@@ -164,6 +192,24 @@ const addFormRam = ref(1);
 const addFormStorage = ref(1);
 const addFormError = ref('');
 const addFormName = ref('');
+const addFormSshKey = ref<number|null>(null);
+const sshKeys = ref<any[]>([]);
+const sshKeysLoading = ref(false);
+const sshKeysError = ref('');
+
+onMounted(async () => {
+  sshKeysLoading.value = true;
+  try {
+    sshKeys.value = await userService.listSshKeys();
+    if (sshKeys.value.length > 0) {
+      addFormSshKey.value = sshKeys.value[0].ID;
+    }
+  } catch (e: any) {
+    sshKeysError.value = e?.message || 'Failed to load SSH keys';
+  } finally {
+    sshKeysLoading.value = false;
+  }
+});
 const addFormNode = computed<RentedNode | undefined>(() => (props.availableNodes || []).find((n: RentedNode) => n.nodeId === addFormNodeId.value));
 const canAssignToNode = computed(() => {
   const node = addFormNode.value;
@@ -194,6 +240,8 @@ watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
   }
 });
 function confirmAddForm() {
+  // Find selected SSH key object
+  const sshKeyObj = (sshKeys.value || []).find((k: any) => k.ID === addFormSshKey.value);
   emit('add-node', {
     name: props.cluster.cluster.name,
     token: '', // If you have a token, use it here
@@ -206,7 +254,7 @@ function confirmAddForm() {
         memory: addFormRam.value, // already MB
         root_size: 2, // MB
         disk_size: addFormStorage.value, // already MB
-        env_vars: {}, // Add env_vars if needed, empty for now
+        env_vars: sshKeyObj ? { SSH_KEY: sshKeyObj.public_key } : {},
       }
     ]
   });
