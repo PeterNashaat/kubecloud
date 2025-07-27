@@ -348,7 +348,11 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(fmt.Sprintf("deploy-%d-nodes", len(cluster.Nodes)))
+	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID)
+	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, wfName, len(cluster.Nodes))
+
+	// Get the workflow
+	wf, err := h.ewfEngine.NewWorkflow(wfName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return

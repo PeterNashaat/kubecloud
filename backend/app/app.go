@@ -256,7 +256,6 @@ func (app *App) StartBackgroundWorkers() {
 // Run starts the server
 func (app *App) Run() error {
 	app.StartBackgroundWorkers()
-	log.Info().Msg("resumeing running workflows")
 	app.handlers.ewfEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", app.config.Server.Port),
