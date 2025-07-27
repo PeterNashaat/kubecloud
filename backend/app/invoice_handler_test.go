@@ -22,6 +22,29 @@ func TestListAllInvoicesHandler(t *testing.T) {
 	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, 0, time.Now())
 	nonAdminUser := CreateTestUser(t, app, "user@example.com", "Normal User", []byte("securepassword"), true, false, 0, time.Now())
 
+	t.Run("Test List all invoices with empty list", func(t *testing.T) {
+		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
+		req, _ := http.NewRequest("GET", "/api/v1/invoices", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+		var result map[string]interface{}
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
+		assert.NotNil(t, result["data"])
+		data, ok := result["data"].(map[string]interface{})
+		assert.True(t, ok)
+		invoicesRaw, ok := data["invoices"]
+		assert.True(t, ok)
+		invoicesBytes, err := json.Marshal(invoicesRaw)
+		assert.NoError(t, err)
+		var invoices []models.Invoice
+		err = json.Unmarshal(invoicesBytes, &invoices)
+		assert.NoError(t, err)
+		assert.Len(t, invoices, 0)
+	})
+
 	invoice1 := &models.Invoice{
 		UserID:    adminUser.ID,
 		Total:     100.0,
@@ -89,18 +112,21 @@ func TestListAllInvoicesHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusForbidden, resp.Code)
 	})
+}
 
-	t.Run("Test List all invoices with empty list", func(t *testing.T) {
-		app2, err := SetUp(t)
-		require.NoError(t, err)
-		router2 := app2.router
-		err = app2.handlers.db.RegisterUser(adminUser)
-		require.NoError(t, err)
-		token := GetAuthToken(t, app2, adminUser.ID, adminUser.Email, adminUser.Username, true)
-		req, _ := http.NewRequest("GET", "/api/v1/invoices", nil)
+func TestListUserInvoicesHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+
+	user := CreateTestUser(t, app, "user@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
+
+	t.Run("Test List user invoices with empty list", func(t *testing.T) {
+		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
+		req, _ := http.NewRequest("GET", "/api/v1/user/invoice/", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
-		router2.ServeHTTP(resp, req)
+		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusOK, resp.Code)
 		var result map[string]interface{}
 		err = json.Unmarshal(resp.Body.Bytes(), &result)
@@ -117,14 +143,6 @@ func TestListAllInvoicesHandler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, invoices, 0)
 	})
-}
-
-func TestListUserInvoicesHandler(t *testing.T) {
-	app, err := SetUp(t)
-	require.NoError(t, err)
-	router := app.router
-
-	user := CreateTestUser(t, app, "user@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
 
 	invoice1 := &models.Invoice{
 		UserID:    user.ID,
@@ -155,33 +173,6 @@ func TestListUserInvoicesHandler(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
 	})
 
-	t.Run("Test List user invoices with empty list", func(t *testing.T) {
-		app2, err := SetUp(t)
-		require.NoError(t, err)
-		router2 := app2.router
-		err = app2.handlers.db.RegisterUser(user)
-		require.NoError(t, err)
-		token := GetAuthToken(t, app2, user.ID, user.Email, user.Username, false)
-		req, _ := http.NewRequest("GET", "/api/v1/user/invoice/", nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		resp := httptest.NewRecorder()
-		router2.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
-		var result map[string]interface{}
-		err = json.Unmarshal(resp.Body.Bytes(), &result)
-		assert.NoError(t, err)
-		assert.NotNil(t, result["data"])
-		data, ok := result["data"].(map[string]interface{})
-		assert.True(t, ok)
-		invoicesRaw, ok := data["invoices"]
-		assert.True(t, ok)
-		invoicesBytes, err := json.Marshal(invoicesRaw)
-		assert.NoError(t, err)
-		var invoices []models.Invoice
-		err = json.Unmarshal(invoicesBytes, &invoices)
-		assert.NoError(t, err)
-		assert.Len(t, invoices, 0)
-	})
 }
 
 func TestDownloadInvoiceHandler(t *testing.T) {
