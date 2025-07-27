@@ -607,9 +607,10 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		"stripe_customer_id": user.StripeCustomerID,
 		"payment_method_id":  paymentMethod.ID,
 		"amount":             int(request.Amount),
+		"mnemonic":           user.Mnemonic,
 	}
 
-	h.ewfEngine.RunAsync(c, wf)
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
 	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", ChargeBalanceResponse{
 		WorkflowID: wf.UUID,

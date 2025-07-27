@@ -15,6 +15,7 @@ func RegisterEWFWorkflows(
 	db models.DB,
 	mail internal.MailService,
 	substrate *substrate.Substrate,
+	sse *internal.SSEManager,
 ) {
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
 	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config))
@@ -88,5 +89,5 @@ func RegisterEWFWorkflows(
 		},
 	})
 
-	registerDeploymentActivities(engine)
+	registerDeploymentActivities(engine, db, sse)
 }
