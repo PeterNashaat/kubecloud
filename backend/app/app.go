@@ -149,6 +149,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		app.db,
 		app.handlers.mailService,
 		app.handlers.substrateClient,
+		app.sseManager,
 	)
 
 	app.registerHandlers()
