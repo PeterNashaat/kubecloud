@@ -94,7 +94,6 @@ const handleVerify = async () => {
     router.push('/sign-in')
   } catch (error) {
     loading.value = false
-    notificationStore.error("Error", 'Verification failed')
   }
 }
 
@@ -112,7 +111,7 @@ const resendCode = async () => {
       confirm_password: 'temporary'
     })
   } catch (error) {
-    notificationStore.error("Error", 'Resend failed please try again')
+    console.error(error)
   } finally {
     resending.value = false
   }

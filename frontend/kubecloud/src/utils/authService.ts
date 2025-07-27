@@ -1,5 +1,6 @@
 import { WorkflowStatus } from '@/types/ewf'
 import { api, createWorkflowStatusChecker } from './api'
+import { useNotificationStore } from '@/stores/notifications'
 
 // Types for auth requests and responses
 export interface RegisterRequest {
@@ -110,7 +111,12 @@ export class AuthService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
-      throw new Error('Registration failed')
+      useNotificationStore().addNotification({
+        title: 'Registration Failed',
+        message: 'Failed to register user',
+        type: 'error',
+        duration: 5000
+      })
     }
     
   }
@@ -124,7 +130,12 @@ export class AuthService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
-      throw new Error('Verification failed')
+      useNotificationStore().addNotification({
+        title: 'Verification Failed',
+        message: 'Failed to verify user',
+        type: 'error',
+        duration: 5000
+      })
     }
   }
 

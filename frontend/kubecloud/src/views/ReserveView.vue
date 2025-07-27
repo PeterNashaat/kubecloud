@@ -208,7 +208,6 @@ const reserveNode = async (nodeId: number) => {
     }, 4000)
   } catch (err) {
     reservedNodeIds.value.delete(nodeId)
-    notificationStore.error('Error', 'Failed to reserve node. Please try again.')
   } finally {
     reservingNodeId.value = null
   }

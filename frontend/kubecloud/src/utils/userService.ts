@@ -2,6 +2,7 @@ import { WorkflowStatus } from '@/types/ewf'
 import { api, createWorkflowStatusChecker } from './api'
 import type { ApiResponse } from './authService'
 import type { ChargeBalanceResponse } from './stripeService'
+import { useNotificationStore } from '@/stores/notifications'
 
 export interface ReserveNodeRequest {
   // Add any required fields if needed
@@ -135,7 +136,12 @@ export class UserService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
-      throw new Error('Node reservation failed')
+      useNotificationStore().addNotification({
+        title: 'Node Reservation Failed',
+        message: 'Failed to reserve node',
+        type: 'error',
+        duration: 5000
+      })
     }
     return response.data.data
   }
@@ -151,7 +157,12 @@ export class UserService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
-      throw new Error('Node unreservation failed')
+      useNotificationStore().addNotification({
+        title: 'Node Unreservation Failed',
+        message: 'Failed to unreserve node',
+        type: 'error',
+        duration: 5000
+      })
     }
     return response.data.data
   }
@@ -162,7 +173,12 @@ export class UserService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
-      throw new Error('Charge failed')
+      useNotificationStore().addNotification({
+        title: 'Charge Failed',
+        message: 'Failed to charge balance',
+        type: 'error',
+        duration: 5000
+      })
     }
   }
 
@@ -198,10 +214,25 @@ export class UserService {
       showNotifications: true,
       errorMessage: 'Failed to redeem voucher'
     })
+    if (res.status !== 201) {
+      const msg = res.data.error || 'Failed to redeem voucher'
+      useNotificationStore().addNotification({
+        title: 'Voucher Redemption Failed',
+        message: msg,
+        type: 'error',
+        duration: 5000
+      })
+      return
+    }
     const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
-      throw new Error('Voucher redemption failed')
+      useNotificationStore().addNotification({
+        title: 'Voucher Redemption Failed',
+        message: 'Failed to redeem voucher',
+        type: 'error',
+        duration: 5000
+      })
     }
   }
 
