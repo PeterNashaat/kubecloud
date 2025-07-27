@@ -180,6 +180,14 @@ export class UserService {
         duration: 5000
       })
     }
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().addNotification({
+        title: 'Charge Success',
+        message: 'Charge balance successful',
+        type: 'success',
+        duration: 5000
+      })
+    }
   }
 
   // Create a PaymentIntent (to be implemented)
