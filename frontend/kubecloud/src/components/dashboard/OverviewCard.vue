@@ -148,6 +148,13 @@ const quickActions = [
     color: 'secondary',
     variant: 'outlined' as const,
     handler: () => emit('navigate', 'payment')
+  },
+  {
+    label: 'Pending Requests',
+    icon: 'mdi-clock-outline',
+    color: 'primary',
+    variant: 'outlined' as const,
+    handler: () => router.push('/pending-requests')
   }
 ]
 

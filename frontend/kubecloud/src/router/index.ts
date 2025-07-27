@@ -79,6 +79,11 @@ const router = createRouter({
       component: () => import('../views/ForgotPasswordView.vue'),
       meta: { requiresGuest: true }
     },
+    {
+      path: '/pending-requests',
+      name: 'pending-requests',
+      component: () => import('../views/PendingRequestsView.vue')
+    },
   ],
   scrollBehavior(to, from, savedPosition) {
     // Always scroll to top on route change
