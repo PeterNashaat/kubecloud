@@ -22,6 +22,20 @@ type ListNodesResponse struct {
 	Nodes []proxyTypes.Node `json:"nodes"`
 }
 
+// ReserveNodeResponse holds the response for reserve node response
+type ReserveNodeResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	NodeID     uint32 `json:"node_id"`
+	Email      string `json:"email"`
+}
+
+// UnreserveNodeResponse holds the response for unreserve node response
+type UnreserveNodeResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	ContractID uint32 `json:"contract_id"`
+	Email      string `json:"email"`
+}
+
 // @Summary List nodes
 // @Description Retrieves a list of nodes from the grid proxy based on the provided filters.
 // @Tags nodes
@@ -79,8 +93,9 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param node_id path string true "Node ID"
-// @Success 200 {object} APIResponse
+// @Success 202 {object} ReserveNodeResponse
 // @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 404 {object} APIResponse "No nodes are available for rent."
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/{node_id} [post]
@@ -154,10 +169,10 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	Success(c, http.StatusAccepted, "Node reservation in progress. You can check its status using the workflow id.", gin.H{
-		"workflow_id": wf.UUID,
-		"node_id":     nodeID,
-		"email":       user.Email,
+	Success(c, http.StatusAccepted, "Node reservation in progress. You can check its status using the workflow id.", ReserveNodeResponse{
+		WorkflowID: wf.UUID,
+		NodeID:     nodeID,
+		Email:      user.Email,
 	})
 
 }
@@ -226,8 +241,9 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param contract_id path string true "Contract ID"
-// @Success 200 {object} APIResponse
+// @Success 202 {object} UnreserveNodeResponse
 // @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 404 {object} APIResponse "User is not found"
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/unreserve/{contract_id} [delete]
@@ -271,10 +287,10 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	Success(c, http.StatusAccepted, "Node unreservation in progress. You can check its status using the workflow id.", gin.H{
-		"workflow_id": wf.UUID,
-		"contract_id": contractID,
-		"email":       user.Email,
+	Success(c, http.StatusAccepted, "Node unreservation in progress. You can check its status using the workflow id.", UnreserveNodeResponse{
+		WorkflowID: wf.UUID,
+		ContractID: contractID,
+		Email:      user.Email,
 	})
 }
 

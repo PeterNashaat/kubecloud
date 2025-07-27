@@ -40,9 +40,9 @@ definitions:
     type: object
   app.ChargeBalanceResponse:
     properties:
-      new_balance:
-        type: number
-      payment_intent_id:
+      email:
+        type: string
+      workflow_id:
         type: string
     type: object
   app.CreditRequestInput:
@@ -98,6 +98,17 @@ definitions:
     - email
     - password
     type: object
+  app.RedeemVoucherResponse:
+    properties:
+      amount:
+        type: number
+      email:
+        type: string
+      voucher_code:
+        type: string
+      workflow_id:
+        type: string
+    type: object
   app.RefreshTokenInput:
     properties:
       refresh_token:
@@ -137,6 +148,22 @@ definitions:
       timeout:
         type: string
     type: object
+  app.RegisterUserResponse:
+    properties:
+      email:
+        type: string
+      workflow_id:
+        type: string
+    type: object
+  app.ReserveNodeResponse:
+    properties:
+      email:
+        type: string
+      node_id:
+        type: integer
+      workflow_id:
+        type: string
+    type: object
   app.SSHKeyInput:
     properties:
       name:
@@ -146,6 +173,15 @@ definitions:
     required:
     - name
     - public_key
+    type: object
+  app.UnreserveNodeResponse:
+    properties:
+      contract_id:
+        type: integer
+      email:
+        type: string
+      workflow_id:
+        type: string
     type: object
   app.UserBalanceResponse:
     properties:
@@ -415,8 +451,8 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Balance is charged successfully
+        "202":
+          description: 'workflow_id: string, email: string'
           schema:
             $ref: '#/definitions/app.ChargeBalanceResponse'
         "400":
@@ -428,7 +464,7 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Charge user balance
@@ -665,12 +701,16 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/app.APIResponse'
+            $ref: '#/definitions/app.ReserveNodeResponse'
         "400":
           description: Invalid request
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: No nodes are available for rent.
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
@@ -697,12 +737,16 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/app.APIResponse'
+            $ref: '#/definitions/app.UnreserveNodeResponse'
         "400":
           description: Invalid request
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: User is not found
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
@@ -728,11 +772,12 @@ paths:
       - application/json
       responses:
         "202":
-          description: Voucher redeemed successfully
+          description: 'workflow_id: string, voucher_code: string, amount: float64,
+            email: string'
           schema:
-            $ref: '#/definitions/app.APIResponse'
+            $ref: '#/definitions/app.RedeemVoucherResponse'
         "400":
-          description: Invalid voucher code or already redeemed
+          description: Invalid voucher code, already redeemed, or expired
           schema:
             $ref: '#/definitions/app.APIResponse'
         "404":
@@ -740,7 +785,7 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Redeem voucher
@@ -798,9 +843,9 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: 'workflow_id: string, email: string'
           schema:
-            $ref: '#/definitions/app.RegisterResponse'
+            $ref: '#/definitions/app.RegisterUserResponse'
         "400":
           description: Invalid request format
           schema:
@@ -810,7 +855,7 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Register a user
@@ -832,10 +877,10 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "202":
+          description: 'workflow_id: string, email: string'
           schema:
-            $ref: '#/definitions/internal.TokenPair'
+            $ref: '#/definitions/app.RegisterUserResponse'
         "400":
           description: Invalid request format or verification failed
           schema:
