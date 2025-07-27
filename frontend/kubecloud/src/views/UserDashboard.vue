@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../stores/user'
 import ClustersCard from '../components/dashboard/ClustersCard.vue'
 import BillingCard from '../components/dashboard/BillingCard.vue'
@@ -12,6 +12,7 @@ import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
 import { useClusterStore } from '../stores/clusters'
+import { useNotificationStore } from '../stores/notifications'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
@@ -20,6 +21,8 @@ const userName = computed(() => userStore.user?.username || 'User')
 const selected = ref('overview')
 
 const clusterStore = useClusterStore()
+const notificationStore = useNotificationStore()
+
 const clusters = computed(() => clusterStore.clusters)
 const clustersArray = computed(() =>
   Array.isArray(clusters.value)
@@ -33,21 +36,58 @@ const clustersArray = computed(() =>
     : []
 )
 
-onMounted(async () => {
-  const savedSection = localStorage.getItem('dashboard-section')
-  if (savedSection) {
-    selected.value = savedSection
+// Constants
+const POLL_INTERVAL_MS = 15000 // 15 seconds
+const STORAGE_KEY_DASHBOARD_SECTION = 'dashboard-section'
+
+// Polling state
+let pollInterval: ReturnType<typeof setInterval> | null = null
+
+// Polling function with error handling
+const pollClusters = async (): Promise<void> => {
+  try {
+    await clusterStore.fetchClusters()
+  } catch (error) {
+    console.error('Error polling clusters:', error)
   }
-  // Fetch real invoices for billing history
-  const invoices = await userService.listUserInvoices()
-  billingHistory.value = invoices.map(inv => ({
-    id: inv.id,
-    date: inv.created_at,
-    description: `Invoice #${inv.id}`,
-    amount: inv.total
-  }))
-  // Fetch user net balance
-  await userStore.updateNetBalance()
+}
+
+onMounted(async () => {
+  try {
+    // Restore selected section from localStorage
+    const savedSection = localStorage.getItem(STORAGE_KEY_DASHBOARD_SECTION)
+    if (savedSection) {
+      selected.value = savedSection
+    }
+    
+    // Fetch initial data
+    const [invoices] = await Promise.all([
+      userService.listUserInvoices(),
+      userStore.updateNetBalance(),
+      clusterStore.fetchClusters()
+    ])
+    
+    // Process invoices
+    billingHistory.value = invoices.map(inv => ({
+      id: inv.id,
+      date: inv.created_at,
+      description: `Invoice #${inv.id}`,
+      amount: inv.total
+    }))
+    
+    // Start polling
+    pollInterval = setInterval(pollClusters, POLL_INTERVAL_MS)
+  } catch (error) {
+    notificationStore.error('Dashboard Error', 'Failed to load dashboard data')
+  }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
 })
 
 interface Bill {
@@ -77,7 +117,7 @@ const totalSpent = computed(() => {
 function handleSidebarSelect(val: string) {
   selected.value = val
   // Save to localStorage for persistence
-  localStorage.setItem('dashboard-section', val)
+  localStorage.setItem(STORAGE_KEY_DASHBOARD_SECTION, val)
 }
 
 function handleNavigate(section: string) {

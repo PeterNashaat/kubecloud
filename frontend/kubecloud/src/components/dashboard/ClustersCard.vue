@@ -84,9 +84,11 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
+import { useNotificationStore } from '../../stores/notifications'
 
 const router = useRouter()
 const clusterStore = useClusterStore()
+const notificationStore = useNotificationStore()
 
 const showDeleteModal = ref(false)
 const deleting = ref(false)
@@ -157,7 +159,7 @@ async function confirmDelete() {
   if (!clusterToDelete.value) return
   deleting.value = true
   await clusterStore.deleteCluster(clusterToDelete.value)
-  await clusterStore.fetchClusters()
+  notificationStore.info('Cluster Removal Started', `Cluster is being removed from the cluster in the background. You will be notified when the operation completes.`);
   showDeleteModal.value = false
   deleting.value = false
   clusterToDelete.value = null

@@ -14,15 +14,9 @@ export function useDeploymentEvents() {
     const userStore = useUserStore()
     const token = userStore.token || ''
     const url = backendBaseUrl + '/api/v1/events?token=' + encodeURIComponent(token)
-    console.log('Connecting to EventSource at', url)
     eventSource.value = new EventSource(url, { withCredentials: true })
 
-    eventSource.value.onopen = () => {
-      console.log('EventSource connection opened')
-    }
-
     eventSource.value.onmessage = (event) => {
-      console.log('EventSource message received:', event.data)
       try {
         const data = JSON.parse(event.data)
         const type = data.type || 'info'

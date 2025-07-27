@@ -28,8 +28,8 @@
                 <td>{{ node.original_name }}</td>
                 <td>{{ node.type }}</td>
                 <td>{{ node.cpu ?? node.vcpu }}</td>
-                <td>{{ node.memory ?? node.ram }} MB</td>
-                <td>{{ node.storage }} MB</td>
+                <td>{{ Math.round((node.memory ?? node.ram) / 1024) }} GB</td>
+                <td>{{ node.storage }} GB</td>
                 <td>{{ node.ip || '-' }}</td>
                 <td>{{ node.contract_id || '-' }}</td>
                 <td>
@@ -44,8 +44,8 @@
           <div class="add-form-wrapper">
             <v-text-field v-model="addFormName" label="Name" class="polished-input" />
             <v-text-field v-model.number="addFormVcpu" label="vCPU" type="number" min="1" class="polished-input" />
-            <v-text-field v-model.number="addFormRam" label="RAM (MB)" type="number" min="1" class="polished-input" />
-            <v-text-field v-model.number="addFormStorage" label="Storage (MB)" type="number" min="1" class="polished-input" />
+            <v-text-field v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" class="polished-input" />
+            <v-text-field v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" class="polished-input" />
             <v-select
               v-model="addFormNodeId"
               :items="availableNodesWithName"
@@ -64,11 +64,11 @@
                     </v-chip>
                     <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getNodeAvailableRAM(item.raw) }} MB RAM
+                      {{ getNodeAvailableRAM(item.raw) }} GB RAM
                     </v-chip>
                     <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getNodeAvailableStorage(item.raw) }} MB Disk
+                      {{ getNodeAvailableStorage(item.raw) }} GB Disk
                     </v-chip>
                     <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
@@ -90,11 +90,11 @@
                     </v-chip>
                     <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getNodeAvailableRAM(item.raw) }} MB RAM
+                      {{ getNodeAvailableRAM(item.raw) }} GB RAM
                     </v-chip>
                     <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getNodeAvailableStorage(item.raw) }} MB Disk
+                      {{ getNodeAvailableStorage(item.raw) }} GB Disk
                     </v-chip>
                     <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
@@ -150,11 +150,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
+import { getAvailableRAM, getAvailableStorage, getTotalCPU } from '../../utils/nodeNormalizer';
 import type { RentedNode } from '../../composables/useNodeManagement';
 import BaseDialogCard from './BaseDialogCard.vue';
 import { userService } from '../../utils/userService';
+import { useNotificationStore } from '../../stores/notifications';
 
+const notificationStore = useNotificationStore();
 const props = defineProps<{
   modelValue: boolean,
   cluster: any,
@@ -178,7 +180,7 @@ watch(() => props.nodes, (val) => { editNodes.value = val || []; });
 const editNodesWithStorage = computed(() =>
   (editNodes.value || []).map(node => ({
     ...node,
-    storage: (node.root_size || 0) + (node.disk_size || 0) + (node.storage || 0)
+    storage: Math.round(((node.root_size || 0) + (node.disk_size || 0) + (node.storage || 0)) / 1024)
   }))
 );
 function removeNode(nodeName: string) {
@@ -187,9 +189,9 @@ function removeNode(nodeName: string) {
 // Add node form state
 const addFormNodeId = ref<number|null>(null);
 const addFormRole = ref('master');
-const addFormVcpu = ref(1);
-const addFormRam = ref(1);
-const addFormStorage = ref(1);
+const addFormVcpu = ref(2);
+const addFormRam = ref(4);
+const addFormStorage = ref(25);
 const addFormError = ref('');
 const addFormName = ref('');
 const addFormSshKey = ref<number|null>(null);
@@ -218,19 +220,17 @@ const canAssignToNode = computed(() => {
     addFormVcpu.value > 0 &&
     addFormRam.value > 0 &&
     addFormStorage.value > 0 &&
-    addFormVcpu.value <= getNodeAvailableCPU(node) &&
     addFormRam.value <= getNodeAvailableRAM(node) &&
     addFormStorage.value <= getNodeAvailableStorage(node)
   );
 });
-watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
+watch([addFormNodeId, addFormRam, addFormStorage], () => {
   const node = addFormNode.value;
   if (!node) {
     addFormError.value = '';
     return;
   }
   if (
-    addFormVcpu.value > getNodeAvailableCPU(node) ||
     addFormRam.value > getNodeAvailableRAM(node) ||
     addFormStorage.value > getNodeAvailableStorage(node)
   ) {
@@ -251,19 +251,20 @@ function confirmAddForm() {
         type: addFormRole.value, // 'master' | 'worker'
         node_id: addFormNodeId.value, // backend expects node_id
         cpu: addFormVcpu.value,
-        memory: addFormRam.value, // already MB
+        memory: addFormRam.value * 1024, // Convert GB to MB
         root_size: 25 * 1024, // MB
-        disk_size: addFormStorage.value, // already MB
+        disk_size: addFormStorage.value * 1024, // Convert GB to MB
         env_vars: sshKeyObj ? { SSH_KEY: sshKeyObj.public_key } : {},
       }
     ]
   });
+  notificationStore.info('Deployment is being updated', 'Your node is being added in the background. You will be notified when it is ready.');
   editTab.value = 'list';
 }
 // Helper to get resources already assigned to a node in this cluster
 function getClusterUsedResources(nodeId: number) {
   // All values in MB
-  return (editNodes.value || []).filter((n: any) => n.node_id === nodeId).reduce((acc: { cpu: number, memory: number, storage: number }, n: any) => {
+  return (editNodes.value || []).filter((n: any) => (n.node_id === nodeId) || (n.nodeId === nodeId)).reduce((acc: { cpu: number, memory: number, storage: number }, n: any) => {
     acc.cpu += n.cpu || 0;
     acc.memory += n.memory || 0; // already MB
     acc.storage += (n.root_size || 0) + (n.disk_size || 0); // already MB
@@ -271,15 +272,14 @@ function getClusterUsedResources(nodeId: number) {
   }, { cpu: 0, memory: 0, storage: 0 });
 }
 function getNodeAvailableCPU(node: RentedNode) {
-  return Math.max(getAvailableCPU(node) - getClusterUsedResources(node.nodeId).cpu, 0);
+  return getTotalCPU(node);
 }
 function getNodeAvailableRAM(node: RentedNode) {
-  // getAvailableRAM returns GB, convert to MB
-  return Math.max((getAvailableRAM(node) * 1024) - getClusterUsedResources(node.nodeId).memory, 0);
+  return Math.max(getAvailableRAM(node) - (getClusterUsedResources(node.nodeId).memory / 1024), 0);
 }
 function getNodeAvailableStorage(node: RentedNode) {
-  // getAvailableStorage returns GB, convert to MB
-  return Math.max((getAvailableStorage(node) * 1024) - getClusterUsedResources(node.nodeId).storage, 0);
+  // getAvailableStorage returns GB, no conversion needed
+  return Math.max(getAvailableStorage(node) - (getClusterUsedResources(node.nodeId).storage / 1024), 0);
 }
 // Ensure every node has a 'name' property for v-select display
 const availableNodesWithName = computed(() =>
