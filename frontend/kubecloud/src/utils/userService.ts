@@ -7,6 +7,16 @@ export interface ReserveNodeRequest {
   // Add any required fields if needed
 }
 
+export interface ReserveNodeResponse {
+  workflow_id: string
+  node_id: number
+  email: string
+}
+export interface UnreserveNodeResponse {
+  workflow_id: string
+  contract_id: number,
+  email: string,
+}
 export interface ChargeBalanceRequest {
   card_type: string
   payment_method_id: string
@@ -121,7 +131,13 @@ export class UserService {
 
   // Reserve a node
   async reserveNode(nodeId: number, data: ReserveNodeRequest = {}) {
-    return api.post(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })
+    const response = await api.post<ApiResponse<ReserveNodeResponse>>(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      throw new Error('Node reservation failed')
+    }
+    return response.data.data
   }
 
   // List reserved nodes
@@ -131,7 +147,13 @@ export class UserService {
 
   // Unreserve a node
   async unreserveNode(contractId: string) {
-    return api.delete(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
+    const response = await api.delete<ApiResponse<UnreserveNodeResponse>>(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      throw new Error('Node unreservation failed')
+    }
+    return response.data.data
   }
 
   // Charge balance
@@ -170,7 +192,7 @@ export class UserService {
   }
 
   // Redeem a voucher
-  async redeemVoucher(voucherCode: string): Promise<any> {
+  async redeemVoucher(voucherCode: string) {
     const res = await api.put<ApiResponse<RedeemVoucherResponse>>(`/v1/user/redeem/${voucherCode}`, {}, {
       requiresAuth: true,
       showNotifications: true,
