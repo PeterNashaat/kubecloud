@@ -146,7 +146,7 @@ export class UserService {
   // List all invoices for the current user
   async listUserInvoices(): Promise<UserInvoice[]> {
     const response = await api.get<{ data: { invoices: UserInvoice[] } }>(
-      '/v1/user/invoice/',
+      '/v1/user/invoice',
       { requiresAuth: true, showNotifications: true, errorMessage: 'Failed to load invoices' }
     )
     return response.data.data.invoices
