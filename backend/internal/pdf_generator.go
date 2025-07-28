@@ -21,24 +21,27 @@ const (
 	startY float64 = 30
 )
 
-func getAssetPath(subdir, filename string) string {
-	cwd, _ := os.Getwd()
+func getAssetPath(subdir, filename string) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get working directory: %w", err)
+	}
 	// Try relative to current working directory
 	path := filepath.Join(cwd, subdir, filename)
 	if _, err := os.Stat(path); err == nil {
-		return path
+		return path, nil
 	}
 	// Try one directory up (for Docker test context)
 	path = filepath.Join(cwd, "..", subdir, filename)
 	if _, err := os.Stat(path); err == nil {
-		return path
+		return path, nil
 	}
 	// Try absolute Docker path
 	path = filepath.Join("/app", subdir, filename)
 	if _, err := os.Stat(path); err == nil {
-		return path
+		return path, nil
 	}
-	return filename // fallback
+	return "", fmt.Errorf("file %q not found in any known path", filename)
 }
 
 type InvoicePDF struct {
@@ -79,17 +82,29 @@ func CreateInvoicePDF(
 }
 
 func (in *InvoicePDF) setFonts() error {
-	fontPath := getAssetPath("internal/fonts", "Arial.ttf")
+	fontPath, err := getAssetPath("internal/fonts", "Arial.ttf")
+	if err != nil {
+		return fmt.Errorf("failed to get Arial font path: %w", err)
+	}
+
 	if err := in.pdf.AddTTFFont("Arial", fontPath); err != nil {
 		return err
 	}
 
-	boldFontPath := getAssetPath("internal/fonts", "Arial-Bold.ttf")
+	boldFontPath, err := getAssetPath("internal/fonts", "Arial-Bold.ttf")
+	if err != nil {
+		return fmt.Errorf("failed to get Arial-Bold font path: %w", err)
+	}
+
 	if err := in.pdf.AddTTFFont("Arial-Bold", boldFontPath); err != nil {
 		return err
 	}
 
-	italicFontPath := getAssetPath("internal/fonts", "Arial-Italic.ttf")
+	italicFontPath, err := getAssetPath("internal/fonts", "Arial-Italic.ttf")
+	if err != nil {
+		return fmt.Errorf("failed to get Arial-Italic font path: %w", err)
+	}
+
 	return in.pdf.AddTTFFont("Arial-Italic", italicFontPath)
 }
 
@@ -160,7 +175,10 @@ func (in *InvoicePDF) draw(companyData InvoiceCompanyData) error {
 }
 
 func (in *InvoicePDF) setLogo() error {
-	logoPath := getAssetPath("internal", "logo_tft.png")
+	logoPath, err := getAssetPath("internal", "logo_tft.png")
+	if err != nil {
+		return fmt.Errorf("failed to get logo path: %w", err)
+	}
 	return in.pdf.Image(logoPath, in.startX, in.startY, nil)
 }
 

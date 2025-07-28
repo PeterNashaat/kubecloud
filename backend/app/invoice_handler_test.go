@@ -212,7 +212,8 @@ func TestDownloadInvoiceHandler(t *testing.T) {
 
 	t.Run("Download non-existing invoice", func(t *testing.T) {
 		token := GetAuthToken(t, app, user1.ID, user1.Email, user1.Username, false)
-		req, _ := http.NewRequest("GET", "/api/v1/user/invoice/99999", nil)
+		maxID := invoice.ID + 1
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/user/invoice/%d", maxID), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
