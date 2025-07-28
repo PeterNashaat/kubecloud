@@ -404,7 +404,7 @@ async function handleRemoveNode(nodeName: string) {
   if (!cluster.value?.cluster?.name) return;
   try {
     await removeNodeFromDeployment(cluster.value.cluster.name, nodeName);
-    notificationStore.info('Node Removal Started', `Node "${nodeName}" is being removed from the cluster in the background. You will be notified when the operation completes.`);
+    notificationStore.info('Node Removal Started', `Node is being removed from the cluster in the background. You will be notified when the operation completes.`);
 
     // Refresh clusters data to update the table
     await clusterStore.fetchClusters();

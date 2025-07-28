@@ -3,7 +3,7 @@
     <div class="footer-content">
       <div class="footer-brand">
         <router-link to="/" class="footer-logo" aria-label="KubeCloud logo">
-          <span class="footer-title">KubeCloud</span>
+          <img :src="logo" alt="KubeCloud Logo" class="logo" width="110">
         </router-link>
       </div>
       <nav class="footer-links">
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-// No logic needed
+  import logo from '../../public/logo.png'
 </script>
 
 <style scoped>
