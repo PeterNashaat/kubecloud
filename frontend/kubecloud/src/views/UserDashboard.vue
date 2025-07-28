@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
 import ClustersCard from '../components/dashboard/ClustersCard.vue'
 import BillingCard from '../components/dashboard/BillingCard.vue'
@@ -37,20 +37,9 @@ const clustersArray = computed(() =>
 )
 
 // Constants
-const POLL_INTERVAL_MS = 15000 // 15 seconds
 const STORAGE_KEY_DASHBOARD_SECTION = 'dashboard-section'
 
-// Polling state
-let pollInterval: ReturnType<typeof setInterval> | null = null
-
-// Polling function with error handling
-const pollClusters = async (): Promise<void> => {
-  try {
-    await clusterStore.fetchClusters()
-  } catch (error) {
-    console.error('Error polling clusters:', error)
-  }
-}
+// Note: Cluster events are handled globally by the useDeploymentEvents composable
 
 onMounted(async () => {
   try {
@@ -59,14 +48,14 @@ onMounted(async () => {
     if (savedSection) {
       selected.value = savedSection
     }
-    
+
     // Fetch initial data
     const [invoices] = await Promise.all([
       userService.listUserInvoices(),
       userStore.updateNetBalance(),
       clusterStore.fetchClusters()
     ])
-    
+
     // Process invoices
     billingHistory.value = invoices.map(inv => ({
       id: inv.id,
@@ -74,19 +63,8 @@ onMounted(async () => {
       description: `Invoice #${inv.id}`,
       amount: inv.total
     }))
-    
-    // Start polling
-    pollInterval = setInterval(pollClusters, POLL_INTERVAL_MS)
   } catch (error) {
     notificationStore.error('Dashboard Error', 'Failed to load dashboard data')
-  }
-})
-
-// Cleanup on unmount
-onUnmounted(() => {
-  if (pollInterval) {
-    clearInterval(pollInterval)
-    pollInterval = null
   }
 })
 

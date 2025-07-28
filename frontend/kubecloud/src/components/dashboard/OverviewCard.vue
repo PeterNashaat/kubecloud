@@ -28,24 +28,6 @@
         </v-btn>
       </div>
     </div>
-
-    <!-- System Status -->
-    <div class="system-status-section">
-      <h3 class="section-title">System Status</h3>
-      <div class="status-grid">
-        <div
-          v-for="(status, index) in systemStatus"
-          :key="index"
-          class="list-item-interactive"
-        >
-          <div class="status-dot running"></div>
-          <div class="status-content">
-            <div class="status-label">{{ status.label }}</div>
-            <div class="status-value">{{ status.value }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -150,27 +132,6 @@ const quickActions = [
     handler: () => emit('navigate', 'payment')
   }
 ]
-
-// System status data
-const systemStatus = [
-  {
-    label: 'Platform',
-    value: 'Operational'
-  },
-  {
-    label: 'API',
-    value: 'Healthy'
-  },
-  {
-    label: 'Networking',
-    value: 'Stable'
-  },
-  {
-    label: 'Storage',
-    value: 'Available'
-  }
-]
-
 const emit = defineEmits(['navigate'])
 </script>
 
@@ -221,31 +182,6 @@ const emit = defineEmits(['navigate'])
   gap: var(--space-4);
 }
 
-.system-status-section {
-  margin-bottom: var(--space-4);
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-4);
-}
-
-.status-content {
-  flex: 1;
-}
-
-.status-label {
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text);
-  margin: 0 0 var(--space-1) 0;
-}
-
-.status-value {
-  font-size: var(--font-size-sm);
-  color: var(--color-primary);
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
   .dashboard-card-header {
@@ -256,20 +192,11 @@ const emit = defineEmits(['navigate'])
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--space-3);
   }
-
-  .status-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: var(--space-3);
-  }
 }
 
 @media (max-width: 480px) {
   .actions-grid {
     grid-template-columns: 1fr;
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

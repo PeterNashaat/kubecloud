@@ -35,8 +35,8 @@
               <div class="cluster-info-grid">
                 <div class="info-label">Project Name</div>
                 <div>{{ cluster.cluster.name || '-' }}</div>
-                <div class="info-label">vCPU</div>
-                <div>{{ totalVcpu }}</div>
+                <div class="info-label">CPU</div>
+                <div>{{ totalCPU }}</div>
                 <div class="info-label">Created</div>
                 <div>{{ formatDate(cluster.created_at) }}</div>
                 <div class="info-label">Storage</div>
@@ -144,7 +144,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
@@ -156,20 +156,9 @@ import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../uti
 import { formatDate } from '../../utils/dateUtils'
 
 // Import dialogs
-import EditClusterNodesDialog from './EditClusterNodesDialog.vue'
-import KubeconfigDialog from './KubeconfigDialog.vue'
-import DeleteClusterDialog from './DeleteClusterDialog.vue'
-
-function getClusterUsedResources(nodeId: number) {
-  // Sums up vcpu, ram, storage for all editNodes with this nodeId
-  // editNodes may contain extended node objects with vcpu/ram/storage or cpu/memory/storage
-  return (editNodes.value || []).filter((n: any) => (n.nodeId === nodeId) || (n.node_id === nodeId)).reduce((acc: { vcpu: number, ram: number, storage: number }, n: any) => {
-    acc.vcpu += ('vcpu' in n ? (n as any).vcpu : (n as any).cpu) || 0;
-    acc.ram += ('ram' in n ? (n as any).ram : (n as any).memory) || 0;
-    acc.storage += (n as any).storage || 0;
-    return acc;
-  }, { vcpu: 0, ram: 0, storage: 0 });
-}
+const EditClusterNodesDialog = defineAsyncComponent(() => import('./EditClusterNodesDialog.vue'))
+const KubeconfigDialog = defineAsyncComponent(() => import('./KubeconfigDialog.vue'))
+const DeleteClusterDialog = defineAsyncComponent(() => import('./DeleteClusterDialog.vue'))
 
 const router = useRouter()
 const route = useRoute()
@@ -190,7 +179,7 @@ const filteredNodes = computed(() => {
   return []
 })
 
-const totalVcpu = computed(() => {
+const totalCPU = computed(() => {
   return filteredNodes.value.length
     ? filteredNodes.value.reduce((sum, node) => sum + (typeof node.cpu === 'number' ? node.cpu : 0), 0)
     : '-'
@@ -260,7 +249,7 @@ const deletingCluster = ref(false)
 async function confirmDelete() {
   deletingCluster.value = true
   showDeleteModal.value = false
-  
+
   if (cluster.value) {
     try {
       await clusterStore.deleteCluster(cluster.value.cluster.name)
@@ -298,47 +287,16 @@ const loadCluster = async () => {
 onMounted(loadCluster)
 watch(() => projectName.value, loadCluster)
 
-// Constants
-const POLL_INTERVAL_MS = 10000 // 10 seconds
-
-// Polling state
-let pollInterval: ReturnType<typeof setInterval> | null = null
-
-// Polling function with error handling
-const pollClusterData = async (): Promise<void> => {
-  if (!cluster.value) return
-  
-  try {
-    await Promise.all([
-      clusterStore.fetchClusters(),
-      fetchRentedNodes()
-    ])
-    
-    // Update editNodes if dialog is open
-    if (editClusterNodesDialog.value) {
-      const updatedCluster = clusterStore.clusters.find(c => c.project_name === cluster.value?.project_name)
-      if (updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes)) {
-        editNodes.value = updatedCluster.cluster.nodes.map((n: any) => ({ ...n }))
-      }
+// Watch for cluster updates and refresh data when needed
+watch(() => clusterStore.clusters, (newClusters) => {
+  // Update editNodes if dialog is open
+  if (editClusterNodesDialog.value && cluster.value) {
+    const updatedCluster = newClusters.find(c => c.project_name === cluster.value?.project_name)
+    if (updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes)) {
+      editNodes.value = updatedCluster.cluster.nodes.map((n: any) => ({ ...n }))
     }
-  } catch (error) {
-    console.error('Error polling cluster data:', error)
-    // Don't show notification to avoid spam, just log the error
   }
-}
-
-// Start polling
-onMounted(() => {
-  pollInterval = setInterval(pollClusterData, POLL_INTERVAL_MS)
-})
-
-// Cleanup on unmount
-onUnmounted(() => {
-  if (pollInterval) {
-    clearInterval(pollInterval)
-    pollInterval = null
-  }
-})
+}, { deep: true })
 
 const goBack = () => {
   router.push('/dashboard')
@@ -360,10 +318,8 @@ async function openEditClusterNodesDialog() {
 const addNodeLoading = ref(false)
 const availableNodes = computed<RentedNode[]>(() => {
   return rentedNodes.value.filter((node: RentedNode) => {
-    const clusterUsed = getClusterUsedResources(node.nodeId);
-    // For CPU, we allow over-provisioning, so we don't filter based on CPU availability
-    const availRAM = getAvailableRAM(node) - clusterUsed.ram;
-    const availStorage = getAvailableStorage(node) - clusterUsed.storage;
+    const availRAM = getAvailableRAM(node);
+    const availStorage = getAvailableStorage(node);
     return availRAM > 0 && availStorage > 0;
   });
 });
@@ -375,11 +331,9 @@ const notificationStore = useNotificationStore()
 
 // SSH keys state
 const sshKeys = ref<any[]>([])
-const sshKeysLoading = ref(false)
-
 const addFormNodeId = ref(null);
 const addFormRole = ref('master');
-const addFormVcpu = ref(1);
+const addFormCpu = ref(1);
 const addFormRam = ref(1);
 const addFormStorage = ref(1);
 const addFormError = ref('');
@@ -390,23 +344,23 @@ const canAssignToNode = computed(() => {
   const node = addFormNode.value;
   if (!node) return false;
   return (
-    addFormVcpu.value > 0 &&
+    addFormCpu.value > 0 &&
     addFormRam.value > 0 &&
     addFormStorage.value > 0 &&
-    addFormVcpu.value <= getAvailableCPU(node) &&
+    addFormCpu.value <= getAvailableCPU(node) &&
     addFormRam.value <= getAvailableRAM(node) &&
     addFormStorage.value <= getAvailableStorage(node)
   );
 });
 
-watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
+watch([addFormNodeId, addFormCpu, addFormRam, addFormStorage], () => {
   const node = addFormNode.value;
   if (!node) {
     addFormError.value = '';
     return;
   }
   if (
-    addFormVcpu.value > getAvailableCPU(node) ||
+    addFormCpu.value > getAvailableCPU(node) ||
     addFormRam.value > getAvailableRAM(node) ||
     addFormStorage.value > getAvailableStorage(node)
   ) {
@@ -427,15 +381,14 @@ async function addNode(payload: any) {
   addFormError.value = '';
   try {
     await addNodeToDeployment(payload.name, payload);
-    notificationStore.info('Node Addition Started', 'Your node is being added to the cluster in the background. You will be notified when the operation completes.');
-    
+
     // Refresh clusters data to update the table
     await clusterStore.fetchClusters();
-    
+
     // Reset add form state
     addFormNodeId.value = null;
     addFormRole.value = 'master';
-    addFormVcpu.value = 1;
+    addFormCpu.value = 1;
     addFormRam.value = 1;
     addFormStorage.value = 1;
   } catch (e: any) {
@@ -452,7 +405,7 @@ async function handleRemoveNode(nodeName: string) {
   try {
     await removeNodeFromDeployment(cluster.value.cluster.name, nodeName);
     notificationStore.info('Node Removal Started', `Node "${nodeName}" is being removed from the cluster in the background. You will be notified when the operation completes.`);
-    
+
     // Refresh clusters data to update the table
     await clusterStore.fetchClusters();
   } catch (e: any) {
