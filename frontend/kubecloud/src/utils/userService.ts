@@ -239,8 +239,16 @@ export class UserService {
       showNotifications: true,
       errorMessage: 'Failed to redeem voucher'
     })
-    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { interval: 6000 })
+    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { interval: 1000, delay: 3000 })
     const status = await workflowChecker.status
+    if(status === WorkflowStatus.StatusCompleted){
+      useNotificationStore().addNotification({
+        title: 'Voucher Redemption Success',
+        message: 'Voucher has been successfully redeemed.',
+        type: 'success',
+        duration: 5000
+      })
+    }
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
         title: 'Voucher Redemption Failed',
@@ -248,6 +256,7 @@ export class UserService {
         type: 'error',
         duration: 5000
       })
+      throw new Error('Failed to redeem voucher')
     }
   }
 

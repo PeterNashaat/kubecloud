@@ -66,7 +66,6 @@ async function onRedeem() {
   try {
     await userService.redeemVoucher(code.value.trim())
     code.value = ''
-    successMessage.value = 'Voucher redeemed successfully!'
   } catch (err: any) {
     console.error(err)
   } finally {
