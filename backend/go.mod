@@ -15,7 +15,7 @@ require (
 	github.com/stripe/stripe-go/v82 v82.2.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/swaggo/swag v1.16.5
+	github.com/swaggo/swag v1.16.6
 	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20250703093252-e7500b106618
 	github.com/threefoldtech/tfgrid-sdk-go/grid-client v0.16.9-0.20250714083056-4943cdc054d8
 	github.com/threefoldtech/tfgrid-sdk-go/grid-proxy v0.16.9-0.20250714083056-4943cdc054d8
