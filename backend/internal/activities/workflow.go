@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/vedhavyas/go-subkey"
 	"github.com/xmonader/ewf"
 )
 
@@ -49,14 +50,19 @@ func RegisterEWFWorkflows(
 	mail internal.MailService,
 	substrate *substrate.Substrate,
 	sse *internal.SSEManager,
+	kycClient *internal.KYCClient,
+	sponsorAddress string,
+	sponsorKeyPair subkey.KeyPair,
 ) {
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
 	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config))
 	engine.Register(StepCreateStripeCustomer, CreateStripeCustomerStep())
+	engine.Register(StepCreateKYCSponsorship, CreateKYCSponsorship(kycClient, sponsorAddress, sponsorKeyPair))
 	engine.Register(StepSaveUser, SaveUserStep(db, config))
 	engine.Register(StepUpdateUserVerified, UpdateUserVerifiedStep(db))
 	engine.Register(StepSendWelcomeEmail, SendWelcomeEmailStep(mail, config))
 	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency))
+	engine.Register(StepCreatePendingRecord, CreatePendingRecord(substrate, db, config.SystemAccount.Mnemonic))
 	engine.Register(StepUpdateCreditCardBalance, UpdateCreditCardBalanceStep(db))
 	engine.Register(StepTransferTFTs, TransferTFTsStep(substrate, config.SystemAccount.Mnemonic))
 	engine.Register(StepCancelPaymentIntent, CancelPaymentIntentStep())
@@ -79,6 +85,10 @@ func RegisterEWFWorkflows(
 			MaxAttempts: 3,
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
 		}},
+		{Name: StepCreateKYCSponsorship, RetryPolicy: &ewf.RetryPolicy{
+			MaxAttempts: 3,
+			BackOff:     ewf.ConstantBackoff(2 * time.Second),
+		}},
 		{Name: StepSaveUser, RetryPolicy: &ewf.RetryPolicy{
 			MaxAttempts: 2,
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
@@ -94,6 +104,7 @@ func RegisterEWFWorkflows(
 	chargeBalanceTemplate := userWorkfowTemplate
 	chargeBalanceTemplate.Steps = []ewf.Step{
 		{Name: StepCreatePaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
+		{Name: StepCreatePendingRecord, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepCancelPaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}}, // Compensation step
 		{Name: StepUpdateCreditCardBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
@@ -101,6 +112,7 @@ func RegisterEWFWorkflows(
 
 	redeemVoucherTemplate := userWorkfowTemplate
 	redeemVoucherTemplate.Steps = []ewf.Step{
+		{Name: StepCreatePendingRecord, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepUpdateCreditedBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}

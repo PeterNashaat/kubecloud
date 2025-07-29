@@ -18,6 +18,8 @@ type User struct {
 	Mnemonic          string    `json:"-" gorm:"column:mnemonic"`
 	SSHKey            string    `json:"ssh_key"`
 	Debt              float64   `json:"debt"`
+	Sponsored         bool      `json:"sponsored"`
+	AccountAddress    string    `json:"account_address" gorm:"column:account_address"`
 }
 
 // SSHKey represents an SSH key for a user

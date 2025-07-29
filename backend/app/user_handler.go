@@ -20,6 +20,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
+
+	"github.com/vedhavyas/go-subkey"
 )
 
 // Handler struct holds configs for all handlers
@@ -37,6 +39,10 @@ type Handler struct {
 	ewfEngine       *ewf.Engine
 	gridNet         string // Network name for the grid
 	sshPublicKey    string // SSH public key loaded at startup
+	systemIdentity  substrate.Identity
+	kycClient       *internal.KYCClient
+	sponsorKeyPair  subkey.KeyPair
+	sponsorAddress  string
 }
 
 // NewHandler create new handler
@@ -44,9 +50,10 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine, gridNet string,
-	sshPublicKey string,
-) *Handler {
+	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine,
+	gridNet string, sshPublicKey string, systemIdentity substrate.Identity,
+	kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string) *Handler {
+
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -61,6 +68,10 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		ewfEngine:       ewfEngine,
 		gridNet:         gridNet,
 		sshPublicKey:    sshPublicKey,
+		systemIdentity:  systemIdentity,
+		kycClient:       kycClient,
+		sponsorKeyPair:  sponsorKeyPair,
+		sponsorAddress:  sponsorAddress,
 	}
 }
 
@@ -151,8 +162,9 @@ type RedeemVoucherResponse struct {
 	Email       string  `json:"email"`
 }
 
-// @Summary Register a user
-// @Description Registers a new user to the system
+// RegisterHandler registers user to the system
+// @Summary Register user (with KYC sponsorship)
+// @Description Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.
 // @Tags users
 // @ID register-user
 // @Accept json
@@ -207,7 +219,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		WorkflowID: wf.UUID,
 		Email:      request.Email,
 	})
-
 }
 
 // @Summary Verify registration code
@@ -274,8 +285,8 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	})
 }
 
-// @Summary Login user
-// @Description Logs a user into the system
+// @Summary Login user (KYC verification checked)
+// @Description Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.
 // @Tags users
 // @ID login-user
 // @Accept json
@@ -302,7 +313,6 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		log.Error().Err(err).Msg("failed to get user by email")
 		Error(c, http.StatusBadRequest, "verification failed", "email or password is incorrect")
 		return
-
 	}
 
 	// verify password
@@ -310,6 +320,20 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	if !match {
 		Error(c, http.StatusUnauthorized, "login failed", "email or password is incorrect")
 		return
+	}
+
+	// Check KYC verification status without blocking login
+	sponsored, err := h.kycClient.IsUserVerified(c.Request.Context(), user.AccountAddress)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check KYC verification status")
+		InternalServerError(c)
+		return
+	}
+	if user.Sponsored != sponsored {
+		user.Sponsored = sponsored
+		if err := h.db.UpdateUserByID(&user); err != nil {
+			log.Error().Err(err).Msg("failed to update user sponsorship status")
+		}
 	}
 
 	// create token pairs
@@ -563,19 +587,6 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 	if err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusNotFound, "User is not found", "")
-		return
-	}
-
-	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Msg("error checking system account balance")
-		InternalServerError(c)
-		return
-	}
-
-	if systemBalanceUSD < float64(request.Amount) {
-		log.Error().Msgf("system account balance is not enough to charge user balance, system balance: %f, requested amount: %d", systemBalanceUSD, request.Amount)
-		InternalServerError(c)
 		return
 	}
 
@@ -899,7 +910,55 @@ func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 		InternalServerError(c)
 		return
 	}
-
 	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
+}
 
+
+// @Summary List user pending records
+// @Description Returns user pending records in the system
+// @Tags users
+// @ID list-user-pending-records
+// @Accept json
+// @Produce json
+// @Success 200 {array} PendingRecordsResponse
+// @Failure 500 {object} APIResponse
+// @Security BearerAuth
+// @Router /user/pending-records [get]
+// ListUserPendingRecordsHandler returns user pending records in the system
+func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var pendingRecordsResponse []PendingRecordsResponse
+	for _, record := range pendingRecords {
+		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd amount")
+			InternalServerError(c)
+			return
+		}
+
+		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
+			InternalServerError(c)
+			return
+		}
+
+		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
+			PendingRecord:        record,
+			USDAmount:            usdAmount,
+			TransferredUSDAmount: usdTransferredAmount,
+		})
+	}
+
+	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
+		"pending_records": pendingRecordsResponse,
+	})
 }

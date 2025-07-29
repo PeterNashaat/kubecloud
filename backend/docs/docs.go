@@ -115,6 +115,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "AdminMiddleware": []
+                    }
+                ],
+                "description": "Returns all pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List pending records",
+                "operationId": "list-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user": {
             "get": {
                 "description": "Retrieves all data of the user",
@@ -477,7 +515,7 @@ const docTemplate = `{
         },
         "/user/login": {
             "post": {
-                "description": "Logs a user into the system",
+                "description": "Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.",
                 "consumes": [
                     "application/json"
                 ],
@@ -487,7 +525,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Login user",
+                "summary": "Login user (KYC verification checked)",
                 "operationId": "login-user",
                 "parameters": [
                     {
@@ -678,6 +716,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns user pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List user pending records",
+                "operationId": "list-user-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user/redeem/{voucher_code}": {
             "put": {
                 "description": "Redeems a voucher for the user",
@@ -781,7 +857,7 @@ const docTemplate = `{
         },
         "/user/register": {
             "post": {
-                "description": "Registers a new user to the system",
+                "description": "Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.",
                 "consumes": [
                     "application/json"
                 ],
@@ -791,7 +867,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Register a user",
+                "summary": "Register user (with KYC sponsorship)",
                 "operationId": "register-user",
                 "parameters": [
                     {
@@ -812,7 +888,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request format",
+                        "description": "Invalid request format or validation error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -1745,6 +1821,9 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
+                "account_address": {
+                    "type": "string"
+                },
                 "admin": {
                     "type": "boolean"
                 },
@@ -1773,6 +1852,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "sponsored": {
+                    "type": "boolean"
                 },
                 "ssh_key": {
                     "type": "string"

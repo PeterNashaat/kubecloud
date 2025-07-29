@@ -6,6 +6,21 @@ export function useDeploymentEvents() {
   const eventSource = ref<EventSource | null>(null)
   const notificationStore = useNotificationStore()
   const seenTaskIds = new Set<string>()
+  const taskEventListeners = new Map<string, Set<Function>>();
+
+  function onTaskEvent(taskId: string, callback: (event: any) => void) {
+    if (!taskEventListeners.has(taskId)) {
+      taskEventListeners.set(taskId, new Set());
+    }
+    taskEventListeners.get(taskId)!.add(callback);
+    // Return unsubscribe function
+    return () => {
+      taskEventListeners.get(taskId)?.delete(callback);
+      if (taskEventListeners.get(taskId)?.size === 0) {
+        taskEventListeners.delete(taskId);
+      }
+    };
+  }
 
   function connect() {
     if (eventSource.value) return
@@ -27,7 +42,12 @@ export function useDeploymentEvents() {
         const data = JSON.parse(event.data)
         const type = data.type || 'info'
         if (type === 'connected') return; // Ignore connected notification event
-        const taskId = data.data?.task_id
+        const taskId = data.task_id || data.data?.task_id
+        if (taskId && taskEventListeners.has(taskId)) {
+          for (const cb of taskEventListeners.get(taskId)!) {
+            cb(data)
+          }
+        }
         if (taskId && seenTaskIds.has(taskId)) return;
         if (taskId) seenTaskIds.add(taskId);
         const message = data.data?.message || JSON.stringify(data)
@@ -57,5 +77,5 @@ export function useDeploymentEvents() {
   onMounted(connect)
   onUnmounted(disconnect)
 
-  return { connect, disconnect }
+  return { connect, disconnect, onTaskEvent }
 }
