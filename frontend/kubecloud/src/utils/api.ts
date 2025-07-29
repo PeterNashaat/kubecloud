@@ -320,7 +320,8 @@ export function createWorkflowStatusChecker(workflowID: string, options?: {
 } {
   const interval = options?.interval ?? 1000;
   const delay = options?.delay ?? 6000;
-  let intervalId: NodeJS.Timeout;
+  let intervalId: NodeJS.Timeout | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
   let rejectFn: (reason?: any) => void;
 
   const statusPromise = new Promise<WorkflowStatus>((resolve, reject) => {
@@ -328,25 +329,37 @@ export function createWorkflowStatusChecker(workflowID: string, options?: {
 
     const check = async () => {
       try {
-        const result = await getWorkflowStatus(workflowID);
-        const status= result.data.data;
+        const result = await getWorkflowStatus(workflowID+1);
+        const status = result.data.data;
 
         if (status === WorkflowStatus.StatusCompleted || status === WorkflowStatus.StatusFailed) {
-          clearInterval(intervalId);
+          if (intervalId) clearInterval(intervalId);
           resolve(status);
         }
       } catch (error) {
-        clearInterval(intervalId);
+        useNotificationStore().addNotification({
+          title: 'Error',
+          message: 'Failed to verify request status',
+          type: 'error',
+          duration: 5000
+        })
+        if (intervalId) clearInterval(intervalId);
         reject(error);
       }
     };
-    // wait for delay before first check before interval
-    new Promise(resolve => setTimeout(resolve, delay)).then(check);
-    intervalId = setInterval(check, interval);
+    
+    // First, wait for the delay before doing anything
+    timeoutId = setTimeout(() => {
+      check();
+      
+      // Then start the interval for subsequent checks
+      intervalId = setInterval(check, interval);
+    }, delay);
   });
 
   const cancel = () => {
-    clearInterval(intervalId);
+    if (intervalId) clearInterval(intervalId);
+    if (timeoutId) clearTimeout(timeoutId);
     rejectFn?.('Polling canceled.');
   };
 
