@@ -67,7 +67,7 @@
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 import { computed, nextTick } from 'vue'
-import logo from '../../public/logo.png'
+import logo from '@/assets/logo.png'
 
 const userStore = useUserStore()
 const router = useRouter()

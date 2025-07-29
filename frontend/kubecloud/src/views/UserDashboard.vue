@@ -64,7 +64,7 @@ onMounted(async () => {
       amount: inv.total
     }))
   } catch (error) {
-    notificationStore.error('Dashboard Error', 'Failed to load dashboard data')
+    console.log(error);
   }
 })
 
