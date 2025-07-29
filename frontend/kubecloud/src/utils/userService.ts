@@ -152,7 +152,7 @@ export class UserService {
       })
       throw new Error('Failed to reserve node')
     }
-    return response.data.data
+    
   }
 
   // List reserved nodes

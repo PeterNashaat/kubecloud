@@ -157,11 +157,9 @@ export function useNodeManagement() {
   async function reserveNode(nodeId: number) {
     reserveNodeLoading.value = true
     try {
-      const response = await userService.reserveNode(nodeId)
+      await userService.reserveNode(nodeId)
       // Refresh the rented nodes list after successful reservation
       await fetchRentedNodes()
-      notificationStore.success('Node Reserved', 'Node has been successfully reserved.')
-      return response
     } catch (err: any) {
       console.error('Failed to reserve node:', err)
       throw err
