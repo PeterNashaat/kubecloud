@@ -222,16 +222,6 @@ export class UserService {
       showNotifications: true,
       errorMessage: 'Failed to redeem voucher'
     })
-    if (res.status !== 201) {
-      const msg = res.data.error || 'Failed to redeem voucher'
-      useNotificationStore().addNotification({
-        title: 'Voucher Redemption Failed',
-        message: msg,
-        type: 'error',
-        duration: 5000
-      })
-      return
-    }
     const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { interval: 6000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
@@ -246,12 +236,22 @@ export class UserService {
 
   // Fetch the user's current balance
   async fetchBalance(): Promise<number> {
+    try {
     const response = await api.get<{ data: { balance_usd: number, debt_usd: number } }>(
       '/v1/user/balance',
       { requiresAuth: true, showNotifications: false }
     )
     const { balance_usd, debt_usd } = response.data.data
     return (balance_usd || 0) - (debt_usd || 0)
+  }catch(e){
+    useNotificationStore().addNotification({
+      title: 'Error',
+      message: 'Failed to fetch balance',
+      type: 'error',
+      duration: 5000
+    })
+    return 0
+  }
   }
 
   // List all SSH keys for the current user
