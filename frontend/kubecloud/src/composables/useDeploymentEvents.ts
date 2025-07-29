@@ -35,6 +35,7 @@ export function useDeploymentEvents() {
     eventSource.value.onopen = () => {
       isConnected.value = true
       reconnectAttempts.value = 0
+      console.log('SSE connection established')
     }
 
     eventSource.value.onmessage = (event) => {
@@ -65,6 +66,8 @@ export function useDeploymentEvents() {
 
     eventSource.value.onerror = (err) => {
       isConnected.value = false
+      console.error('SSE connection error:', err)
+
       // Attempt to reconnect
       if (reconnectAttempts.value < maxReconnectAttempts) {
         setTimeout(() => {
@@ -92,24 +95,23 @@ export function useDeploymentEvents() {
     ])
   }
 
-  // Manual refresh function for components that need it
-  function manualRefresh() {
-    return refreshClusterData()
-  }
-
   // Watch for token changes to reconnect
   watch(() => userStore.token, (newToken) => {
     if (newToken && !isConnected.value) {
       connect()
-    } else if (!newToken) {
+    }
+    if (!newToken && isConnected.value) {
       disconnect()
     }
-  })
+  }, { immediate: true })
 
   onMounted(() => {
-    if (userStore.token) {
-      connect()
-    }
+    // Simple fallback: if token exists but not connected after a short delay, connect
+    setTimeout(() => {
+      if (userStore.token && !isConnected.value) {
+        connect()
+      }
+    }, 100)
   })
 
   onUnmounted(() => {
@@ -119,7 +121,6 @@ export function useDeploymentEvents() {
   return {
     connect,
     disconnect,
-    manualRefresh,
     refreshClusterData
   }
 }
