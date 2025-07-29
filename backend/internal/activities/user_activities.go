@@ -404,7 +404,7 @@ func CancelPaymentIntentStep() ewf.StepFn {
 	}
 }
 
-func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf.StepFn {
+func TransferTFTsStep(substrateClient *substrate.Substrate, systemMnemonic string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		if state["insufficient_balance"] == true {
 			return nil // Skip transfer
@@ -433,7 +433,12 @@ func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf
 			return fmt.Errorf("'mnemonic' in state is not a string")
 		}
 
-		err := internal.TransferTFTs(substrate, uint64(amount), mnemonic, systemMnemonic)
+		systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(systemMnemonic)
+		if err != nil {
+			return fmt.Errorf("failed to create system identity: %w", err)
+		}
+
+		err = internal.TransferTFTs(substrateClient, uint64(amount), mnemonic, systemIdentity)
 		if err != nil {
 			log.Error().Err(err).Send()
 			state["transfer_tfts_failed"] = true

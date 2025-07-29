@@ -913,7 +913,6 @@ func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
 }
 
-
 // @Summary List user pending records
 // @Description Returns user pending records in the system
 // @Tags users
