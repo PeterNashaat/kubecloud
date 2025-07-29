@@ -182,7 +182,6 @@ export class UserService {
         duration: 5000
       })
     }
-    return response.data.data
   }
 
   // Charge balance
