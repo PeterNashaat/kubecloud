@@ -35,4 +35,5 @@ const (
 	StepRemoveClusterFromDB     = "remove-cluster-from-db"
 	StepDeployNode              = "deploy-node"
 	StepDeployNetwork           = "deploy-network"
+	StepRedeemVoucher           = "redeem-voucher"
 )
