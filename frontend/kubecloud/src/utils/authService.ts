@@ -117,6 +117,7 @@ export class AuthService {
         type: 'error',
         duration: 5000
       })
+      throw new Error('Failed to register user')
     }
     
   }
@@ -136,6 +137,7 @@ export class AuthService {
         type: 'error',
         duration: 5000
       })
+      throw new Error('Failed to verify user')
     }
   }
 

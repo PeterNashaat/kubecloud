@@ -193,8 +193,6 @@ const handleSignUp = async () => {
       password: form.password,
       confirmPassword: form.confirmPassword
     })
-    
-   
 
     // Redirect to verify page on success
     router.push({ path: '/register/verify', query: { email: form.email } })

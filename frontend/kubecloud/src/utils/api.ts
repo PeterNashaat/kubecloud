@@ -329,7 +329,7 @@ export function createWorkflowStatusChecker(workflowID: string, options?: {
 
     const check = async () => {
       try {
-        const result = await getWorkflowStatus(workflowID+1);
+        const result = await getWorkflowStatus(workflowID);
         const status = result.data.data;
 
         if (status === WorkflowStatus.StatusCompleted || status === WorkflowStatus.StatusFailed) {
