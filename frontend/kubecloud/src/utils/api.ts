@@ -155,14 +155,14 @@ class ApiClient {
       }
     } catch (error) {
       clearTimeout(timeoutId)
-      
+
       // Clear loading notification if it was shown
       if (loadingNotificationId) {
         notificationStore.removeNotification(loadingNotificationId)
       }
-      
+
       let errorMessage = 'An unexpected error occurred'
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           errorMessage = 'Request timed out'
@@ -234,7 +234,7 @@ export const withRetry = async <T>(
       return await fn()
     } catch (error) {
       lastError = error as Error
-      
+
       if (i < maxRetries - 1) {
         await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)))
       }
@@ -249,7 +249,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   wait: number
 ): ((...args: Parameters<T>) => void) => {
   let timeout: ReturnType<typeof setTimeout>
-  
+
   return (...args: Parameters<T>) => {
     clearTimeout(timeout)
     timeout = setTimeout(() => func(...args), wait)
@@ -267,21 +267,6 @@ export async function deployCluster(payload: any) {
   return res.json();
 }
 
-export function listenToEvents(taskId: string, onMessage: (data: any) => void) {
-  const eventSource = new EventSource(`/api/v1/events?task_id=${taskId}`);
-  eventSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      onMessage(data);
-    } catch {
-      onMessage(event.data);
-    }
-  };
-  eventSource.onerror = (err) => {
-    eventSource.close();
-  };
-  return eventSource;
-} 
 export async function getWorkflowStatus(workflowID: string): Promise<ApiResponse<{ data: WorkflowStatus }>> {
   return api.get(`/v1/workflow/${workflowID}`, { requiresAuth: false, showNotifications: false })
 }

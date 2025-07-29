@@ -35,7 +35,7 @@
 
 <script lang="ts" setup>
 import { RouterView, useRoute } from 'vue-router'
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useUserStore } from './stores/user'
 import NavBar from './components/NavBar.vue'
 import AppFooter from './components/AppFooter.vue'
@@ -43,8 +43,7 @@ import ErrorBoundary from './components/ErrorBoundary.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import UnifiedBackground from './components/UnifiedBackground.vue'
 import FloatingClouds from './components/FloatingClouds.vue'
-import { useDeploymentEvents } from './composables/useDeploymentEvents'
-
+import { useDeploymentEvents } from "./composables/useDeploymentEvents"
 const route = useRoute()
 const userStore = useUserStore()
 const isInitializing = ref(true)
@@ -78,26 +77,16 @@ const currentTheme = computed(() => {
   return themeMap[path] || 'default'
 })
 
-const { connect, disconnect } = useDeploymentEvents()
 
-// Connect to deployment events only after user is logged in
-watch(
-  () => userStore.isLoggedIn,
-  (loggedIn) => {
-    if (loggedIn) {
-      connect()
-    } else {
-      disconnect()
-    }
-  },
-  { immediate: false }
-)
 
 // Initialize authentication state
 onMounted(async () => {
   try {
     // Initialize auth state (check localStorage for tokens)
     await userStore.initializeAuth()
+
+    // Initialize deployment events for real-time updates
+    useDeploymentEvents()
   } catch (error) {
     console.error('Failed to initialize authentication:', error)
   } finally {
@@ -105,9 +94,6 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {
-  disconnect()
-})
 </script>
 
 <style scoped>

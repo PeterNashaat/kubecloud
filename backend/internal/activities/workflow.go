@@ -64,6 +64,7 @@ func RegisterEWFWorkflows(
 	engine.Register(StepReserveNode, ReserveNodeStep(db, substrate))
 	engine.Register(StepUnreserveNode, UnreserveNodeStep(db, substrate))
 	engine.Register(StepUpdateCreditedBalance, UpdateCreditedBalanceStep(db))
+	engine.Register(StepRedeemVoucher, RedeemVoucherStep(db))
 
 	registerWorkflowTemplate := userWorkfowTemplate
 	registerWorkflowTemplate.Steps = []ewf.Step{
@@ -106,6 +107,7 @@ func RegisterEWFWorkflows(
 	redeemVoucherTemplate.Steps = []ewf.Step{
 		{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepUpdateCreditedBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
+		{Name: StepRedeemVoucher, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
 	engine.RegisterTemplate(WorkflowRedeemVoucher, &redeemVoucherTemplate)
 

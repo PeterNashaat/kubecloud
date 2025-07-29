@@ -12,6 +12,7 @@ import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
 import { useClusterStore } from '../stores/clusters'
+import { useNotificationStore } from '../stores/notifications'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
@@ -20,6 +21,8 @@ const userName = computed(() => userStore.user?.username || 'User')
 const selected = ref('overview')
 
 const clusterStore = useClusterStore()
+const notificationStore = useNotificationStore()
+
 const clusters = computed(() => clusterStore.clusters)
 const clustersArray = computed(() =>
   Array.isArray(clusters.value)
@@ -33,21 +36,35 @@ const clustersArray = computed(() =>
     : []
 )
 
+// Constants
+const STORAGE_KEY_DASHBOARD_SECTION = 'dashboard-section'
+
+// Note: Cluster events are handled globally by the useDeploymentEvents composable
+
 onMounted(async () => {
-  const savedSection = localStorage.getItem('dashboard-section')
-  if (savedSection) {
-    selected.value = savedSection
+  try {
+    // Restore selected section from localStorage
+    const savedSection = localStorage.getItem(STORAGE_KEY_DASHBOARD_SECTION)
+    if (savedSection) {
+      selected.value = savedSection
+    }
+
+    // Fetch initial data
+    const [invoices] = await Promise.all([
+      userService.listUserInvoices(),
+      userStore.updateNetBalance(),
+    ])
+
+    // Process invoices
+    billingHistory.value = invoices.map(inv => ({
+      id: inv.id,
+      date: inv.created_at,
+      description: `Invoice ${inv.id}`,
+      amount: inv.total
+    }))
+  } catch (error) {
+    console.error(error);
   }
-  // Fetch real invoices for billing history
-  const invoices = await userService.listUserInvoices()
-  billingHistory.value = invoices.map(inv => ({
-    id: inv.id,
-    date: inv.created_at,
-    description: `Invoice #${inv.id}`,
-    amount: inv.total
-  }))
-  // Fetch user net balance
-  await userStore.updateNetBalance()
 })
 
 interface Bill {
@@ -59,14 +76,8 @@ interface Bill {
 
 const billingHistory = ref<Bill[]>([])
 
-const sshKeys = ref([
-  { id: 1, name: 'My Laptop', fingerprint: 'SHA256:Abc123...Xyz789', addedDate: '2024-01-01' },
-  { id: 2, name: 'Work PC', fingerprint: 'SHA256:Def456...789', addedDate: '2024-01-05' }
-])
-const vouchers = ref([
-  { id: 1, name: 'Welcome Bonus', description: 'New user welcome credit', amount: '$50.00', expiryDate: '2024-12-31', icon: 'mdi-gift', iconColor: '#F472B6' },
-  { id: 2, name: 'Referral Credit', description: 'Friend referral bonus', amount: '$25.00', expiryDate: '2024-06-30', icon: 'mdi-account-multiple', iconColor: '#38BDF8' }
-])
+const sshKeys = ref([])
+const vouchers = ref([])
 const totalSpent = computed(() => {
   return billingHistory.value
     .filter(bill => bill.amount > 0)
@@ -77,17 +88,13 @@ const totalSpent = computed(() => {
 function handleSidebarSelect(val: string) {
   selected.value = val
   // Save to localStorage for persistence
-  localStorage.setItem('dashboard-section', val)
+  localStorage.setItem(STORAGE_KEY_DASHBOARD_SECTION, val)
 }
 
 function handleNavigate(section: string) {
   selected.value = section
   // Save to localStorage for persistence
   localStorage.setItem('dashboard-section', section)
-}
-
-function redeemVoucher(voucher: any) {
-  alert(`Redeem voucher: ${voucher.name}`)
 }
 </script>
 
@@ -117,7 +124,7 @@ function redeemVoucher(voucher: any) {
               <BillingCard v-if="selected === 'billing'" :billingHistory="billingHistory" />
               <PaymentCard v-if="selected === 'payment'" />
               <SshKeysCard v-if="selected === 'ssh'" :sshKeys="sshKeys" />
-              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
+              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" />
               <NodesCard v-if="selected === 'nodes'" />
               <ProfileCard v-if="selected === 'profile'" />
             </div>
