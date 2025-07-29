@@ -288,14 +288,38 @@ export async function getWorkflowStatus(workflowID: string): Promise<ApiResponse
 
 
 
+/**
+ * Creates a workflow status checker that polls for workflow status at regular intervals.
+ *
+ * @param workflowID - The ID of the workflow to check
+ * @param options - Configuration options
+ * @param options.delay - Initial delay before first check in milliseconds (default: 6000ms)
+ * @param options.interval - Polling interval in milliseconds (default: 1000ms)
+ * 
+ * @returns An object containing:
+ *   - status: A promise that resolves with the final workflow status (completed or failed)
+ *   - cancel: A function to cancel the polling process
+ * 
+ * @description
+ * This function implements a polling pattern with two timing mechanisms:
+ * 1. An initial delay (delay) before the first status check
+ * 2. Regular interval checks (interval) that continue until completion or cancellation
+ * 
+ * The polling continues until one of these conditions is met:
+ * - The workflow completes successfully (StatusCompleted)
+ * - The workflow fails (StatusFailed)
+ * - An error occurs during polling
+ * - The polling is manually canceled via the returned cancel function
+ */
 export function createWorkflowStatusChecker(workflowID: string, options?: {
   interval?: number;
+  delay?: number;
 }): {
   status: Promise<WorkflowStatus>;
   cancel: () => void;
 } {
-  const interval = options?.interval ?? 3000;
-
+  const interval = options?.interval ?? 1000;
+  const delay = options?.delay ?? 6000;
   let intervalId: NodeJS.Timeout;
   let rejectFn: (reason?: any) => void;
 
@@ -316,7 +340,8 @@ export function createWorkflowStatusChecker(workflowID: string, options?: {
         reject(error);
       }
     };
-
+    // wait for delay before first check before interval
+    new Promise(resolve => setTimeout(resolve, delay)).then(check);
     intervalId = setInterval(check, interval);
   });
 
