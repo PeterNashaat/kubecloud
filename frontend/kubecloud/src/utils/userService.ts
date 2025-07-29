@@ -133,7 +133,7 @@ export class UserService {
   // Reserve a node
   async reserveNode(nodeId: number, data: ReserveNodeRequest = {}) {
     const response = await api.post<ApiResponse<ReserveNodeResponse>>(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { intervalDelay: 3000, interval: 1000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
     const status = await workflowChecker.status
     if(status === WorkflowStatus.StatusCompleted){
       useNotificationStore().addNotification({
@@ -163,7 +163,7 @@ export class UserService {
   // Unreserve a node
   async unreserveNode(contractId: string) {
     const response = await api.delete<ApiResponse<UnreserveNodeResponse>>(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { intervalDelay: 3000, interval: 1000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
@@ -187,7 +187,7 @@ export class UserService {
   // Charge balance
   async chargeBalance(data: ChargeBalanceRequest) {
     const response = await api.post<ApiResponse<ChargeBalanceResponse>>('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { intervalDelay: 3000, interval: 2000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 2000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
@@ -240,7 +240,7 @@ export class UserService {
       showNotifications: true,
       errorMessage: 'Failed to redeem voucher'
     })
-    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { intervalDelay: 3000, interval: 1000 })
+    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
     const status = await workflowChecker.status
     if(status === WorkflowStatus.StatusCompleted){
       useNotificationStore().addNotification({

@@ -297,14 +297,14 @@ export async function getWorkflowStatus(workflowID: string): Promise<ApiResponse
  * - The polling is manually canceled via the returned cancel function
  */
 export function createWorkflowStatusChecker(workflowID: string, options?: {
-  intervalDelay?: number;
+  initialDelay?: number;
   interval?: number;
 }): {
   status: Promise<WorkflowStatus>;
   cancel: () => void;
 } {
   const interval = options?.interval ?? 1000;
-  const delay = options?.intervalDelay ?? 6000;
+  const delay = options?.initialDelay ?? 6000;
   let intervalId: NodeJS.Timeout | null = null;
   let timeoutId: NodeJS.Timeout | null = null;
   let rejectFn: (reason?: any) => void;

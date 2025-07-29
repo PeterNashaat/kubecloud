@@ -108,7 +108,7 @@ export class AuthService {
       errorMessage: 'Registration failed',
       timeout: 60000
     })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { intervalDelay: 15000,interval: 3000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 15000,interval: 3000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusCompleted) {
       useNotificationStore().addNotification({
@@ -136,7 +136,7 @@ export class AuthService {
       showNotifications: true,
       errorMessage: 'Verification failed'
     })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { intervalDelay: 3000, interval: 2000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 2000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusCompleted) {
       useNotificationStore().addNotification({
