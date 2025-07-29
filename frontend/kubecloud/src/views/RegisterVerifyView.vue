@@ -94,6 +94,7 @@ const handleVerify = async () => {
     router.push('/sign-in')
   } catch (error) {
     loading.value = false
+    console.error(error)
   }
 }
 

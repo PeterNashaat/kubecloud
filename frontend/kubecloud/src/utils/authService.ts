@@ -136,8 +136,16 @@ export class AuthService {
       showNotifications: true,
       errorMessage: 'Verification failed'
     })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 2000, delay: 3000 })
     const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().addNotification({
+        title: 'Verification Success',
+        message: 'User verified successfully',
+        type: 'success',
+        duration: 5000
+      })
+    }
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
         title: 'Verification Failed',
