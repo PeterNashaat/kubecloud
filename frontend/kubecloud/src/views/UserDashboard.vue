@@ -64,7 +64,7 @@ onMounted(async () => {
       amount: inv.total
     }))
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 })
 
