@@ -202,11 +202,11 @@ const reserveNode = async (nodeId: number) => {
   try {
     await userService.reserveNode(nodeId)
     reservedNodeIds.value.add(nodeId) // Optimistically remove from UI
-    notificationStore.success('Success', 'Node reserved successfully.')
     setTimeout(() => {
       fetchNodes()
     }, 4000)
   } catch (err) {
+    console.error(err)
     reservedNodeIds.value.delete(nodeId)
   } finally {
     reservingNodeId.value = null

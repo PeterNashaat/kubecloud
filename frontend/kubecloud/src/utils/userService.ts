@@ -133,8 +133,16 @@ export class UserService {
   // Reserve a node
   async reserveNode(nodeId: number, data: ReserveNodeRequest = {}) {
     const response = await api.post<ApiResponse<ReserveNodeResponse>>(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { delay: 3000, interval: 1000 })
     const status = await workflowChecker.status
+    if(status === WorkflowStatus.StatusCompleted){
+      useNotificationStore().addNotification({
+        title: 'Node Reserved',
+        message: 'Node has been successfully reserved.',
+        type: 'success',
+        duration: 5000
+      })
+    }
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
         title: 'Node Reservation Failed',
@@ -142,6 +150,7 @@ export class UserService {
         type: 'error',
         duration: 5000
       })
+      throw new Error('Failed to reserve node')
     }
     return response.data.data
   }
@@ -154,13 +163,22 @@ export class UserService {
   // Unreserve a node
   async unreserveNode(contractId: string) {
     const response = await api.delete<ApiResponse<UnreserveNodeResponse>>(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { delay: 3000, interval: 1000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
         title: 'Node Unreservation Failed',
         message: 'Failed to unreserve node',
         type: 'error',
+        duration: 5000
+      })
+      throw new Error('Failed to unreserve node')
+    }
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().addNotification({
+        title: 'Node Unreservation Success',
+        message: 'Node has been successfully unreserved.',
+        type: 'success',
         duration: 5000
       })
     }
