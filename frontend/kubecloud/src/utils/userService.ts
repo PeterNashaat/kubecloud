@@ -187,7 +187,7 @@ export class UserService {
   // Charge balance
   async chargeBalance(data: ChargeBalanceRequest) {
     const response = await api.post<ApiResponse<ChargeBalanceResponse>>('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 6000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { interval: 2000, delay: 3000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusFailed) {
       useNotificationStore().addNotification({
@@ -196,6 +196,7 @@ export class UserService {
         type: 'error',
         duration: 5000
       })
+      throw new Error('Failed to charge balance')
     }
     if (status === WorkflowStatus.StatusCompleted) {
       useNotificationStore().addNotification({
