@@ -53,7 +53,6 @@ onMounted(async () => {
     const [invoices] = await Promise.all([
       userService.listUserInvoices(),
       userStore.updateNetBalance(),
-      clusterStore.fetchClusters()
     ])
 
     // Process invoices
