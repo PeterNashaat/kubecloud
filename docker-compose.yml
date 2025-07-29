@@ -10,8 +10,8 @@ services:
 
   mycelium:
     build: 
-      context: ./backend
-      dockerfile: Dockerfile.mycelium
+      context: ./mycelium-peer
+      dockerfile: Dockerfile
     container_name: mycelium
     cap_add: # Required for TUN device creation by mycelium process
       - NET_ADMIN
@@ -19,21 +19,9 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     ports:
-      - "8080:8080"
+      - "8080:8080" # exposes the backend API 
     networks:
       - app-network # connect to redis with network
-    command: >
-      --peers
-      tcp://188.40.132.242:9651
-      tcp://136.243.47.186:9651
-      tcp://185.69.166.7:9651
-      tcp://185.69.166.8:9651
-      tcp://65.21.231.58:9651
-      tcp://65.109.18.113:9651
-      tcp://209.159.146.190:9651
-      tcp://5.78.122.16:9651
-      tcp://5.223.43.251:9651
-      tcp://142.93.217.194:9651
     volumes:
       - mycelium-data:/var/lib/mycelium
       - mycelium-bin:/usr/local/bin
@@ -50,7 +38,7 @@ services:
     volumes:
       - ./backend/kubecloud.db:/app/kubecloud.db
       - ./backend/config.json:/app/config.json
-      - /root/.ssh:/root/.ssh:ro
+      - /home/omar/.ssh:/root/.ssh:ro
       - mycelium-bin:/usr/local/bin:ro # shares mycelium binary from mycelium container
     environment:
       - MYCELIUM_HOST=localhost
@@ -74,6 +62,6 @@ networks:
     driver: bridge
 
 volumes:
-  mycelium-data:
+  mycelium-data: 
   mycelium-bin:
 
