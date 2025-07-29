@@ -163,7 +163,6 @@ func AddNodeStep() ewf.StepFn {
 
 func DeployNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		log.Info().Msgf("Deploying with state: %+v", state)
 		ensureClient(state)
 
 		config, err := getConfig(state)
