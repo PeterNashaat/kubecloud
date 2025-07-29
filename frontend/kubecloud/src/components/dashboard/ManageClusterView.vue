@@ -382,9 +382,6 @@ async function addNode(payload: any) {
   try {
     await addNodeToDeployment(payload.name, payload);
 
-    // Refresh clusters data to update the table
-    await clusterStore.fetchClusters();
-
     // Reset add form state
     addFormNodeId.value = null;
     addFormRole.value = 'master';
@@ -405,9 +402,6 @@ async function handleRemoveNode(nodeName: string) {
   try {
     await removeNodeFromDeployment(cluster.value.cluster.name, nodeName);
     notificationStore.info('Node Removal Started', `Node is being removed from the cluster in the background. You will be notified when the operation completes.`);
-
-    // Refresh clusters data to update the table
-    await clusterStore.fetchClusters();
   } catch (e: any) {
     const errorMessage = e?.message || 'Failed to remove node';
     notificationStore.error('Remove Node Failed', errorMessage);

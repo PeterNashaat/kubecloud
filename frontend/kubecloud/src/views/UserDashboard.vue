@@ -60,7 +60,7 @@ onMounted(async () => {
     billingHistory.value = invoices.map(inv => ({
       id: inv.id,
       date: inv.created_at,
-      description: `Invoice #${inv.id}`,
+      description: `Invoice ${inv.id}`,
       amount: inv.total
     }))
   } catch (error) {
@@ -77,14 +77,8 @@ interface Bill {
 
 const billingHistory = ref<Bill[]>([])
 
-const sshKeys = ref([
-  { id: 1, name: 'My Laptop', fingerprint: 'SHA256:Abc123...Xyz789', addedDate: '2024-01-01' },
-  { id: 2, name: 'Work PC', fingerprint: 'SHA256:Def456...789', addedDate: '2024-01-05' }
-])
-const vouchers = ref([
-  { id: 1, name: 'Welcome Bonus', description: 'New user welcome credit', amount: '$50.00', expiryDate: '2024-12-31', icon: 'mdi-gift', iconColor: '#F472B6' },
-  { id: 2, name: 'Referral Credit', description: 'Friend referral bonus', amount: '$25.00', expiryDate: '2024-06-30', icon: 'mdi-account-multiple', iconColor: '#38BDF8' }
-])
+const sshKeys = ref([])
+const vouchers = ref([])
 const totalSpent = computed(() => {
   return billingHistory.value
     .filter(bill => bill.amount > 0)
@@ -102,10 +96,6 @@ function handleNavigate(section: string) {
   selected.value = section
   // Save to localStorage for persistence
   localStorage.setItem('dashboard-section', section)
-}
-
-function redeemVoucher(voucher: any) {
-  alert(`Redeem voucher: ${voucher.name}`)
 }
 </script>
 
@@ -135,7 +125,7 @@ function redeemVoucher(voucher: any) {
               <BillingCard v-if="selected === 'billing'" :billingHistory="billingHistory" />
               <PaymentCard v-if="selected === 'payment'" />
               <SshKeysCard v-if="selected === 'ssh'" :sshKeys="sshKeys" />
-              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
+              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" />
               <NodesCard v-if="selected === 'nodes'" />
               <ProfileCard v-if="selected === 'profile'" />
             </div>

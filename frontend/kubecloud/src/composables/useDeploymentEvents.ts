@@ -8,7 +8,6 @@ export interface DeploymentEvent {
   type: string
   data: any
   message?: string
-  task_id?: string
   timestamp: string
 }
 
@@ -19,7 +18,6 @@ export function useDeploymentEvents() {
   const clusterStore = useClusterStore()
   const { fetchRentedNodes } = useNodeManagement()
 
-  const seenTaskIds = new Set<string>()
   const isConnected = ref(false)
   const reconnectAttempts = ref(0)
   const maxReconnectAttempts = 5
@@ -48,12 +46,7 @@ export function useDeploymentEvents() {
           return
         }
 
-        // Prevent duplicate processing
-        const taskId = data.task_id || data.data?.task_id
-        if (taskId && seenTaskIds.has(taskId)) return
-        if (taskId) seenTaskIds.add(taskId)
-
-        // Handle workflow updates - backend sends simplified messages
+        // Handle workflow updates
         if (type === 'workflow_update') {
           const message = data.message || data.data?.message
           if (message) {

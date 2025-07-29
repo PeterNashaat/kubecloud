@@ -33,7 +33,7 @@
                 <td>{{ node.ip || '-' }}</td>
                 <td>{{ node.contract_id || '-' }}</td>
                 <td>
-                  <v-btn @click="removeNode(node.original_name)"><v-icon>mdi-delete</v-icon></v-btn>
+                  <v-btn @click="removeNode(node.original_name)" :disabled='node.type == "leader"'><v-icon>mdi-delete</v-icon></v-btn>
                 </td>
               </tr>
             </tbody>
@@ -42,31 +42,30 @@
         </div>
         <div v-else-if="editTab === 'add'">
           <div class="add-form-wrapper">
-            <v-text-field v-model="addFormName" label="Name" class="polished-input" />
-            <v-text-field v-model.number="addFormCpu" label="CPU" type="number" min="1" class="polished-input" />
-            <v-text-field v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" class="polished-input" />
-            <v-text-field v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" class="polished-input" />
+            <v-text-field v-model="addFormName" label="Name" />
+            <v-text-field v-model.number="addFormCpu" label="CPU" type="number" min="1" />
+            <v-text-field v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" />
+            <v-text-field v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" />
             <v-select
               v-model="addFormNodeId"
               :items="availableNodesWithName"
               item-title="name"
               item-value="nodeId"
               label="Select Node"
-              class="polished-input"
             >
               <template #item="{ item, props }">
-                <div class="node-option-row" v-bind="props">
-                  <div class="node-id">Node {{ item.raw.nodeId }}</div>
+                <div class="d-flex pa-3" v-bind="props">
+                  <div class="mr-3">Node {{ item.raw.nodeId }}</div>
                   <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-chip color="primary" text-color="white" size="x-small" class="mr-2" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
                       {{ getTotalCPU(item.raw) }} CPU
                     </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-chip color="success" text-color="white" size="x-small" class="mr-2" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-memory</v-icon>
                       {{ getAvailableRAM(item.raw) }} GB RAM
                     </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-chip color="info" text-color="white" size="x-small" class="mr-2" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
                       {{ getAvailableStorage(item.raw) }} GB Disk
                     </v-chip>
@@ -81,18 +80,18 @@
                 </div>
               </template>
               <template #selection="{ item }">
-                <div class="node-option-row">
-                  <div class="node-id">Node {{ item.raw.nodeId }}</div>
+                <div class="d-flex">
+                  <div class="mr-3">Node {{ item.raw.nodeId }}</div>
                   <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-chip color="primary" text-color="white" size="x-small" class="mr-2" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
                       {{ getTotalCPU(item.raw) }} CPU
                     </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-chip color="success" text-color="white" size="x-small" class="mr-2" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-memory</v-icon>
                       {{ getAvailableRAM(item.raw) }} GB RAM
                     </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
+                    <v-chip color="info" text-color="white" size="x-small" class="mr-2" variant="outlined">
                       <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
                       {{ getAvailableStorage(item.raw) }} GB Disk
                     </v-chip>
@@ -107,7 +106,7 @@
                 </div>
               </template>
             </v-select>
-            <v-select v-model="addFormRole" :items="['master', 'worker']" label="Role" class="polished-input" />
+            <v-select v-model="addFormRole" :items="['master', 'worker']" label="Role" />
             <div class="ssh-key-section" style="margin-top: 1.5rem; width: 100%;">
               <label class="ssh-key-label">SSH Key</label>
               <div v-if="sshKeysLoading" class="mb-2"><v-progress-circular indeterminate size="24" color="primary" /></div>

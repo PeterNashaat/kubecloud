@@ -1,14 +1,9 @@
 <template>
   <div class="dashboard-card">
-    <div class="dashboard-card-header">
-      <div class="dashboard-card-title-section">
-        <div class="dashboard-card-title-content">
-          <h3 class="dashboard-card-title">Dashboard Overview</h3>
-          <p class="dashboard-card-subtitle">Your KubeCloud platform at a glance</p>
-        </div>
-      </div>
+    <div class="mb-8">
+      <h3 class="dashboard-card-title">Dashboard Overview</h3>
+      <p class="dashboard-card-subtitle">Your KubeCloud platform at a glance</p>
     </div>
-
     <!-- Stats Grid -->
     <StatsGrid :stats="statsData" />
 
@@ -136,26 +131,10 @@ const emit = defineEmits(['navigate'])
 </script>
 
 <style scoped>
-.dashboard-card-header {
-  text-align: center;
-  margin-bottom: var(--space-8);
-}
-
-.dashboard-card-title-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dashboard-card-title-content {
-  text-align: center;
-}
-
 .dashboard-card-title {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-  margin: 0 0 var(--space-2) 0;
 }
 
 .dashboard-card-subtitle {
@@ -163,10 +142,6 @@ const emit = defineEmits(['navigate'])
   color: var(--color-primary);
   font-weight: var(--font-weight-medium);
   opacity: 0.9;
-}
-
-.quick-actions-section {
-  margin-bottom: var(--space-8);
 }
 
 .section-title {
@@ -184,10 +159,6 @@ const emit = defineEmits(['navigate'])
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .dashboard-card-header {
-    margin-bottom: var(--space-6);
-  }
-
   .actions-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--space-3);
