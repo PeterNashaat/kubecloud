@@ -3,7 +3,7 @@
     <v-container fluid class="pa-0">
       <div class="dashboard-header mb-6">
         <h1 class="hero-title">Pending Requests</h1>
-        <p class="section-subtitle">View and manage your pending transfer requests</p>
+        <p class="section-subtitle">View your pending transfer requests</p>
       </div>
       <div class="dashboard-content-wrapper">
         <div class="dashboard-layout">
@@ -12,7 +12,7 @@
           </div>
           <div class="dashboard-main">
             <div class="dashboard-cards">
-              <PendingRequestsCard />
+              <UserPendingRequestsCard />
             </div>
           </div>
         </div>
@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import PendingRequestsCard from '../components/dashboard/PendingRequestsCard.vue'
+import UserPendingRequestsCard from '../components/dashboard/UserPendingRequestsCard.vue'
 
 const selected = ref('overview')
 function handleSidebarSelect(val: string) {

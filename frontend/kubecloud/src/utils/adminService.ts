@@ -1,5 +1,6 @@
 import { api } from "./api"
 import type { ApiResponse } from "./authService"
+import type { PendingRequest } from "./userService"
 
 // Types for admin requests and responses
 export interface User {
@@ -136,6 +137,16 @@ export class AdminService {
       errorMessage: 'Failed to load invoices'
     })
     return response.data.data.invoices
+  }
+
+  // List all pending requests (requires admin auth)
+  async listPendingRequests(): Promise<PendingRequest[]> {
+    const response = await api.get<ApiResponse<{ pendingRequests: PendingRequest[] }>>('/v1/pending-records', {
+      requiresAuth: true,
+      showNotifications: true,
+      errorMessage: 'Failed to load pending requests'
+    })
+    return response.data.data.pendingRequests
   }
 }
 
