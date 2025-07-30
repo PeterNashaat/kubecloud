@@ -271,20 +271,20 @@ export class UserService {
   }
 
   // Fetch the user's current balance
-  async fetchBalance(): Promise<number> {
+  async fetchBalance(): Promise<{balance: number, pending_balance: number}> {
     try {
-    const response = await api.get<{ data: { balance_usd: number, debt_usd: number } }>(
+    const response = await api.get<{ data: { balance_usd: number, debt_usd: number, pending_balance_usd: number } }>(
       '/v1/user/balance',
       { requiresAuth: true, showNotifications: false }
     )
-    const { balance_usd, debt_usd } = response.data.data
-    return (balance_usd || 0) - (debt_usd || 0)
+    const { balance_usd, debt_usd, pending_balance_usd } = response.data.data
+    return {balance: (balance_usd || 0) - (debt_usd || 0), pending_balance: pending_balance_usd || 0}
   }catch(e){
     useNotificationStore().error(
       'Error',
       'Failed to fetch balance',
     )
-    return 0
+    return {balance: 0, pending_balance: 0}
   }
   }
 
