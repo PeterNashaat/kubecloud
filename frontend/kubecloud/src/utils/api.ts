@@ -1,3 +1,4 @@
+import { WorkflowStatus } from '@/types/ewf'
 import { useNotificationStore } from '../stores/notifications'
 import { useUserStore } from '../stores/user'
 import { useRouter } from 'vue-router'
@@ -265,3 +266,88 @@ export async function deployCluster(payload: any) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getWorkflowStatus(workflowID: string): Promise<ApiResponse<{ data: WorkflowStatus }>> {
+  return api.get(`/v1/workflow/${workflowID}`, { requiresAuth: false, showNotifications: false })
+}
+
+
+
+/**
+ * Creates a workflow status checker that polls for workflow status at regular intervals.
+ *
+ * @param workflowID - The ID of the workflow to check
+ * @param options - Configuration options
+ * @param options.delay - Initial delay before first check in milliseconds (default: 6000ms)
+ * @param options.interval - Polling interval in milliseconds (default: 1000ms)
+ * 
+ * @returns An object containing:
+ *   - status: A promise that resolves with the final workflow status (completed or failed)
+ *   - cancel: A function to cancel the polling process
+ * 
+ * @description
+ * This function implements a polling pattern with two timing mechanisms:
+ * 1. An initial delay (delay) before the first status check
+ * 2. Regular interval checks (interval) that continue until completion or cancellation
+ * 
+ * The polling continues until one of these conditions is met:
+ * - The workflow completes successfully (StatusCompleted)
+ * - The workflow fails (StatusFailed)
+ * - An error occurs during polling
+ * - The polling is manually canceled via the returned cancel function
+ */
+export function createWorkflowStatusChecker(workflowID: string, options?: {
+  initialDelay?: number;
+  interval?: number;
+}): {
+  status: Promise<WorkflowStatus>;
+  cancel: () => void;
+} {
+  const interval = options?.interval ?? 1000;
+  const delay = options?.initialDelay ?? 6000;
+  let intervalId: NodeJS.Timeout | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
+  let rejectFn: (reason?: any) => void;
+
+  const statusPromise = new Promise<WorkflowStatus>((resolve, reject) => {
+    rejectFn = reject;
+
+    const check = async () => {
+      try {
+        const result = await getWorkflowStatus(workflowID);
+        const status = result.data.data;
+
+        if (status === WorkflowStatus.StatusCompleted || status === WorkflowStatus.StatusFailed) {
+          if (intervalId) clearInterval(intervalId);
+          resolve(status);
+        }
+      } catch (error) {
+        useNotificationStore().error(
+          'Error',
+          'Failed to verify request status',
+        )
+        if (intervalId) clearInterval(intervalId);
+        reject(error);
+      }
+    };
+    
+    // First, wait for the delay before doing anything
+    timeoutId = setTimeout(() => {
+      check();
+      
+      // Then start the interval for subsequent checks
+      intervalId = setInterval(check, interval);
+    }, delay);
+  });
+
+  const cancel = () => {
+    if (intervalId) clearInterval(intervalId);
+    if (timeoutId) clearTimeout(timeoutId);
+    rejectFn?.('Polling canceled.');
+  };
+
+  return { status: statusPromise, cancel };
+}
+
+
+
