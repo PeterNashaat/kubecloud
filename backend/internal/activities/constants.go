@@ -15,8 +15,6 @@ const (
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"
 	StepCreatePendingRecord     = "create_pending_record"
-	StepTransferTFTs            = "transfer_tfts"
-	StepCancelPaymentIntent     = "cancel_payment_intent"
 	StepUpdateCreditCardBalance = "update_user_balance"
 	StepSendVerificationEmail   = "send_verification_email"
 	StepSetupTFChain            = "setup_tfchain"

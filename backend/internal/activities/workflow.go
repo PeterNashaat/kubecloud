@@ -64,8 +64,6 @@ func RegisterEWFWorkflows(
 	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency))
 	engine.Register(StepCreatePendingRecord, CreatePendingRecord(substrate, db, config.SystemAccount.Mnemonic))
 	engine.Register(StepUpdateCreditCardBalance, UpdateCreditCardBalanceStep(db))
-	engine.Register(StepTransferTFTs, TransferTFTsStep(substrate, config.SystemAccount.Mnemonic))
-	engine.Register(StepCancelPaymentIntent, CancelPaymentIntentStep())
 	engine.Register(StepCreateIdentity, CreateIdentityStep())
 	engine.Register(StepReserveNode, ReserveNodeStep(db, substrate))
 	engine.Register(StepUnreserveNode, UnreserveNodeStep(db, substrate))
@@ -108,8 +106,6 @@ func RegisterEWFWorkflows(
 		{Name: StepCreatePaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepUpdateCreditCardBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepCreatePendingRecord, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
-		{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
-		{Name: StepCancelPaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}}, // Compensation step
 	}
 	engine.RegisterTemplate(WorkflowChargeBalance, &chargeBalanceTemplate)
 
@@ -117,7 +113,6 @@ func RegisterEWFWorkflows(
 	redeemVoucherTemplate.Steps = []ewf.Step{
 		{Name: StepUpdateCreditedBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepCreatePendingRecord, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
-		{Name: StepTransferTFTs, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
 	engine.RegisterTemplate(WorkflowRedeemVoucher, &redeemVoucherTemplate)
 

@@ -168,7 +168,7 @@ const docTemplate = `{
                     "200": {
                         "description": "User is retrieved successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/app.GetUserResponse"
                         }
                     },
                     "404": {
@@ -754,44 +754,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/user/pending-records": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns user pending records in the system",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "List user pending records",
-                "operationId": "list-user-pending-records",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/app.PendingRecordsResponse"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/user/redeem/{voucher_code}": {
             "put": {
                 "description": "Redeems a voucher for the user",
@@ -926,7 +888,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request format or validation error",
+                        "description": "Invalid request format",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -1581,6 +1543,69 @@ const docTemplate = `{
                 }
             }
         },
+        "app.GetUserResponse": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "account_address": {
+                    "type": "string"
+                },
+                "admin": {
+                    "type": "boolean"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "credit_card_balance": {
+                    "description": "money from credit card",
+                    "type": "number"
+                },
+                "credited_balance": {
+                    "description": "manually added by admin or from vouchers",
+                    "type": "number"
+                },
+                "debt": {
+                    "type": "number"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "password": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "pending_amount_usd": {
+                    "type": "number"
+                },
+                "sponsored": {
+                    "type": "boolean"
+                },
+                "ssh_key": {
+                    "type": "string"
+                },
+                "stripe_customer_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "verified": {
+                    "type": "boolean"
+                }
+            }
+        },
         "app.LoginInput": {
             "type": "object",
             "required": [
@@ -1595,6 +1620,36 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 64,
                     "minLength": 3
+                }
+            }
+        },
+        "app.PendingRecordsResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "tft_amount": {
+                    "description": "TFTs are multiplied by 1e7",
+                    "type": "integer"
+                },
+                "transferred_tft_amount": {
+                    "type": "integer"
+                },
+                "transferred_usd_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "usd_amount": {
+                    "type": "number"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -1733,6 +1788,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "debt_usd": {
+                    "type": "number"
+                },
+                "pending_balance_usd": {
                     "type": "number"
                 }
             }

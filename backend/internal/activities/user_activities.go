@@ -357,95 +357,21 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 		if !ok {
 			return fmt.Errorf("'userID' in state is not a int")
 		}
+
 		requestedTFTs, err := internal.FromUSDToTFT(substrateClient, float64(amountInt))
 		if err != nil {
 			log.Error().Err(err).Msg("error converting usd")
 			return err
 		}
 
-		systemBalanceUSD, err := internal.GetUserBalanceUSD(substrateClient, systemMnemonic)
-		if err != nil {
-			log.Error().Err(err).Msg("error checking system account balance")
-			return err
-		}
-
-		if systemBalanceUSD < float64(amountInt) {
-			if err = db.CreatePendingRecord(&models.PendingRecord{
-				UserID:    userID,
-				TFTAmount: requestedTFTs,
-			}); err != nil {
-				log.Error().Err(err).Send()
-				return err
-			}
-			state["insufficient_balance"] = true
-			return nil
-
-		}
-
-		state["insufficient_balance"] = false
-		return nil
-	}
-}
-
-func CancelPaymentIntentStep() ewf.StepFn {
-	return func(ctx context.Context, state ewf.State) error {
-		failed, ok := state["transfer_tfts_failed"].(bool)
-		if !ok || !failed {
-			return nil
-		}
-		paymentIntentID, _ := state["payment_intent_id"].(string)
-		if paymentIntentID == "" {
-			return nil
-		}
-		if err := internal.CancelPaymentIntent(paymentIntentID); err != nil {
-			log.Error().Err(err).Msg("error canceling payment intent in compensation step")
-			return err
-		}
-		return nil
-	}
-}
-
-func TransferTFTsStep(substrateClient *substrate.Substrate, systemMnemonic string) ewf.StepFn {
-	return func(ctx context.Context, state ewf.State) error {
-		if state["insufficient_balance"] == true {
-			return nil // Skip transfer
-		}
-
-		amountVal, ok := state["amount"]
-		if !ok {
-			return fmt.Errorf("missing 'amount' in state")
-		}
-		var amount float64
-		switch v := amountVal.(type) {
-		case float64:
-			amount = v
-		case int:
-			amount = float64(v)
-		default:
-			return fmt.Errorf("'amount' in state is not a float64 or int")
-		}
-
-		mnemonicVal, ok := state["mnemonic"]
-		if !ok {
-			return fmt.Errorf("missing 'mnemonic' in state")
-		}
-		mnemonic, ok := mnemonicVal.(string)
-		if !ok {
-			return fmt.Errorf("'mnemonic' in state is not a string")
-		}
-
-		systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(systemMnemonic)
-		if err != nil {
-			return fmt.Errorf("failed to create system identity: %w", err)
-		}
-
-		err = internal.TransferTFTs(substrateClient, uint64(amount), mnemonic, systemIdentity)
-		if err != nil {
+		if err = db.CreatePendingRecord(&models.PendingRecord{
+			UserID:    userID,
+			TFTAmount: requestedTFTs,
+		}); err != nil {
 			log.Error().Err(err).Send()
-			state["transfer_tfts_failed"] = true
 			return err
 		}
-		state["transfer_tfts_failed"] = false
+
 		return nil
 	}
 }
@@ -474,22 +400,17 @@ func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 		default:
 			return fmt.Errorf("'amount' in state is not a float64 or int")
 		}
-		log.Info().Msgf("Amount in workflow: ", amount)
 
 		user, err := db.GetUserByID(userID)
 		if err != nil {
 			return fmt.Errorf("user not found: %w", err)
 		}
-		log.Info().Msgf("User before update: ", user)
+
 		user.CreditCardBalance += amount
 		if err := db.UpdateUserByID(&user); err != nil {
 			return fmt.Errorf("error updating user: %w", err)
 		}
-		user, err = db.GetUserByID(userID)
-		if err != nil {
-			return fmt.Errorf("user not found: %w", err)
-		}
-		log.Info().Msgf("User after update: ", user)
+
 		state["new_balance"] = user.CreditCardBalance
 		state["mnemonic"] = user.Mnemonic
 		return nil
