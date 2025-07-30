@@ -2,20 +2,12 @@ package kubedeployer
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"net"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 )
-
-func getRandomMyceliumNetSeed() (string, error) {
-	key := make([]byte, MYC_NET_SEED_LEN)
-	_, err := rand.Read(key)
-	return hex.EncodeToString(key), err
-}
 
 func getIpForVm(ctx context.Context, tfPluginClient deployer.TFPluginClient, networkName string, nodeID uint32) (string, error) {
 	network := tfPluginClient.State.Networks.GetNetwork(networkName)
