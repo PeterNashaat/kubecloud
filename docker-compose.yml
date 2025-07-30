@@ -38,7 +38,7 @@ services:
     volumes:
       - ./backend/kubecloud.db:/app/kubecloud.db
       - ./backend/config.json:/app/config.json
-      - /home/omar/.ssh:/root/.ssh:ro
+      - /root/.ssh:/root/.ssh:ro
       - mycelium-bin:/usr/local/bin:ro # shares mycelium binary from mycelium container
     environment:
       - MYCELIUM_HOST=localhost

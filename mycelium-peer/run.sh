@@ -24,5 +24,5 @@ else
   PEERS="$DEFAULT_PEERS"
 fi
 
-echo "🚀 Starting: $TARGET_BINARY --key-file /etc/netseed --peers $PEERS"
-exec "$TARGET_BINARY" --key-file /etc/netseed --peers $PEERS
+echo "🚀 Starting: $TARGET_BINARY --peers $PEERS"
+exec "$TARGET_BINARY" --peers $PEERS
