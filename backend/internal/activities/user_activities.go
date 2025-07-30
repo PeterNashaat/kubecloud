@@ -382,6 +382,7 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 
 		}
 
+		state["insufficient_balance"] = false
 		return nil
 	}
 }
@@ -473,15 +474,22 @@ func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 		default:
 			return fmt.Errorf("'amount' in state is not a float64 or int")
 		}
+		log.Info().Msgf("Amount in workflow: ", amount)
 
 		user, err := db.GetUserByID(userID)
 		if err != nil {
 			return fmt.Errorf("user not found: %w", err)
 		}
+		log.Info().Msgf("User before update: ", user)
 		user.CreditCardBalance += amount
 		if err := db.UpdateUserByID(&user); err != nil {
 			return fmt.Errorf("error updating user: %w", err)
 		}
+		user, err = db.GetUserByID(userID)
+		if err != nil {
+			return fmt.Errorf("user not found: %w", err)
+		}
+		log.Info().Msgf("User after update: ", user)
 		state["new_balance"] = user.CreditCardBalance
 		state["mnemonic"] = user.Mnemonic
 		return nil
@@ -490,9 +498,6 @@ func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 
 func UpdateCreditedBalanceStep(db models.DB) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		if failed, ok := state["transfer_tfts_failed"].(bool); ok && failed {
-			return fmt.Errorf("TFT transfer failed, not updating credited balance")
-		}
 		userIDVal, ok := state["user_id"]
 		if !ok {
 			return fmt.Errorf("missing 'user_id' in state")
