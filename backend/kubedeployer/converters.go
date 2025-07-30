@@ -2,6 +2,7 @@ package kubedeployer
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
@@ -12,8 +13,16 @@ const (
 	K3S_ENTRYPOINT = "/sbin/zinit init"
 	K3S_DATA_DIR   = "/mnt/data"
 	K3S_IFACE      = "flannel-br"
-	K3S_TOKEN      = "randomely_generated_token"
 )
+
+func generateRandomString(length int) string {
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(result)
+}
 
 func deploymentFromNode(
 	node Node,
@@ -58,6 +67,7 @@ func deploymentFromNode(
 	vm.EnvVars["MASTER"] = "false"
 	vm.EnvVars["HA"] = "false"
 	vm.EnvVars["K3S_URL"] = ""
+	vm.EnvVars["K3S_TOKEN"] = token
 
 	if node.Type == NodeTypeMaster || node.Type == NodeTypeLeader {
 		vm.EnvVars["MASTER"] = "true"
@@ -66,13 +76,6 @@ func deploymentFromNode(
 	if node.Type != NodeTypeLeader {
 		vm.EnvVars["K3S_URL"] = fmt.Sprintf("https://%s:6443", leaderIP)
 	}
-
-	if token == "" {
-		vm.EnvVars["K3S_TOKEN"] = K3S_TOKEN
-	} else {
-		vm.EnvVars["K3S_TOKEN"] = token
-	}
-
 	if vm.EnvVars["K3S_FLANNEL_IFACE"] == "" {
 		vm.EnvVars["K3S_FLANNEL_IFACE"] = K3S_IFACE
 	}

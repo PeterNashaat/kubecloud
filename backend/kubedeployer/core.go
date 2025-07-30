@@ -38,6 +38,10 @@ func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node, ma
 		leaderIP = leaderNode.IP
 	}
 
+	if cluster.Token == "" {
+		cluster.Token = generateRandomString(32)
+	}
+
 	depl, err := deploymentFromNode(
 		node,
 		cluster.ProjectName,

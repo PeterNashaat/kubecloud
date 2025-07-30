@@ -333,7 +333,7 @@ func createWorkloadsFromNode(node Node, deploymentNames DeploymentNames, network
 	}
 
 	if vm.EnvVars["K3S_TOKEN"] == "" {
-		vm.EnvVars["K3S_TOKEN"] = K3S_TOKEN
+		vm.EnvVars["K3S_TOKEN"] = generateRandomString(32)
 	}
 	if vm.EnvVars["K3S_FLANNEL_IFACE"] == "" {
 		vm.EnvVars["K3S_FLANNEL_IFACE"] = K3S_IFACE
