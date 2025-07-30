@@ -10,7 +10,7 @@ bridge="flannel-br"
 eth_iface="eth0"
 
 echo "🔧 Creating bridge: $bridge"
-ip link add name $bridge type bridge
+ip link add name $bridge type bridge || true
 ip link set $bridge up
 
 echo "[*] Migrating IPv4 configuration from $eth_iface to $bridge..."
@@ -42,8 +42,12 @@ ipv6_gw=$(ip -6 route show 400::/7 | grep "dev $IPV6_IFACE" | awk '/via/ {print 
 # Extract additional global IPv6 on eth0 (not link-local)
 eth0_ipv6_extra=$(ip -6 addr show dev "$eth_iface" | awk '/inet6/ && !/fe80::/ {print $2}' | head -n1)
 
-# Detect default IPv6 route via eth0
-eth0_ipv6_gw=$(ip -6 route show default | awk '$1 == "default" && $3 == "via" && $5 == "'"$eth_iface"'" {print $3; exit}')
+# Detect current default IPv6 route via eth0
+eth0_ipv6_default=$(ip -6 route show default | grep "dev $eth_iface" | grep -v "fe80::" | head -n1)
+if [[ -n "$eth0_ipv6_default" ]]; then
+  eth0_ipv6_gw=$(echo "$eth0_ipv6_default" | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1)}')
+  echo "[*] Found default IPv6 gateway on $eth_iface: $eth0_ipv6_gw"
+fi
 
 # Step 5: Clean up original IPs
 ip addr del "$ipv4" dev "$eth_iface"
@@ -59,7 +63,7 @@ ip link set "$IPV6_IFACE" master "$bridge"
 ip link set "$eth_iface" up
 ip link set "$IPV6_IFACE" up
 
-# Step 7: Reassign IPs
+# Step 7: Reassign IPs to bridge (important: order matters)
 if [[ -n "$eth0_ipv6_extra" ]]; then
   echo "[+] Moving additional IPv6 ($eth0_ipv6_extra) from $eth_iface to $bridge"
   ip addr add "$eth0_ipv6_extra" dev "$bridge"
