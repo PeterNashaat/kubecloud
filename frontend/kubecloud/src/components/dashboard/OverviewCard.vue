@@ -125,7 +125,7 @@ const quickActions = [
     color: 'secondary',
     variant: 'outlined' as const,
     handler: () => emit('navigate', 'payment')
-  }
+  },
 ]
 const emit = defineEmits(['navigate'])
 </script>

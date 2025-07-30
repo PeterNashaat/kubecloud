@@ -13,6 +13,7 @@ import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
 import { useClusterStore } from '../stores/clusters'
 import { useNotificationStore } from '../stores/notifications'
+import PendingRequestsCard from '../components/dashboard/PendingRequestsCard.vue'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
@@ -127,6 +128,7 @@ function handleNavigate(section: string) {
               <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" />
               <NodesCard v-if="selected === 'nodes'" />
               <ProfileCard v-if="selected === 'profile'" />
+              <PendingRequestsCard v-if="selected === 'pending-requests'"/>
             </div>
           </div>
         </div>
