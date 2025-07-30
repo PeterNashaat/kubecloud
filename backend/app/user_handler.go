@@ -744,9 +744,9 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 	wf.State = map[string]interface{}{
-		"user_id":      user.ID,
-		"amount":       voucher.Value,
-		"mnemonic":     user.Mnemonic,
+		"user_id":  user.ID,
+		"amount":   voucher.Value,
+		"mnemonic": user.Mnemonic,
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
