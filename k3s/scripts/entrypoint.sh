@@ -19,7 +19,7 @@ if [[ "${DUAL_STACK}" = "true" && "${MASTER}" = "true" ]]; then
     EXTRA_ARGS="$EXTRA_ARGS --flannel-ipv6-masq"
 fi
 
-if [[ "${DUAL_STACK}" = "true" ]]
+if [[ "${DUAL_STACK}" = "true" ]]; then
     # this to force the ip selection from flannel-br to use mycelium ip
     # not any other ipv6 on flannel-br
 
