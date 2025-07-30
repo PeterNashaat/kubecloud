@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authService, type LoginRequest, type RegisterRequest, type VerifyCodeRequest } from '@/utils/authService'
+import { authService, type LoginRequest, type RegisterRequest } from '@/utils/authService'
 import { api } from '@/utils/api'
 import type { ApiResponse } from '@/utils/authService'
 import { userService } from '@/utils/userService'
@@ -96,33 +96,6 @@ export const useUserStore = defineStore('user',
       }
     }
 
-    const verifyCode = async (email: string, code: number) => {
-      isLoading.value = true
-      error.value = null
-
-      try {
-        const verifyData: VerifyCodeRequest = { email, code }
-        const response = await authService.verifyCode(verifyData)
-        
-        // Store tokens
-        authService.storeTokens(response.access_token, response.refresh_token)
-        
-        // Set token in store
-        token.value = response.access_token
-        
-        // Fetch user profile from backend
-        const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
-        user.value = userRes.data.data.user
-        
-        return response
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : 'Verification failed'
-        throw err
-      } finally {
-        isLoading.value = false
-      }
-    }
-
     const updateProfile = async (updates: Partial<User>) => {
       if (!user.value) throw new Error('User not logged in')
 
@@ -189,7 +162,6 @@ export const useUserStore = defineStore('user',
       login,
       logout,
       register,
-      verifyCode,
       updateProfile,
       refreshToken,
       initializeAuth,

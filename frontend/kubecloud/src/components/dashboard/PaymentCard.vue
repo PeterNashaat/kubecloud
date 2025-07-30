@@ -118,11 +118,13 @@ async function chargeBalance() {
       payment_method_id: tokenId, // This is now a 'tok_' id
       amount: Number(selectedAmount)
     })
+    await userStore.updateNetBalance()
     // Clear the form
     if (cardElement.value) cardElement.value.clear()
     amount.value = 5
     customAmount.value = null
   } catch (err: any) {
+    console.error('Failed to charge balance:', err)
   } finally {
     loading.value = false
   }
