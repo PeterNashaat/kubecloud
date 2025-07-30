@@ -528,27 +528,3 @@ func UpdateCreditedBalanceStep(db models.DB) ewf.StepFn {
 		return nil
 	}
 }
-
-func RedeemVoucherStep(db models.DB) ewf.StepFn {
-	return func(ctx context.Context, state ewf.State) error {
-		if failed, ok := state["transfer_tfts_failed"].(bool); ok && failed {
-			return fmt.Errorf("TFT transfer failed, not redeeming voucher")
-		}
-		voucherCodeVal, ok := state["voucher_code"]
-		if !ok {
-			return fmt.Errorf("missing 'voucher_code' in state")
-		}
-		voucher, ok := voucherCodeVal.(string)
-		if !ok {
-			return fmt.Errorf("'mnemonic' in state is not a string")
-		}
-		err := db.RedeemVoucher(voucher)
-		if err != nil {
-			return fmt.Errorf("error redeeming voucher")
-		}
-
-		return nil
-
-	}
-
-}

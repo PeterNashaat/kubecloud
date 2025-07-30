@@ -730,6 +730,13 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
+	err = h.db.RedeemVoucher(voucher.Code)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -740,7 +747,6 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		"user_id":      user.ID,
 		"amount":       voucher.Value,
 		"mnemonic":     user.Mnemonic,
-		"voucher_code": voucher.Code,
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
