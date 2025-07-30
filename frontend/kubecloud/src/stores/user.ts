@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authService, type LoginRequest, type RegisterRequest, type VerifyCodeRequest } from '@/utils/authService'
+import { authService, type LoginRequest, type RegisterRequest } from '@/utils/authService'
 import { api } from '@/utils/api'
 import type { ApiResponse } from '@/utils/authService'
 import { userService } from '@/utils/userService'

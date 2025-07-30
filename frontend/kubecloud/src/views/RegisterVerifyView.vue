@@ -51,14 +51,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useNotificationStore } from '../stores/notifications'
-import { useUserStore } from '../stores/user'
 import { authService } from '../utils/authService'
 
 const route = useRoute()
 const router = useRouter()
-const notificationStore = useNotificationStore()
-const userStore = useUserStore()
 
 const form = reactive({
   email: route.query.email ? String(route.query.email) : '',

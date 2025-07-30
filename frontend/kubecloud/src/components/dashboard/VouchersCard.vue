@@ -38,19 +38,7 @@
 import { ref } from 'vue'
 import { userService } from '../../utils/userService'
 import { useUserStore } from '../../stores/user'
-import { api } from '../../utils/api'
-import type { ApiResponse } from '../../utils/authService'
 
-interface Voucher {
-  id: number | string
-  name: string
-  description?: string
-  amount: string
-  expiryDate: string
-  used?: boolean
-  icon?: string
-  iconColor?: string
-}
 
 const code = ref('')
 const loading = ref(false)
@@ -74,12 +62,6 @@ async function onRedeem() {
   await userStore.updateNetBalance()
 }
 
-function isExpired(expiryDate: string) {
-  if (!expiryDate) return false
-  const now = new Date()
-  const exp = new Date(expiryDate)
-  return exp < now
-}
 </script>
 
 <style scoped>

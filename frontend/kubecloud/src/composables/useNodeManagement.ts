@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
 import { userService } from '@/utils/userService'
-import { useNotificationStore } from '@/stores/notifications'
 
 // Interface for rented nodes (matches the grid proxy structure)
 export interface RentedNode {
@@ -100,7 +99,6 @@ export function useNodeManagement() {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const reserveNodeLoading = ref(false)
-  const notificationStore = useNotificationStore()
 
   // Fetch user's rented nodes
   async function fetchRentedNodes() {
