@@ -110,7 +110,7 @@ definitions:
         items:
           type: integer
         type: array
-      pending_amount_usd:
+      pending_balance_usd:
         type: number
       sponsored:
         type: boolean
