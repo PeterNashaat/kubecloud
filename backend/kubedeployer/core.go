@@ -55,9 +55,14 @@ func (c *Client) DeployNode(ctx context.Context, cluster *Cluster, node Node, ma
 		log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to deploy node to grid")
 		return fmt.Errorf("failed to deploy node %s: %v", node.Name, err)
 	}
+
+	result, err := c.GridClient.State.LoadDeploymentFromGrid(ctx, node.NodeID, node.Name)
+	if err != nil {
+		return fmt.Errorf("failed to load deployment for node %s: %v", node.Name, err)
+	}
 	log.Debug().Str("node_name", node.Name).Msg("Grid deployment successful")
 
-	res, err := nodeFromDeployment(depl)
+	res, err := nodeFromDeployment(result)
 	if err != nil {
 		log.Error().Err(err).Str("node_name", node.Name).Msg("Failed to extract node from deployment")
 		return fmt.Errorf("failed to get node from deployment: %v", err)
