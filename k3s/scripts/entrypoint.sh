@@ -44,12 +44,12 @@ if [[ "${DUAL_STACK}" = "true" ]]; then
 
     # Step 3: Get global IPv6 addresses and match subnet
     ipv6_list=$(ip -6 addr show dev "$K3S_FLANNEL_IFACE" scope global | awk '/inet6/ {print $2}' | cut -d'/' -f1)
-    ipv6_match=""
+    ipv6=""
 
     for ip in $ipv6_list; do
         ip_prefix=$(echo "$ip" | cut -d':' -f1-4)
         if [ "$ip_prefix" = "$prefix" ]; then
-            ipv6_match=$ip
+            ipv6=$ip
             break
         fi
     done
