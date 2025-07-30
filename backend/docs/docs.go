@@ -1583,7 +1583,7 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "pending_amount_usd": {
+                "pending_balance_usd": {
                     "type": "number"
                 },
                 "sponsored": {
