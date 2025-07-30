@@ -20,9 +20,6 @@
         <template v-slot:[`item.created_at`]="{ item }">
           <span>{{ formatDate(item.created_at) }}</span>
         </template>
-        <template v-slot:[`item.created_at`]="{ item }">
-          <span>{{ formatTime(item.created_at) }}</span>
-        </template>
         <template v-slot:[`item.usd_amount`]="{ item }">
           <span>${{ item.usd_amount.toFixed(2) }}</span>
         </template>
@@ -46,25 +43,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { userService, type PendingRequest } from '../../utils/userService'
-
+import {formatDate} from '../../utils/uiUtils.ts'
 const pendingRequests = ref<PendingRequest[]>([])
 
 const headers = [
-  { title: 'Date', key: 'created_at' },
-  { title: 'Time', key: 'created_at' },
+  { title: 'Request Date', key: 'created_at' },
   { title: 'Requested Amount', key: 'usd_amount' },
   { title: 'Transferred Amount', key: 'transferred_usd_amount' },
   { title: 'Status', key: 'status' },
 ]
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
+
+userService.listUserPendingRequests().then((response) => {
+ pendingRequests.value = response || []
+})
+
+
 
 userService.listUserPendingRequests().then((response) => {
  pendingRequests.value = response || []
