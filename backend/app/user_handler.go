@@ -165,7 +165,7 @@ type RedeemVoucherResponse struct {
 
 type GetUserResponse struct {
 	models.User
-	PendingBalanceUSD float64 `json:"pending_balance_usd"`
+	PendingAmountUSD float64 `json:"pending_amount_usd"`
 }
 
 // RegisterHandler registers user to the system
@@ -675,8 +675,8 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 	}
 
 	userResponse := GetUserResponse{
-		User:              user,
-		PendingBalanceUSD: usdPendingAmount,
+		User:             user,
+		PendingAmountUSD: usdPendingAmount,
 	}
 
 	Success(c, http.StatusOK, "User is retrieved successfully", userResponse)
