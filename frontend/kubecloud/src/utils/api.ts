@@ -322,12 +322,10 @@ export function createWorkflowStatusChecker(workflowID: string, options?: {
           resolve(status);
         }
       } catch (error) {
-        useNotificationStore().addNotification({
-          title: 'Error',
-          message: 'Failed to verify request status',
-          type: 'error',
-          duration: 5000
-        })
+        useNotificationStore().error(
+          'Error',
+          'Failed to verify request status',
+        )
         if (intervalId) clearInterval(intervalId);
         reject(error);
       }

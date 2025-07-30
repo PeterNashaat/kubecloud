@@ -111,20 +111,16 @@ export class AuthService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 15000,interval: 3000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusCompleted) {
-      useNotificationStore().addNotification({
-        title: 'Registration Success',
-        message: 'User registered successfully',
-        type: 'success',
-        duration: 5000
-      })
+      useNotificationStore().success(
+        'Registration Success',
+        'User registered successfully',
+      )
     }
     if (status === WorkflowStatus.StatusFailed) {
-      useNotificationStore().addNotification({
-        title: 'Registration Failed',
-        message: 'Failed to register user',
-        type: 'error',
-        duration: 5000
-      })
+      useNotificationStore().error(
+        'Registration Failed',
+        'Failed to register user',
+      )
       throw new Error('Failed to register user')
     }
     
@@ -139,20 +135,16 @@ export class AuthService {
     const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 2000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusCompleted) {
-      useNotificationStore().addNotification({
-        title: 'Verification Success',
-        message: 'User verified successfully',
-        type: 'success',
-        duration: 5000
-      })
+      useNotificationStore().success(
+        'Verification Success',
+        'User verified successfully',
+      )
     }
     if (status === WorkflowStatus.StatusFailed) {
-      useNotificationStore().addNotification({
-        title: 'Verification Failed',
-        message: 'Failed to verify user',
-        type: 'error',
-        duration: 5000
-      })
+      useNotificationStore().error(
+        'Verification Failed',
+        'Failed to verify user',
+      )
       throw new Error('Failed to verify user')
     }
   }
