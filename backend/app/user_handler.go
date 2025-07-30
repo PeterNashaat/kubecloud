@@ -138,8 +138,9 @@ type ChargeBalanceResponse struct {
 
 // UserBalanceResponse struct holds the response data for user balance
 type UserBalanceResponse struct {
-	BalanceUSD float64 `json:"balance_usd"`
-	DebtUSD    float64 `json:"debt_usd"`
+	BalanceUSD        float64 `json:"balance_usd"`
+	DebtUSD           float64 `json:"debt_usd"`
+	PendingBalanceUSD float64 `json:"pending_balance_usd"`
 }
 
 // SSHKeyInput struct for adding SSH keys
@@ -160,6 +161,11 @@ type RedeemVoucherResponse struct {
 	VoucherCode string  `json:"voucher_code"`
 	Amount      float64 `json:"amount"`
 	Email       string  `json:"email"`
+}
+
+type GetUserResponse struct {
+	models.User
+	PendingAmountUSD float64 `json:"pending_amount_usd"`
 }
 
 // RegisterHandler registers user to the system
@@ -634,7 +640,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 // @Tags users
 // @ID get-user
 // @Produce json
-// @Success 200 {object} models.User "User is retrieved successfully"
+// @Success 200 {object} GetUserResponse "User is retrieved successfully"
 // @Failure 404 {object} APIResponse "User is not found"
 // @Failure 500 {object} APIResponse
 // @Router /user [get]
@@ -649,9 +655,31 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
-		"user": user,
-	})
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var tftPendingAmount uint64
+	for _, record := range pendingRecords {
+		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
+	}
+
+	usdPendingAmount, err := internal.FromTFTtoUSD(h.substrateClient, tftPendingAmount)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert tft to usd")
+		InternalServerError(c)
+		return
+	}
+
+	userResponse := GetUserResponse{
+		User:             user,
+		PendingAmountUSD: usdPendingAmount,
+	}
+
+	Success(c, http.StatusOK, "User is retrieved successfully", userResponse)
 }
 
 // @Summary Get user balance
@@ -673,14 +701,37 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
+
 	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
+		return
 	}
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var tftPendingAmount uint64
+	for _, record := range pendingRecords {
+		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
+	}
+
+	usdPendingAmount, err := internal.FromTFTtoUSD(h.substrateClient, tftPendingAmount)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert tft to usd")
+		InternalServerError(c)
+		return
+	}
+
 	Success(c, http.StatusOK, "Balance is fetched", UserBalanceResponse{
-		BalanceUSD: usdBalance,
-		DebtUSD:    user.Debt,
+		BalanceUSD:        usdBalance,
+		DebtUSD:           user.Debt,
+		PendingBalanceUSD: usdPendingAmount,
 	})
 }
 

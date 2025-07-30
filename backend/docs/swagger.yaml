@@ -86,6 +86,49 @@ definitions:
     - expire_after_days
     - value
     type: object
+  app.GetUserResponse:
+    properties:
+      account_address:
+        type: string
+      admin:
+        type: boolean
+      code:
+        type: integer
+      credit_card_balance:
+        description: money from credit card
+        type: number
+      credited_balance:
+        description: manually added by admin or from vouchers
+        type: number
+      debt:
+        type: number
+      email:
+        type: string
+      id:
+        type: integer
+      password:
+        items:
+          type: integer
+        type: array
+      pending_amount_usd:
+        type: number
+      sponsored:
+        type: boolean
+      ssh_key:
+        type: string
+      stripe_customer_id:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+      verified:
+        type: boolean
+    required:
+    - email
+    - password
+    - username
+    type: object
   app.LoginInput:
     properties:
       email:
@@ -98,16 +141,6 @@ definitions:
     - email
     - password
     type: object
-  app.RedeemVoucherResponse:
-    properties:
-      amount:
-        type: number
-      email:
-        type: string
-      voucher_code:
-        type: string
-      workflow_id:
-        type: string
   app.PendingRecordsResponse:
     properties:
       created_at:
@@ -127,6 +160,17 @@ definitions:
         type: number
       user_id:
         type: integer
+    type: object
+  app.RedeemVoucherResponse:
+    properties:
+      amount:
+        type: number
+      email:
+        type: string
+      voucher_code:
+        type: string
+      workflow_id:
+        type: string
     type: object
   app.RefreshTokenInput:
     properties:
@@ -207,6 +251,8 @@ definitions:
       balance_usd:
         type: number
       debt_usd:
+        type: number
+      pending_balance_usd:
         type: number
     type: object
   app.VerifyCodeInput:
@@ -448,7 +494,7 @@ paths:
         "200":
           description: User is retrieved successfully
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/app.GetUserResponse'
         "404":
           description: User is not found
           schema:
@@ -920,7 +966,7 @@ paths:
           schema:
             $ref: '#/definitions/app.RegisterUserResponse'
         "400":
-          description: Invalid request format or validation error
+          description: Invalid request format
           schema:
             $ref: '#/definitions/app.APIResponse'
         "409":
