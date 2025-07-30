@@ -12,16 +12,17 @@ import NodesCard from '../components/dashboard/NodesCard.vue'
 import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
 import { useClusterStore } from '../stores/clusters'
-import { useRoute } from 'vue-router'
+import { useNotificationStore } from '../stores/notifications'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
 
 // Initialize selected section from localStorage or default to 'overview'
-const route = useRoute()
 const selected = ref('overview')
 
 const clusterStore = useClusterStore()
+const notificationStore = useNotificationStore()
+
 const clusters = computed(() => clusterStore.clusters)
 const clustersArray = computed(() =>
   Array.isArray(clusters.value)
@@ -35,32 +36,34 @@ const clustersArray = computed(() =>
     : []
 )
 
+// Constants
+const STORAGE_KEY_DASHBOARD_SECTION = 'dashboard-section'
+
+// Note: Cluster events are handled globally by the useDeploymentEvents composable
+
 onMounted(async () => {
-  // Check for ?section=... in the URL
-  if (route.query.section && typeof route.query.section === 'string') {
-    selected.value = route.query.section
-  } else {
-    const savedSection = localStorage.getItem('dashboard-section')
+  try {
+    // Restore selected section from localStorage
+    const savedSection = localStorage.getItem(STORAGE_KEY_DASHBOARD_SECTION)
     if (savedSection) {
       selected.value = savedSection
     }
-  }
-  // Fetch real invoices for billing history
-  const invoices = await userService.listUserInvoices()
-  billingHistory.value = invoices.map(inv => ({
-    id: inv.id,
-    date: inv.created_at,
-    description: `Invoice #${inv.id}`,
-    amount: inv.total
-  }))
-  // Fetch user net balance
-  await userStore.updateNetBalance()
-})
 
-watch(() => route.query.section, (newSection) => {
-  if (typeof newSection === 'string') {
-    selected.value = newSection
-    localStorage.setItem('dashboard-section', newSection)
+    // Fetch initial data
+    const [invoices] = await Promise.all([
+      userService.listUserInvoices(),
+      userStore.updateNetBalance(),
+    ])
+
+    // Process invoices
+    billingHistory.value = invoices.map(inv => ({
+      id: inv.id,
+      date: inv.created_at,
+      description: `Invoice ${inv.id}`,
+      amount: inv.total
+    }))
+  } catch (error) {
+    console.error(error);
   }
 })
 
@@ -85,17 +88,13 @@ const totalSpent = computed(() => {
 function handleSidebarSelect(val: string) {
   selected.value = val
   // Save to localStorage for persistence
-  localStorage.setItem('dashboard-section', val)
+  localStorage.setItem(STORAGE_KEY_DASHBOARD_SECTION, val)
 }
 
 function handleNavigate(section: string) {
   selected.value = section
   // Save to localStorage for persistence
   localStorage.setItem('dashboard-section', section)
-}
-
-function redeemVoucher(voucher: any) {
-  alert(`Redeem voucher: ${voucher.name}`)
 }
 </script>
 
@@ -125,7 +124,7 @@ function redeemVoucher(voucher: any) {
               <BillingCard v-if="selected === 'billing'" :billingHistory="billingHistory" />
               <PaymentCard v-if="selected === 'payment'" />
               <SshKeysCard v-if="selected === 'ssh'" :sshKeys="sshKeys" />
-              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
+              <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" />
               <NodesCard v-if="selected === 'nodes'" />
               <ProfileCard v-if="selected === 'profile'" />
             </div>

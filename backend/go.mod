@@ -21,7 +21,7 @@ require (
 	github.com/threefoldtech/zosbase v0.1.10
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/vedhavyas/go-subkey v1.0.3
-	github.com/xmonader/ewf v0.0.0-20250727095913-2edd05548469
+	github.com/xmonader/ewf v0.0.0-20250727220238-fa576295fe80
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 	gorm.io/gorm v1.30.1
 )

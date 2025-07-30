@@ -1,14 +1,9 @@
 <template>
   <div class="dashboard-card">
-    <div class="dashboard-card-header">
-      <div class="dashboard-card-title-section">
-        <div class="dashboard-card-title-content">
-          <h3 class="dashboard-card-title">Dashboard Overview</h3>
-          <p class="dashboard-card-subtitle">Your KubeCloud platform at a glance</p>
-        </div>
-      </div>
+    <div class="mb-8">
+      <h3 class="dashboard-card-title">Dashboard Overview</h3>
+      <p class="dashboard-card-subtitle">Your KubeCloud platform at a glance</p>
     </div>
-
     <!-- Stats Grid -->
     <StatsGrid :stats="statsData" />
 
@@ -26,24 +21,6 @@
           <v-icon :icon="action.icon" class="mr-2"></v-icon>
           {{ action.label }}
         </v-btn>
-      </div>
-    </div>
-
-    <!-- System Status -->
-    <div class="system-status-section">
-      <h3 class="section-title">System Status</h3>
-      <div class="status-grid">
-        <div
-          v-for="(status, index) in systemStatus"
-          :key="index"
-          class="list-item-interactive"
-        >
-          <div class="status-dot running"></div>
-          <div class="status-content">
-            <div class="status-label">{{ status.label }}</div>
-            <div class="status-value">{{ status.value }}</div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -150,51 +127,14 @@ const quickActions = [
     handler: () => emit('navigate', 'payment')
   }
 ]
-
-// System status data
-const systemStatus = [
-  {
-    label: 'Platform',
-    value: 'Operational'
-  },
-  {
-    label: 'API',
-    value: 'Healthy'
-  },
-  {
-    label: 'Networking',
-    value: 'Stable'
-  },
-  {
-    label: 'Storage',
-    value: 'Available'
-  }
-]
-
 const emit = defineEmits(['navigate'])
 </script>
 
 <style scoped>
-.dashboard-card-header {
-  text-align: center;
-  margin-bottom: var(--space-8);
-}
-
-.dashboard-card-title-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dashboard-card-title-content {
-  text-align: center;
-}
-
 .dashboard-card-title {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-  margin: 0 0 var(--space-2) 0;
 }
 
 .dashboard-card-subtitle {
@@ -202,10 +142,6 @@ const emit = defineEmits(['navigate'])
   color: var(--color-primary);
   font-weight: var(--font-weight-medium);
   opacity: 0.9;
-}
-
-.quick-actions-section {
-  margin-bottom: var(--space-8);
 }
 
 .section-title {
@@ -221,44 +157,10 @@ const emit = defineEmits(['navigate'])
   gap: var(--space-4);
 }
 
-.system-status-section {
-  margin-bottom: var(--space-4);
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-4);
-}
-
-.status-content {
-  flex: 1;
-}
-
-.status-label {
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text);
-  margin: 0 0 var(--space-1) 0;
-}
-
-.status-value {
-  font-size: var(--font-size-sm);
-  color: var(--color-primary);
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
-  .dashboard-card-header {
-    margin-bottom: var(--space-6);
-  }
-
   .actions-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: var(--space-3);
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: var(--space-3);
   }
 }
@@ -266,10 +168,6 @@ const emit = defineEmits(['navigate'])
 @media (max-width: 480px) {
   .actions-grid {
     grid-template-columns: 1fr;
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

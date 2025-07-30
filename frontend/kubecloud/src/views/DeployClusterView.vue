@@ -5,7 +5,7 @@
         <h1 class="hero-title">Deploy New Cluster</h1>
         <p class="section-subtitle">Create and configure your Kubernetes cluster in just a few steps</p>
       </div>
-      
+
       <div class="deploy-content-wrapper">
         <div class="deploy-card">
           <!-- Progress Indicator -->
@@ -196,7 +196,7 @@ function generateClusterNameLocal() {
 
 // Navigate to SSH keys management
 function navigateToSshKeys() {
-  router.push('/dashboard?section=ssh');
+  router.push('/dashboard');
 }
 
 
@@ -262,6 +262,11 @@ const clusterPayload = computed<Cluster>(() => {
   };
 });
 
+function navigateToDasgboard() {
+  localStorage.setItem('dashboard-section', 'clusters')
+  router.push('/dashboard');
+}
+
 async function onDeployCluster() {
   deploying.value = true;
   try {
@@ -276,6 +281,7 @@ async function onDeployCluster() {
     // Optionally handle error
   } finally {
     deploying.value = false;
+    navigateToDasgboard();
   }
 }
 
