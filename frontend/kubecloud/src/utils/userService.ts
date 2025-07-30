@@ -248,6 +248,16 @@ export class UserService {
     })
     return response.data.data
   }
+
+  async listUserPendingRequests(): Promise<PendingRequest[]> {
+    const response = await api.get<{ data: { pending_records: PendingRequest[] } }>(`/v1/user/pending-records`, {
+      requiresAuth: true,
+      showNotifications: false,
+      errorMessage: 'Failed to load pending requests'
+    })
+    console.log(response.data.data.pending_records)
+    return response.data.data.pending_records
+  }
 }
 
 export const userService = new UserService()

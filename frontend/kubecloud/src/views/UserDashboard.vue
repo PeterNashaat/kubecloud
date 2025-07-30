@@ -13,6 +13,7 @@ import DashboardSidebar from '../components/DashboardSidebar.vue'
 import { userService } from '../utils/userService'
 import { useClusterStore } from '../stores/clusters'
 import { useRoute } from 'vue-router'
+import PendingRequestsCard from '../components/dashboard/PendingRequestsCard.vue'
 
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.username || 'User')
@@ -128,6 +129,7 @@ function redeemVoucher(voucher: any) {
               <VouchersCard v-if="selected === 'vouchers'" :vouchers="vouchers" @redeem="redeemVoucher" />
               <NodesCard v-if="selected === 'nodes'" />
               <ProfileCard v-if="selected === 'profile'" />
+              <PendingRequestsCard v-if="selected === 'pending-requests'"/>
             </div>
           </div>
         </div>

@@ -7,12 +7,12 @@
       </div>
       <div class="dashboard-content-wrapper">
         <div class="dashboard-layout">
-          <!-- <div class="dashboard-sidebar">
+          <div class="dashboard-sidebar">
             <DashboardSidebar :selected="'pending-requests'" @update:selected="handleSidebarSelect" />
-          </div> -->
+          </div>
           <div class="dashboard-main">
             <div class="dashboard-cards">
-              <PendingRequestsCard :pendingRequests="pendingRequests" />
+              <PendingRequestsCard />
             </div>
           </div>
         </div>
@@ -22,53 +22,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import PendingRequestsCard from '../components/dashboard/PendingRequestsCard.vue'
-import type { PendingRequest } from '../utils/userService'
 
-// Fake data for testing
-const pendingRequests = ref<PendingRequest[]>([
-  {
-    created_at: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
-    id: 1,
-    tft_amount: 1000,
-    transferred_tft_amount: 1000,
-    transferred_usd_amount: 50,
-    updated_at: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
-    usd_amount: 50,
-    user_id: 123
-  },
-  {
-    created_at: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
-    id: 2,
-    tft_amount: 2500,
-    transferred_tft_amount: 1250,
-    transferred_usd_amount: 62.5,
-    updated_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-    usd_amount: 125,
-    user_id: 123
-  },
-  {
-    created_at: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
-    id: 3,
-    tft_amount: 500,
-    transferred_tft_amount: 0,
-    transferred_usd_amount: 0,
-    updated_at: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
-    usd_amount: 25,
-    user_id: 123
-  },
-  {
-    created_at: new Date().toISOString(),
-    id: 4,
-    tft_amount: 3000,
-    transferred_tft_amount: 0,
-    transferred_usd_amount: 0,
-    updated_at: new Date().toISOString(),
-    usd_amount: 150,
-    user_id: 123
-  }
-])
+const selected = ref('overview')
+function handleSidebarSelect(val: string) {
+  selected.value = val
+  // Save to localStorage for persistence
+  localStorage.setItem('dashboard-section', val)
+}
+
 </script>
 
 <style scoped>
