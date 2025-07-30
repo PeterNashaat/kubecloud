@@ -111,6 +111,13 @@ export interface AddSshKeyRequest {
   public_key: string
 }
 
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
+  created_at: string;
+}
+
 export class UserService {
   // List all available nodes
   async listNodes(filters?: any) {
@@ -205,7 +212,7 @@ export class UserService {
   // List all invoices for the current user
   async listUserInvoices(): Promise<UserInvoice[]> {
     const response = await api.get<{ data: { invoices: UserInvoice[] } }>(
-      '/v1/user/invoice/',
+      '/v1/user/invoice',
       { requiresAuth: true, showNotifications: true, errorMessage: 'Failed to load invoices' }
     )
     return response.data.data.invoices
@@ -293,8 +300,8 @@ export class UserService {
     })
   }
   // Add node to deployment
-  async addNodeToDeployment(deploymentName: string, nodePayload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
-    return api.post(`/v1/deployments/${deploymentName}/nodes`, nodePayload, { requiresAuth: true, showNotifications: true })
+  async addNodeToDeployment(deploymentName: string, clusterPayload: { name: string, nodes: any[] }) {
+    return api.post<TaskResponse>(`/v1/deployments/${deploymentName}/nodes`, clusterPayload, { requiresAuth: true, showNotifications: true });
   }
 
   // Remove node from deployment

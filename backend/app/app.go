@@ -117,6 +117,11 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 
 	// Create an app-level context for coordinating shutdown
+	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system identity: %w", err)
+	}
+
 	sshPublicKeyBytes, err := os.ReadFile(config.SSH.PublicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read SSH public key from %s: %w", config.SSH.PublicKeyPath, err)
@@ -125,11 +130,41 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	_, appCancel := context.WithCancel(context.Background())
 
+	// Derive sponsor (system) account SS58 address once
+	sponsorKeyPair, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
+	if err != nil {
+		appCancel()
+		return nil, fmt.Errorf("failed to create sponsor keypair from system account: %w", err)
+	}
+	sponsorAddress, err := internal.AccountAddressFromKeypair(sponsorKeyPair)
+	if err != nil {
+		appCancel()
+		return nil, fmt.Errorf("failed to create sponsor address from keypair: %w", err)
+	}
+
 	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
+
+	// Validate KYC configuration
+	if strings.TrimSpace(config.KYCVerifierAPIURL) == "" {
+		appCancel()
+		return nil, fmt.Errorf("KYC verifier API URL is required")
+	}
+	if strings.TrimSpace(config.KYCChallengeDomain) == "" {
+		appCancel()
+		return nil, fmt.Errorf("KYC challenge domain is required")
+	}
+
+	// Initialize KYC client
+	kycClient := internal.NewKYCClient(
+		config.KYCVerifierAPIURL,
+		config.KYCChallengeDomain,
+		nil, // Use default http.Client
+	)
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, ewfEngine, config.SystemAccount.Network, sshPublicKey)
+		sseManager, ewfEngine, config.SystemAccount.Network, sshPublicKey,
+		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress)
 
 	app := &App{
 		router:        router,
@@ -150,12 +185,12 @@ func NewApp(config internal.Configuration) (*App, error) {
 		app.handlers.mailService,
 		app.handlers.substrateClient,
 		app.sseManager,
+		app.handlers.kycClient,
+		sponsorAddress,
+		sponsorKeyPair,
 	)
 
 	app.registerHandlers()
-
-	// Deprecated: using ewfEngine now
-	// app.workerManager.Start()
 
 	return app, nil
 }
@@ -179,6 +214,7 @@ func (app *App) registerHandlers() {
 			}
 
 			adminGroup.GET("/invoices", app.handlers.ListAllInvoicesHandler)
+			adminGroup.GET("/pending-records", app.handlers.ListPendingRecordsHandler)
 
 			vouchersGroup := adminGroup.Group("/vouchers")
 			{
@@ -210,7 +246,8 @@ func (app *App) registerHandlers() {
 				authGroup.GET("/balance", app.handlers.GetUserBalance)
 				authGroup.PUT("/redeem/:voucher_code", app.handlers.RedeemVoucherHandler)
 				authGroup.GET("/invoice/:invoice_id", app.handlers.DownloadInvoiceHandler)
-				authGroup.GET("/invoice/", app.handlers.ListUserInvoicesHandler)
+				authGroup.GET("/invoice", app.handlers.ListUserInvoicesHandler)
+				authGroup.GET("/pending-records", app.handlers.ListUserPendingRecordsHandler)
 				// SSH Key management
 				authGroup.GET("/ssh-keys", app.handlers.ListSSHKeysHandler)
 				authGroup.POST("/ssh-keys", app.handlers.AddSSHKeyHandler)
@@ -251,6 +288,7 @@ func (app *App) registerHandlers() {
 func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
 	go app.handlers.TrackUserDebt(app.gridClient)
+	go app.handlers.MonitorSystemBalanceAndHandleSettlement()
 }
 
 // Run starts the server

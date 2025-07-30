@@ -108,6 +108,25 @@ definitions:
         type: string
       workflow_id:
         type: string
+  app.PendingRecordsResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      tft_amount:
+        description: TFTs are multiplied by 1e7
+        type: integer
+      transferred_tft_amount:
+        type: integer
+      transferred_usd_amount:
+        type: number
+      updated_at:
+        type: string
+      usd_amount:
+        type: number
+      user_id:
+        type: integer
     type: object
   app.RefreshTokenInput:
     properties:
@@ -269,6 +288,8 @@ definitions:
     type: object
   models.User:
     properties:
+      account_address:
+        type: string
       admin:
         type: boolean
       code:
@@ -289,6 +310,8 @@ definitions:
         items:
           type: integer
         type: array
+      sponsored:
+        type: boolean
       ssh_key:
         type: string
       stripe_customer_id:
@@ -391,6 +414,30 @@ paths:
       summary: List nodes
       tags:
       - nodes
+  /pending-records:
+    get:
+      consumes:
+      - application/json
+      description: Returns all pending records in the system
+      operationId: list-pending-records
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/app.PendingRecordsResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
+      summary: List pending records
+      tags:
+      - admin
   /user:
     get:
       description: Retrieves all data of the user
@@ -631,7 +678,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Logs a user into the system
+      description: Logs a user in. Checks KYC verification status and updates user
+        sponsorship status if needed. Login is not blocked by KYC errors.
       operationId: login-user
       parameters:
       - description: Login Input
@@ -659,7 +707,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/app.APIResponse'
-      summary: Login user
+      summary: Login user (KYC verification checked)
       tags:
       - users
   /user/nodes:
@@ -758,6 +806,30 @@ paths:
       summary: Unreserve node
       tags:
       - nodes
+  /user/pending-records:
+    get:
+      consumes:
+      - application/json
+      description: Returns user pending records in the system
+      operationId: list-user-pending-records
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/app.PendingRecordsResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List user pending records
+      tags:
+      - users
   /user/redeem/{voucher_code}:
     put:
       description: Redeems a voucher for the user
@@ -830,7 +902,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Registers a new user to the system
+      description: Registers a new user, sets up blockchain account, and creates KYC
+        sponsorship. Sends verification code to email.
       operationId: register-user
       parameters:
       - description: Register Input
@@ -847,7 +920,7 @@ paths:
           schema:
             $ref: '#/definitions/app.RegisterUserResponse'
         "400":
-          description: Invalid request format
+          description: Invalid request format or validation error
           schema:
             $ref: '#/definitions/app.APIResponse'
         "409":
@@ -858,7 +931,7 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
-      summary: Register a user
+      summary: Register user (with KYC sponsorship)
       tags:
       - users
   /user/register/verify:

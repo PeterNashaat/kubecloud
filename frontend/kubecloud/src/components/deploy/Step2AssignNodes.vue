@@ -7,8 +7,18 @@
       </h3>
       <p class="section-subtitle">Select which reserved nodes will host your cluster VMs</p>
     </div>
-    <!-- Replace custom grid with Vuetify grid -->
-    <v-row>
+    <div v-if="availableNodes.length === 0" class="nodes-empty">
+      <div class="empty-card">
+        <v-icon icon="mdi-server-network-off" size="38" color="primary" class="empty-icon mb-3"></v-icon>
+        <div class="empty-title">No Reserved Nodes</div>
+        <div class="empty-desc">You have not reserved any nodes yet.<br>To deploy a cluster, you must first reserve at least one node.</div>
+        <v-btn color="primary" class="mt-4" variant="elevated" to="/nodes">
+          <v-icon icon="mdi-plus" size="20" class="mr-2"></v-icon>
+          Reserve Node
+        </v-btn>
+      </div>
+    </div>
+    <v-row v-else>
       <v-col cols="12" v-for="(vm, index) in allVMs" :key="index">
         <div class="vm-assignment-card">
           <div class="vm-assignment-header">
@@ -221,5 +231,41 @@ function nodeLabel(node: any) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+.nodes-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 260px;
+  width: 100%;
+}
+.empty-card {
+  background: var(--color-surface-1, #18192b);
+  border: 1.5px solid var(--color-border, #334155);
+  border-radius: 16px;
+  padding: 2.5rem 2rem 2rem 2rem;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 420px;
+  width: 100%;
+}
+.empty-icon {
+  margin-bottom: 0.5rem;
+}
+.empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text, #cfd2fa);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+.empty-desc {
+  color: var(--color-text-muted, #7c7fa5);
+  font-size: 1.05rem;
+  text-align: center;
+  margin-bottom: 1.2rem;
+  line-height: 1.5;
 }
 </style> 
