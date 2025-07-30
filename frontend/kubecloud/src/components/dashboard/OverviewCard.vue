@@ -82,6 +82,7 @@ const statsData = computed(() => [
   {
     icon: 'mdi-currency-usd',
     value: `$${userStore.netBalance.toFixed(2)}`,
+    subvalue: userStore.pendingBalance > 0 ? `+$${userStore.pendingBalance.toFixed(2)} pending` : '',
     label: 'Balance'
   },
   {

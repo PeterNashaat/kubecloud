@@ -157,6 +157,7 @@ export const useUserStore = defineStore('user',
       isLoading,
       error,
       netBalance,
+      pendingBalance,
 
       // Computed
       isAdmin,
