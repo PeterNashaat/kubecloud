@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -17,6 +18,8 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"gorm.io/gorm"
+
+	"github.com/vedhavyas/go-subkey"
 )
 
 // Handler struct holds configs for all handlers
@@ -32,6 +35,10 @@ type Handler struct {
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
 	gridNet         string // Network name for the grid
+	systemIdentity  substrate.Identity
+	kycClient       *internal.KYCClient
+	sponsorKeyPair  subkey.KeyPair
+	sponsorAddress  string
 }
 
 // NewHandler create new handler
@@ -40,7 +47,9 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
 	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridNet string) *Handler {
+	gridNet string, systemIdentity substrate.Identity,
+	kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string) *Handler {
+
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -53,6 +62,10 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		redis:           redis,
 		sseManager:      sseManager,
 		gridNet:         gridNet,
+		systemIdentity:  systemIdentity,
+		kycClient:       kycClient,
+		sponsorKeyPair:  sponsorKeyPair,
+		sponsorAddress:  sponsorAddress,
 	}
 }
 
@@ -129,19 +142,37 @@ type SSHKeyInput struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
-// @Summary Register a user
-// @Description Registers a new user to the system
+// KYC sponsorship helpers
+func (h *Handler) createKYCSponsorship(ctx context.Context, mnemonic string) error {
+	sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
+	if err != nil {
+		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
+	}
+	sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
+	if err != nil {
+		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
+	}
+
+	if err := h.kycClient.CreateSponsorship(ctx, h.sponsorAddress, h.sponsorKeyPair, sponseeAddress, sponseeKeyPair); err != nil {
+		return fmt.Errorf("failed to create KYC sponsorship: %w", err)
+	}
+
+	return nil
+}
+
+// RegisterHandler registers user to the system
+// @Summary Register user (with KYC sponsorship)
+// @Description Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.
 // @Tags users
 // @ID register-user
 // @Accept json
 // @Produce json
 // @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse
-// @Failure 400 {object} APIResponse "Invalid request format"
+// @Success 201 {object} RegisterResponse "Verification code sent successfully"
+// @Failure 400 {object} APIResponse "Invalid request format or validation error"
 // @Failure 409 {object} APIResponse "User already registered"
 // @Failure 500 {object} APIResponse
 // @Router /user/register [post]
-// RegisterHandler registers user to the system
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
 
@@ -225,10 +256,38 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 		user.Mnemonic = mnemonic
 		user.StripeCustomerID = customer.ID
+		// Set user.AccountAddress from mnemonic
+		sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to create keypair for SS58 address")
+			InternalServerError(c)
+			return
+		}
+		sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get SS58 address")
+			InternalServerError(c)
+			return
+		}
+		user.AccountAddress = sponseeAddress
 
 		err = h.db.RegisterUser(&user)
 		if err != nil {
 			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+
+		if err := h.createKYCSponsorship(c.Request.Context(), mnemonic); err != nil {
+			log.Error().Err(err).Msg("failed to create KYC sponsorship")
+			InternalServerError(c)
+			return
+		}
+
+		// Set sponsored to true after successful sponsorship creation
+		user.Sponsored = true
+		if err := h.db.UpdateUserByID(&user); err != nil {
+			log.Error().Err(err).Msg("failed to update user sponsorship status")
 			InternalServerError(c)
 			return
 		}
@@ -238,7 +297,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		Email:   request.Email,
 		Timeout: fmt.Sprintf("%d seconds", h.config.MailSender.Timeout),
 	})
-
 }
 
 // @Summary Verify registration code
@@ -268,7 +326,6 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		log.Error().Err(err).Msg("failed to get user by email")
 		Error(c, http.StatusBadRequest, "verification failed", "email or password is incorrect")
 		return
-
 	}
 
 	if user.Verified {
@@ -286,12 +343,11 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	err = h.db.UpdateUserVerification(user.ID, true)
-	if err != nil {
+	user.Verified = true
+	if err := h.db.UpdateUserByID(&user); err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
-
 	}
 
 	subject, body := h.mailService.WelcomeMailContent(user.Username, h.config.Server.Host)
@@ -312,8 +368,8 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	Success(c, http.StatusCreated, "token pair generated", tokenPair)
 }
 
-// @Summary Login user
-// @Description Logs a user into the system
+// @Summary Login user (KYC verification checked)
+// @Description Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.
 // @Tags users
 // @ID login-user
 // @Accept json
@@ -340,7 +396,6 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		log.Error().Err(err).Msg("failed to get user by email")
 		Error(c, http.StatusBadRequest, "verification failed", "email or password is incorrect")
 		return
-
 	}
 
 	// verify password
@@ -348,6 +403,20 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	if !match {
 		Error(c, http.StatusUnauthorized, "login failed", "email or password is incorrect")
 		return
+	}
+
+	// Check KYC verification status without blocking login
+	sponsored, err := h.kycClient.IsUserVerified(c.Request.Context(), user.AccountAddress)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check KYC verification status")
+		InternalServerError(c)
+		return
+	}
+	if user.Sponsored != sponsored {
+		user.Sponsored = sponsored
+		if err := h.db.UpdateUserByID(&user); err != nil {
+			log.Error().Err(err).Msg("failed to update user sponsorship status")
+		}
 	}
 
 	// create token pairs
@@ -605,19 +674,6 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Msg("error checking system account balance")
-		InternalServerError(c)
-		return
-	}
-
-	if systemBalanceUSD < float64(request.Amount) {
-		log.Error().Msgf("system account balance is not enough to charge user balance, system balance: %f, requested amount: %d", systemBalanceUSD, request.Amount)
-		InternalServerError(c)
-		return
-	}
-
 	paymentMethod, err := internal.CreatePaymentMethod(request.CardType, request.PaymentToken)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating payment method")
@@ -641,14 +697,44 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(request.Amount))
 	if err != nil {
 		log.Error().Err(err).Send()
-		if err = internal.CancelPaymentIntent(intent.ID); err != nil {
-			log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
-		}
 		InternalServerError(c)
 		return
+	}
+
+	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Msg("error checking system account balance")
+		InternalServerError(c)
+		return
+	}
+
+	responseMsg := "Balance is charged successfully"
+
+	if systemBalanceUSD < float64(request.Amount) {
+		if err = h.db.CreatePendingRecord(&models.PendingRecord{
+			UserID:    userID,
+			TFTAmount: requestedTFTs,
+		}); err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+		responseMsg = "Balance is pending to be charged, will be charged soon"
+
+	} else {
+		err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
+		if err != nil {
+			log.Error().Err(err).Send()
+			// TODO: should we handle it as pending too?
+			if err = internal.CancelPaymentIntent(intent.ID); err != nil {
+				log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
+			}
+			InternalServerError(c)
+			return
+		}
 	}
 
 	user.CreditCardBalance += float64(request.Amount)
@@ -660,7 +746,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusCreated, "Balance is charged successfully", ChargeBalanceResponse{
+	Success(c, http.StatusCreated, responseMsg, ChargeBalanceResponse{
 		PaymentIntentID: intent.ID,
 		NewBalance:      user.CreditCardBalance,
 	})
@@ -784,14 +870,42 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, uint64(voucher.Value), user.Mnemonic, h.config.SystemAccount.Mnemonic)
+	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(voucher.Value))
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 
-	Success(c, http.StatusOK, "Voucher is redeemed successfully", nil)
+	systemUSDBalance, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	responseMsg := "Voucher is redeemed successfully"
+
+	if systemUSDBalance < float64(voucher.Value) {
+		if err = h.db.CreatePendingRecord(&models.PendingRecord{
+			UserID:    userID,
+			TFTAmount: requestedTFTs,
+		}); err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+		responseMsg = "Balance is pending to be charged, will be charged soon"
+	} else {
+		err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
+		if err != nil {
+			log.Error().Err(err).Send()
+			InternalServerError(c)
+			return
+		}
+	}
+
+	Success(c, http.StatusOK, responseMsg, nil)
 }
 
 // @Summary List user SSH keys
@@ -919,4 +1033,53 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 	}
 
 	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
+}
+
+// @Summary List user pending records
+// @Description Returns user pending records in the system
+// @Tags users
+// @ID list-user-pending-records
+// @Accept json
+// @Produce json
+// @Success 200 {array} PendingRecordsResponse
+// @Failure 500 {object} APIResponse
+// @Security BearerAuth
+// @Router /user/pending-records [get]
+// ListUserPendingRecordsHandler returns user pending records in the system
+func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var pendingRecordsResponse []PendingRecordsResponse
+	for _, record := range pendingRecords {
+		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd amount")
+			InternalServerError(c)
+			return
+		}
+
+		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
+			InternalServerError(c)
+			return
+		}
+
+		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
+			PendingRecord:        record,
+			USDAmount:            usdAmount,
+			TransferredUSDAmount: usdTransferredAmount,
+		})
+	}
+
+	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
+		"pending_records": pendingRecordsResponse,
+	})
 }

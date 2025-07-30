@@ -1,4 +1,3 @@
-version: "3"
 services:
   redis-db:
     image: redis:alpine
@@ -6,19 +5,47 @@ services:
     ports:
       - 6379:6379
     container_name: redis-db
+    networks:
+      - app-network
+
+  mycelium:
+    build: 
+      context: ./mycelium-peer
+      dockerfile: Dockerfile
+    container_name: mycelium
+    cap_add: # Required for TUN device creation by mycelium process
+      - NET_ADMIN
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "8080:8080" # exposes the backend API 
+    networks:
+      - app-network # connect to redis with network
+    volumes:
+      - mycelium-data:/var/lib/mycelium
+      - mycelium-bin:/usr/local/bin
+    restart: unless-stopped
 
   backend:
-    build: ./backend
-    ports:
-      - "8080:8080"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     depends_on:
       - redis-db
-    working_dir: /opt/project      
+      - mycelium
+    working_dir: /opt/project
     volumes:
       - ./backend/kubecloud.db:/app/kubecloud.db
       - ./backend/config.json:/app/config.json
       - /root/.ssh:/root/.ssh:ro
+      - mycelium-bin:/usr/local/bin:ro # shares mycelium binary from mycelium container
+    environment:
+      - MYCELIUM_HOST=localhost
+      - REDIS_HOST=redis-db
+      - REDIS_PORT=6379
     command: ["/kubecloud", "--config", "/app/config.json"]
+    network_mode: "service:mycelium" # inherits mycelium's network, including app-network access
 
   frontend:
     environment:
@@ -29,3 +56,12 @@ services:
       dockerfile: Dockerfile
     ports:
        - "8000:80"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mycelium-data: 
+  mycelium-bin:
+

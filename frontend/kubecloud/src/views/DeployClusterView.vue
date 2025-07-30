@@ -43,6 +43,7 @@
               :isStep1Valid="isStep1Valid"
               :sshKeysLoading="sshKeysLoading"
               @nextStep="nextStep"
+              @navigateToSshKeys="navigateToSshKeys"
             />
             <Step2AssignNodes
               v-else-if="step === 2"

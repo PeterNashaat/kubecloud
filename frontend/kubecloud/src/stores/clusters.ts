@@ -57,7 +57,8 @@ export const useClusterStore = defineStore('clusters', () => {
 
     try {
       const response = await api.get('/v1/deployments', { requiresAuth: true })
-      clusters.value = (response.data as { deployments: Cluster[] }).deployments
+      const deployments = (response.data as { deployments: Cluster[] }).deployments
+      clusters.value = Array.isArray(deployments) ? deployments : []
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch clusters'
       throw err

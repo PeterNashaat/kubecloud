@@ -138,7 +138,7 @@ const props = defineProps<{
   canAssignToNode: boolean,
   addNodeLoading: boolean
 }>();
-const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated']);
+const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated', 'remove-node']);
 const dialog = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val)
@@ -152,7 +152,6 @@ const editNodesWithStorage = computed(() =>
     storage: (node.root_size || 0) + (node.disk_size || 0) + (node.storage || 0)
   }))
 );
-function closeDialog() { emit('update:modelValue', false); }
 function removeNode(nodeName: string) {
   emit('remove-node', nodeName);
 }
