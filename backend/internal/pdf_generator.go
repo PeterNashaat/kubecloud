@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"embed"
 	"fmt"
+	"io"
 	"kubecloud/models"
 	"strconv"
 	"time"
@@ -10,17 +12,20 @@ import (
 	"github.com/signintech/gopdf"
 )
 
+//go:embed logo.png fonts/Arial.ttf fonts/Arial-Bold.ttf fonts/Arial-Italic.ttf
+var pdfAssets embed.FS
+
 const (
 	greyColor     uint8 = 80
 	darkGreyColor uint8 = 60
 
 	startX float64 = 25
 	startY float64 = 30
-	// TODO:
-	logoPath       = "internal/logo_tft.png"
-	fontPath       = "internal/fonts/Arial.ttf"
-	boldFontPath   = "internal/fonts/Arial-Bold.ttf"
-	italicFontPath = "internal/fonts/Arial-Italic.ttf"
+
+	logoPath       = "logo.png"
+	fontPath       = "fonts/Arial.ttf"
+	boldFontPath   = "fonts/Arial-Bold.ttf"
+	italicFontPath = "fonts/Arial-Italic.ttf"
 )
 
 type InvoicePDF struct {
@@ -61,15 +66,27 @@ func CreateInvoicePDF(
 }
 
 func (in *InvoicePDF) setFonts() error {
-	if err := in.pdf.AddTTFFont("Arial", fontPath); err != nil {
+	arialFont, err := pdfAssets.ReadFile(fontPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to read Arial font")
+	}
+	if err := in.pdf.AddTTFFontData("Arial", arialFont); err != nil {
 		return err
 	}
 
-	if err := in.pdf.AddTTFFont("Arial-Bold", boldFontPath); err != nil {
+	arialBoldFont, err := pdfAssets.ReadFile(boldFontPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to read Arial-Bold font")
+	}
+	if err := in.pdf.AddTTFFontData("Arial-Bold", arialBoldFont); err != nil {
 		return err
 	}
 
-	return in.pdf.AddTTFFont("Arial-Italic", italicFontPath)
+	arialItalicFont, err := pdfAssets.ReadFile(italicFontPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to read Arial-Italic font")
+	}
+	return in.pdf.AddTTFFontData("Arial-Italic", arialItalicFont)
 }
 
 func (in *InvoicePDF) draw(companyData InvoiceCompanyData) error {
@@ -139,7 +156,32 @@ func (in *InvoicePDF) draw(companyData InvoiceCompanyData) error {
 }
 
 func (in *InvoicePDF) setLogo() error {
-	return in.pdf.Image(logoPath, in.startX, in.startY, nil)
+	logoFile, err := pdfAssets.Open(logoPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to open logo file")
+	}
+	defer logoFile.Close()
+
+	// Create a temporary file holder
+	logoData, err := io.ReadAll(logoFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to read logo data")
+	}
+
+	imgHolder, err := gopdf.ImageHolderByBytes(logoData)
+	if err != nil {
+		return errors.Wrap(err, "failed to create image holder")
+	}
+
+	return in.pdf.ImageByHolder(
+		imgHolder,
+		in.startX,
+		in.startY,
+		&gopdf.Rect{
+			W: 200,
+			H: 30,
+		},
+	)
 }
 
 func (in *InvoicePDF) title() error {
