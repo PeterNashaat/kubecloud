@@ -82,8 +82,12 @@ func (h *Handler) MonthlyInvoicesHandler() {
 				log.Error().Err(err).Send()
 			}
 		}
-	}
 
+		// Sleep until the first day of the next month to avoid running multiple times on the last day
+		nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 5, 0, 0, now.Location())
+		sleepDuration := nextMonth.Sub(now)
+		time.Sleep(sleepDuration)
+	}
 }
 
 // @Summary Download invoice
@@ -158,11 +162,16 @@ func (h *Handler) DownloadInvoiceHandler(c *gin.Context) {
 
 func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) error {
 	records, err := h.db.ListUserNodes(user.ID)
-	now := time.Now()
-
 	if err != nil {
 		return err
 	}
+
+	if len(records) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+
 	var nodeItems []models.NodeItem
 	var totalInvoiceCost float64
 
@@ -206,6 +215,7 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 		totalInvoiceCost += totalAmountUSD
 
 	}
+
 	invoice := models.Invoice{
 		UserID:    user.ID,
 		Total:     totalInvoiceCost,
@@ -213,10 +223,12 @@ func (h *Handler) createUserInvoice(user models.User, monthLastDay time.Time) er
 		Tax:       0, //TODO:
 		CreatedAt: time.Now(),
 	}
+
 	file, err := internal.CreateInvoicePDF(invoice, user, h.config.Invoice)
 	if err != nil {
 		return err
 	}
+
 	invoice.FileData = file
 	if err = h.db.CreateInvoice(&invoice); err != nil {
 		return err

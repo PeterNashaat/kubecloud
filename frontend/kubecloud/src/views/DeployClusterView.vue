@@ -196,6 +196,7 @@ function generateClusterNameLocal() {
 
 // Navigate to SSH keys management
 function navigateToSshKeys() {
+  localStorage.setItem('dashboard-section', 'ssh')
   router.push('/dashboard');
 }
 

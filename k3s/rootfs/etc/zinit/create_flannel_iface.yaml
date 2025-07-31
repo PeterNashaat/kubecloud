@@ -1,0 +1,2 @@
+exec: /scripts/create_flannel_iface.sh
+oneshot: true
