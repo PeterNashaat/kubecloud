@@ -127,16 +127,6 @@ export interface PendingRecord {
   updated_at: string;
   usd_amount: number;
   user_id: number;
-  file_name?: string;
-  method?: string;
-  text?: string;
-}
-
-export interface TaskResponse {
-  task_id: string;
-  status: string;
-  message: string;
-  created_at: string;
 }
 
 export class UserService {
