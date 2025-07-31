@@ -206,7 +206,6 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	}
 
 	twinID, err := h.substrateClient.GetTwinByPubKey(identity.PublicKey())
-	fmt.Println(twinID)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)

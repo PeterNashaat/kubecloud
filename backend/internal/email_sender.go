@@ -119,11 +119,11 @@ func (service *MailService) NotifyAdminsMailContent(recordsNumber int, host stri
 }
 
 func (service *MailService) InvoiceMailContent(invoiceTotal float64, currency string, invoiceID int) (string, string) {
-	mailBody := "We hope this message finds you well.\n"
-	mailBody += fmt.Sprintf("Our records show that there is an outstanding invoice for %v %s associated with your account (%d). ", invoiceTotal, currency, invoiceID)
+	mailBody := "We hope this message finds you well. <br>"
+	mailBody += fmt.Sprintf("Our records show that there is an outstanding invoice (%d) for %v %s associated with your account. ", invoiceID, invoiceTotal, currency)
 
 	mailBody += "If you have already made the payment or need any assistance, "
-	mailBody += "please don't hesitate to reach out to us.\n\n"
+	mailBody += "please don't hesitate to reach out to us. <br><br>"
 	mailBody += "We appreciate your prompt attention to this matter and thank you for being a valued customer."
 
 	subject := "Invoice Notification"
