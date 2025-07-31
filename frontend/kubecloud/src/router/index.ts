@@ -82,7 +82,7 @@ const router = createRouter({
     {
       path: '/pending-requests',
       name: 'pending-requests',
-      component: () => import('../views/PendingRequestsView.vue')
+      component: () => import('../views/PendingRecordsView.vue')
     },
   ],
   scrollBehavior(to, from, savedPosition) {

@@ -1,9 +1,9 @@
 <template>
-  <div class="requests-table-container">
-    <v-data-table :loading="loading" :headers="headers" :items="pendingRequests" class="requests-table"
-      :items-per-page="5" :no-data-text="'No pending requests found'" density="comfortable">
+  <div class="records-table-container">
+    <v-data-table :loading="loading" :headers="headers" :items="pendingRecords" class="records-table"
+      :items-per-page="5" :no-data-text="'No pending records found'" density="comfortable">
       <template v-if="showUserID" v-slot:[`item.user_id`]="{ item }">
-        <slot name="user_id" :item="item"></slot>
+        <span>{{ item.user_id }}</span>
       </template>
       <template v-slot:[`item.created_at`]="{ item }">
         <span>{{ formatDate(item.created_at) }}</span>
@@ -25,12 +25,12 @@
 </template>
 
 <script setup lang="ts">
-import { type PendingRequest } from '../../utils/userService'
+import { type PendingRecord } from '../../utils/userService'
 import { formatDate } from '../../utils/uiUtils.ts'
 
 const props = defineProps({
-  pendingRequests: {
-    type: Array as () => PendingRequest[],
+  pendingRecords: {
+    type: Array as () => PendingRecord[],
     required: true,
     default: () => []
   },
@@ -45,7 +45,7 @@ const props = defineProps({
 })
 
 const headers = [
-  { title: 'Request Date', key: 'created_at' },
+  { title: 'Record Date', key: 'created_at' },
   { title: 'Requested Amount', key: 'usd_amount' },
   { title: 'Transferred Amount', key: 'transferred_usd_amount' },
   { title: 'Status', key: 'status' },
@@ -57,15 +57,14 @@ if (props.showUserID) {
 
 
 
-function getStatus(item: PendingRequest): string {
-  if (item.transferred_usd_amount === item.usd_amount &&
-    item.transferred_tft_amount === item.tft_amount) {
+function getStatus(item: PendingRecord): string {
+  if (item.transferred_usd_amount === item.usd_amount) {
     return 'Completed'
   }
   return 'Pending'
 }
 
-function getStatusColor(item: PendingRequest): string {
+function getStatusColor(item: PendingRecord): string {
   const status = getStatus(item)
   if (status === 'Completed') {
     return 'success'
@@ -75,14 +74,14 @@ function getStatusColor(item: PendingRequest): string {
 </script>
 
 <style scoped>
-.requests-table-container {
+.records-table-container {
   margin-bottom: var(--space-6);
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--color-border);
 }
 
-.requests-table {
+.records-table {
   background: transparent;
   width: 100%;
 }

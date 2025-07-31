@@ -8,7 +8,7 @@ import AdminVouchersSection from '@/components/AdminVouchersTable.vue'
 import AdminClustersSection from '@/components/AdminClustersSection.vue'
 import AdminSystemSection from '@/components/AdminSystemCard.vue'
 import AdminInvoicesTable from '@/components/AdminInvoicesTable.vue'
-import AdminPendingRequestsCard from '@/components/dashboard/AdminPendingRequestsCard.vue'
+import AdminPendingRecordsCard from '@/components/dashboard/AdminPendingRecordsCard.vue'
 // Use defineAsyncComponent to avoid TypeScript issues
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
 
@@ -200,7 +200,7 @@ async function loadInvoices() {
             @update:voucherExpiry="voucherExpiry = $event"
           />
           <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
-          <AdminPendingRequestsCard v-else-if="selected === 'pending-requests'" />
+          <AdminPendingRecordsCard v-else-if="selected === 'pending-records'" />
           <v-dialog v-model="creditDialog" max-width="500" persistent>
             <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">
               <v-card-title class="text-h6 font-weight-bold mb-2 text-center">Manual Credit</v-card-title>

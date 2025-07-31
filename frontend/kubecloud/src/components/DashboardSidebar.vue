@@ -64,8 +64,8 @@ const navigationItems = [
     icon: 'mdi-receipt'
   },
   {
-    key: 'pending-requests',
-    title: 'Pending Requests',
+    key: 'pending-records',
+    title: 'Pending Records',
     icon: 'mdi-clock-outline'
   },
   {

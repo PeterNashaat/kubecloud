@@ -3,13 +3,13 @@
     <div class="dashboard-card-header">
       <div class="dashboard-card-title-section">
         <div class="dashboard-card-title-content">
-          <h3 class="dashboard-card-title">Pending Requests</h3>
-          <p class="dashboard-card-subtitle">View users pending transfer requests</p>
+          <h3 class="dashboard-card-title">Pending Records</h3>
+          <p class="dashboard-card-subtitle">View users pending transfer records</p>
         </div>
       </div>
     </div>
-    <PendingRequestsTable 
-      :pendingRequests="pendingRequests" 
+    <PendingRecordsTable 
+      :pendingRecords="pendingRecords" 
       :showUserID="true"
       :loading="loading"
     />
@@ -18,28 +18,28 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { type PendingRequest } from '../../utils/userService'
-import PendingRequestsTable from './PendingRequestsTable.vue'
+import { type PendingRecord } from '../../utils/userService'
+import PendingRecordsTable from './PendingRecordsTable.vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { adminService } from '@/utils/adminService'
 
-const pendingRequests = ref<PendingRequest[]>([])
+const pendingRecords = ref<PendingRecord[]>([])
 const notificationStore = useNotificationStore()
 
 onMounted(async () => {
-  await loadPendingRequests()
+  await loadPendingRecords()
 })
 
 const loading = ref(false)
 
-async function loadPendingRequests() {
+async function loadPendingRecords() {
   loading.value = true
   try {
-    const response = await adminService.listPendingRequests()
-    pendingRequests.value = response || []
+    const response = await adminService.listPendingRecords()
+    pendingRecords.value = response || []
   } catch (error) {
-    console.error('Failed to load pending requests:', error)
-    notificationStore.error('Error', 'Failed to load pending requests')
+    console.error('Failed to load pending records:', error)
+    notificationStore.error('Error', 'Failed to load pending records')
   } finally {
     loading.value = false
   }

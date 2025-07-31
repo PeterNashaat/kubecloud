@@ -118,7 +118,7 @@ export interface TaskResponse {
   created_at: string;
 }
 
-export interface PendingRequest {
+export interface PendingRecord {
   created_at: string;
   id: number;
   tft_amount: number;
@@ -127,6 +127,9 @@ export interface PendingRequest {
   updated_at: string;
   usd_amount: number;
   user_id: number;
+  file_name?: string;
+  method?: string;
+  text?: string;
 }
 
 export interface TaskResponse {
@@ -327,21 +330,21 @@ export class UserService {
     return api.delete(`/v1/deployments/${deploymentName}/nodes/${nodeName}`, { requiresAuth: true, showNotifications: true })
   }
 
-  // List all pending requests
-  async listPendingRequests(): Promise<PendingRequest[]> {
-    const response = await api.get<ApiResponse<PendingRequest[]>>('/v1/user/pending-requests', {
+  // List all pending records
+  async listPendingRecords(): Promise<PendingRecord[]> {
+    const response = await api.get<ApiResponse<PendingRecord[]>>('/v1/user/pending-records', {
       requiresAuth: true,
-      showNotifications: false,
-      errorMessage: 'Failed to load pending requests'
+      showNotifications: true,
+      errorMessage: 'Failed to load pending records'
     })
     return response.data.data
   }
 
-  async listUserPendingRequests(): Promise<PendingRequest[]> {
-    const response = await api.get<{ data: { pending_records: PendingRequest[] } }>(`/v1/user/pending-records`, {
+  async listUserPendingRecords(): Promise<PendingRecord[]> {
+    const response = await api.get<{ data: { pending_records: PendingRecord[] } }>(`/v1/user/pending-records`, {
       requiresAuth: true,
-      showNotifications: false,
-      errorMessage: 'Failed to load pending requests'
+      showNotifications: true,
+      errorMessage: 'Failed to load pending records'
     })
     console.log(response.data.data.pending_records)
     return response.data.data.pending_records
