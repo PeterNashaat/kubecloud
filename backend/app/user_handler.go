@@ -114,9 +114,9 @@ type ChangePasswordInput struct {
 
 // ChargeBalanceInput struct holds required data to charge users' balance
 type ChargeBalanceInput struct {
-	CardType     string `json:"card_type" binding:"required"`
-	PaymentToken string `json:"payment_method_id" binding:"required"`
-	Amount       uint64 `json:"amount" binding:"required"`
+	CardType     string `json:"card_type" validate:"required"`
+	PaymentToken string `json:"payment_method_id" validate:"required"`
+	Amount       uint64 `json:"amount" validate:"required,gt=0"`
 }
 
 // RegisterResponse struct holds data returned when user registers
@@ -619,10 +619,15 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	if request.Amount <= 0 {
-		Error(c, http.StatusBadRequest, "Amount must be greater than zero", "")
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
+
+	// if request.Amount <= 0 {
+	// 	Error(c, http.StatusBadRequest, "Amount must be greater than zero", "")
+	// 	return
+	// }
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
