@@ -24,7 +24,6 @@ services:
       - app-network # connect to redis with network
     volumes:
       - mycelium-data:/var/lib/mycelium
-      - mycelium-bin:/usr/local/bin
     restart: unless-stopped
 
   backend:
@@ -39,7 +38,6 @@ services:
       - ./backend/kubecloud.db:/app/kubecloud.db
       - ./backend/config.json:/app/config.json
       - /root/.ssh:/root/.ssh:ro
-      - mycelium-bin:/usr/local/bin:ro # shares mycelium binary from mycelium container
     environment:
       - MYCELIUM_HOST=localhost
       - REDIS_HOST=redis-db
@@ -63,5 +61,4 @@ networks:
 
 volumes:
   mycelium-data: 
-  mycelium-bin:
 

@@ -10,7 +10,6 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/zos"
-	"github.com/threefoldtech/zosbase/pkg/netlight/resource"
 )
 
 func DeployCluster(ctx context.Context, gridNet, mnemonic string, cluster Cluster, sshKey string, userID string) (Cluster, error) {
@@ -198,13 +197,7 @@ func loadNewClusterState(ctx context.Context, tfplugin deployer.TFPluginClient, 
 			return Cluster{}, fmt.Errorf("failed to load deployment for node %s: %v", node.Name, err)
 		}
 
-		seed := cluster.Nodes[idx].EnvVars["NET_SEED"]
-		inspections, err := resource.InspectMycelium([]byte(seed))
-		if err != nil {
-			return Cluster{}, fmt.Errorf("failed to inspect mycelium for node %s: %v", node.Name, err)
-		}
-
-		cluster.Nodes[idx].MyceliumIP = inspections.IP().String()
+		cluster.Nodes[idx].MyceliumIP = result.Vms[0].MyceliumIP
 		cluster.Nodes[idx].IP = result.Vms[0].IP
 		cluster.Nodes[idx].PlanetaryIP = result.Vms[0].PlanetaryIP
 		cluster.Nodes[idx].ContractID = result.ContractID
@@ -296,10 +289,6 @@ func mergeClusterStates(existingCluster, newNodesCluster Cluster) Cluster {
 }
 
 func createWorkloadsFromNode(node Node, deploymentNames DeploymentNames, networkName string, token string, vmIP, leaderIP, sshKey string) (workloads.VM, workloads.Disk, error) {
-	netSeed, err := getRandomMyceliumNetSeed()
-	if err != nil {
-		return workloads.VM{}, workloads.Disk{}, err
-	}
 	workloadName := deploymentNames.GetNodeName(node.Name)
 
 	disk := workloads.Disk{
@@ -330,7 +319,6 @@ func createWorkloadsFromNode(node Node, deploymentNames DeploymentNames, network
 	}
 
 	vm.EnvVars["K3S_NODE_NAME"] = workloadName
-	vm.EnvVars["NET_SEED"] = netSeed
 	vm.EnvVars["DUAL_STACK"] = "true"
 	vm.EnvVars["MASTER"] = "false"
 	vm.EnvVars["HA"] = "false"
@@ -345,7 +333,7 @@ func createWorkloadsFromNode(node Node, deploymentNames DeploymentNames, network
 	}
 
 	if vm.EnvVars["K3S_TOKEN"] == "" {
-		vm.EnvVars["K3S_TOKEN"] = K3S_TOKEN
+		vm.EnvVars["K3S_TOKEN"] = generateRandomString(32)
 	}
 	if vm.EnvVars["K3S_FLANNEL_IFACE"] == "" {
 		vm.EnvVars["K3S_FLANNEL_IFACE"] = K3S_IFACE
