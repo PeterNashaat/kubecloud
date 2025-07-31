@@ -77,39 +77,39 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 
 // RegisterInput struct for data needed when user register
 type RegisterInput struct {
-	Name            string `json:"name" binding:"required" validate:"min=3,max=64"`
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=8,max=64"`
-	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
+	Name            string `json:"name" validate:"required,min=3,max=64"`
+	Email           string `json:"email" validate:"required,email"`
+	Password        string `json:"password" validate:"required,min=8,max=64"`
+	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
 }
 
 // LoginInput struct for login handler
 type LoginInput struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=3,max=64"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=3,max=64"`
 }
 
 // RefreshTokenInput struct when user refresh token
 type RefreshTokenInput struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 // EmailInput struct for user when forgetting password
 type EmailInput struct {
-	Email string `json:"email" binding:"required,email"`
+	Email string `json:"email" validate:"required,email"`
 }
 
 // VerifyCodeInput struct takes verification code from user
 type VerifyCodeInput struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  int    `json:"code" binding:"required,numeric"`
+	Email string `json:"email" validate:"required,email"`
+	Code  int    `json:"code" validate:"required"`
 }
 
 // ChangePasswordInput struct for user to change password
 type ChangePasswordInput struct {
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=8,max=64"`
-	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
+	Email           string `json:"email" validate:"required,email"`
+	Password        string `json:"password" validate:"required,min=8,max=64"`
+	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
 }
 
 // ChargeBalanceInput struct holds required data to charge users' balance
@@ -191,11 +191,16 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	// password and confirm password should match
-	if request.Password != request.ConfirmPassword {
-		Error(c, http.StatusBadRequest, "Validation Error", "password and confirm password don't match")
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
+
+	// // password and confirm password should match
+	// if request.Password != request.ConfirmPassword {
+	// 	Error(c, http.StatusBadRequest, "Validation Error", "password and confirm password don't match")
+	// 	return
+	// }
 
 	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
@@ -244,6 +249,11 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -313,6 +323,11 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	// get user by email
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
@@ -374,6 +389,11 @@ func (h *Handler) RefreshTokenHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	accessToken, err := h.tokenManager.AccessTokenFromRefresh(request.RefreshToken)
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -406,6 +426,11 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -470,6 +495,11 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	// get user by email
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
@@ -530,10 +560,15 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 		return
 	}
 
-	if request.Password != request.ConfirmPassword {
-		Error(c, http.StatusBadRequest, "password mismatch", "password and confirm password don't match")
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
+
+	// if request.Password != request.ConfirmPassword {
+	// 	Error(c, http.StatusBadRequest, "password mismatch", "password and confirm password don't match")
+	// 	return
+	// }
 
 	// hash password
 	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
