@@ -264,6 +264,7 @@ const clusterPayload = computed<Cluster>(() => {
 });
 
 function navigateToDasgboard() {
+  localStorage.setItem('dashboard-section', 'clusters')
   router.push('/dashboard');
 }
 
