@@ -13,6 +13,7 @@ export interface User {
   verified: boolean
   updated_at: string
   balance_usd?: number
+  pending_balance_usd?: number
 }
 
 export interface AuthState {
@@ -31,6 +32,7 @@ export const useUserStore = defineStore('user',
     const isLoading = ref(false)
     const error = ref<string | null>(null)
     const netBalance = ref(0)
+    const pendingBalance = ref(0)
 
     // Computed properties
     const isAdmin = computed(() => user.value?.admin)
@@ -143,7 +145,9 @@ export const useUserStore = defineStore('user',
     }
 
     const updateNetBalance = async () => {
-      netBalance.value = await userService.fetchBalance()
+      const balance = await userService.fetchBalance()
+      netBalance.value = balance.balance
+      pendingBalance.value = balance.pending_balance
     }
 
     return {
@@ -153,6 +157,7 @@ export const useUserStore = defineStore('user',
       isLoading,
       error,
       netBalance,
+      pendingBalance,
 
       // Computed
       isAdmin,

@@ -118,6 +118,17 @@ export interface TaskResponse {
   created_at: string;
 }
 
+export interface PendingRecord {
+  created_at: string;
+  id: number;
+  tft_amount: number;
+  transferred_tft_amount: number;
+  transferred_usd_amount: number;
+  updated_at: string;
+  usd_amount: number;
+  user_id: number;
+}
+
 export class UserService {
   // List all available nodes
   async listNodes(filters?: any) {
@@ -253,20 +264,20 @@ export class UserService {
   }
 
   // Fetch the user's current balance
-  async fetchBalance(): Promise<number> {
+  async fetchBalance(): Promise<{balance: number, pending_balance: number}> {
     try {
-    const response = await api.get<{ data: { balance_usd: number, debt_usd: number } }>(
+    const response = await api.get<{ data: { balance_usd: number, debt_usd: number, pending_balance_usd: number } }>(
       '/v1/user/balance',
       { requiresAuth: true, showNotifications: false }
     )
-    const { balance_usd, debt_usd } = response.data.data
-    return (balance_usd || 0) - (debt_usd || 0)
+    const { balance_usd, debt_usd, pending_balance_usd } = response.data.data
+    return {balance: (balance_usd || 0) - (debt_usd || 0), pending_balance: pending_balance_usd || 0}
   }catch(e){
     useNotificationStore().error(
       'Error',
       'Failed to fetch balance',
     )
-    return 0
+    return {balance: 0, pending_balance: 0}
   }
   }
 
@@ -307,6 +318,25 @@ export class UserService {
   // Remove node from deployment
   async removeNodeFromDeployment(deploymentName: string, nodeName: string) {
     return api.delete(`/v1/deployments/${deploymentName}/nodes/${nodeName}`, { requiresAuth: true, showNotifications: true })
+  }
+
+  // List all pending records
+  async listPendingRecords(): Promise<PendingRecord[]> {
+    const response = await api.get<ApiResponse<PendingRecord[]>>('/v1/user/pending-records', {
+      requiresAuth: true,
+      showNotifications: true,
+      errorMessage: 'Failed to load pending records'
+    })
+    return response.data.data
+  }
+
+  async listUserPendingRecords(): Promise<PendingRecord[]> {
+    const response = await api.get<{ data: { pending_records: PendingRecord[] } }>(`/v1/user/pending-records`, {
+      requiresAuth: true,
+      showNotifications: true,
+      errorMessage: 'Failed to load pending records'
+    })
+    return response.data.data.pending_records
   }
 }
 
