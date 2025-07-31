@@ -141,12 +141,12 @@ export class AdminService {
 
   // List all pending requests (requires admin auth)
   async listPendingRequests(): Promise<PendingRequest[]> {
-    const response = await api.get<ApiResponse<{ pendingRequests: PendingRequest[] }>>('/v1/pending-records', {
+    const response = await api.get<ApiResponse<{ pending_records: PendingRequest[] }>>('/v1/pending-records', {
       requiresAuth: true,
       showNotifications: true,
-      errorMessage: 'Failed to load pending requests'
+      errorMessage: 'Failed to load pending records'
     })
-    return response.data.data.pendingRequests
+    return response.data.data.pending_records
   }
 }
 

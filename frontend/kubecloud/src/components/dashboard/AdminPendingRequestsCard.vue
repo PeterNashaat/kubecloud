@@ -11,6 +11,7 @@
     <PendingRequestsTable 
       :pendingRequests="pendingRequests" 
       :showUserID="true"
+      :loading="loading"
     />
   </div>
 </template>
@@ -29,13 +30,18 @@ onMounted(async () => {
   await loadPendingRequests()
 })
 
+const loading = ref(false)
+
 async function loadPendingRequests() {
+  loading.value = true
   try {
     const response = await adminService.listPendingRequests()
     pendingRequests.value = response || []
   } catch (error) {
     console.error('Failed to load pending requests:', error)
     notificationStore.error('Error', 'Failed to load pending requests')
+  } finally {
+    loading.value = false
   }
 }
 
