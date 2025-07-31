@@ -336,7 +336,6 @@ export class UserService {
       showNotifications: true,
       errorMessage: 'Failed to load pending records'
     })
-    console.log(response.data.data.pending_records)
     return response.data.data.pending_records
   }
 }
