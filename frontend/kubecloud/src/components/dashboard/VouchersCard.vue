@@ -38,19 +38,7 @@
 import { ref } from 'vue'
 import { userService } from '../../utils/userService'
 import { useUserStore } from '../../stores/user'
-import { api } from '../../utils/api'
-import type { ApiResponse } from '../../utils/authService'
 
-interface Voucher {
-  id: number | string
-  name: string
-  description?: string
-  amount: string
-  expiryDate: string
-  used?: boolean
-  icon?: string
-  iconColor?: string
-}
 
 const code = ref('')
 const loading = ref(false)
@@ -66,25 +54,14 @@ async function onRedeem() {
   try {
     await userService.redeemVoucher(code.value.trim())
     code.value = ''
-    successMessage.value = 'Voucher redeemed successfully!'
-    // Fetch updated balance
-    const res = await api.get<ApiResponse<{ balance_usd: number; debt_usd: number }>>('/v1/user/balance', { requiresAuth: true })
-    if (userStore.user) {
-      userStore.user.balance_usd = res.data.data.balance_usd
-    }
   } catch (err: any) {
-    errorMessage.value = err?.response?.data?.message || 'Failed to redeem voucher.'
+    console.error(err)
   } finally {
     loading.value = false
   }
+  await userStore.updateNetBalance()
 }
 
-function isExpired(expiryDate: string) {
-  if (!expiryDate) return false
-  const now = new Date()
-  const exp = new Date(expiryDate)
-  return exp < now
-}
 </script>
 
 <style scoped>

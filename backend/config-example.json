@@ -52,6 +52,7 @@
     "private_key_path": "/home/user/.ssh/id_rsa",
     "public_key_path": "/home/user/.ssh/id_rsa.pub"
   },
+  "debug": false,
   "kyc_verifier_api_url": "kyc-url",
   "kyc_challenge_domain": "kyc-domain"
 }

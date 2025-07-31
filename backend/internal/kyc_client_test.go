@@ -117,11 +117,11 @@ func TestCreateSponsorship(t *testing.T) {
 	defer ts.Close()
 
 	client := NewKYCClient(ts.URL, "testdomain", nil)
-	mnemonic := os.Getenv("MNEMONIC")
-	if mnemonic == "" {
-		t.Fatal("MNEMONIC environment variable is not set")
+	TEST_MNEMONIC := os.Getenv("TEST_MNEMONIC")
+	if TEST_MNEMONIC == "" {
+		t.Fatal("TEST_MNEMONIC environment variable is not set")
 	}
-	kp, _ := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	kp, _ := sr25519.Scheme{}.FromPhrase(TEST_MNEMONIC, "")
 	err := client.CreateSponsorship(context.Background(), "sponsor", kp, "sponsee", kp)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -138,11 +138,11 @@ func TestCreateSponsorship_Non201(t *testing.T) {
 	defer ts.Close()
 
 	client := NewKYCClient(ts.URL, "testdomain", nil)
-	mnemonic := os.Getenv("MNEMONIC")
-	if mnemonic == "" {
-		t.Fatal("MNEMONIC environment variable is not set")
+	TEST_MNEMONIC := os.Getenv("TEST_MNEMONIC")
+	if TEST_MNEMONIC == "" {
+		t.Fatal("TEST_MNEMONIC environment variable is not set")
 	}
-	kp, _ := sr25519.Scheme{}.FromPhrase(mnemonic, "")
+	kp, _ := sr25519.Scheme{}.FromPhrase(TEST_MNEMONIC, "")
 	err := client.CreateSponsorship(context.Background(), "sponsor", kp, "sponsee", kp)
 	if err == nil {
 		t.Errorf("expected error for non-201 response")

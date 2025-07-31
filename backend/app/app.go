@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/middlewares"
 	"kubecloud/models/sqlite"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
+	"github.com/xmonader/ewf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -96,15 +98,25 @@ func NewApp(config internal.Configuration) (*App, error) {
 	gridClient, err := deployer.NewTFPluginClient(
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
-		// TODO: remove this after testing
-		// deployer.WithSubstrateURL("wss://tfchain.dev.grid.tf/ws"),
-		// deployer.WithProxyURL("https://gridproxy.dev.grid.tf"),
-		// deployer.WithRelayURL("wss://relay.dev.grid.tf"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
+	// create storage for workflows
+	ewfStore, err := ewf.NewSQLiteStore(config.Database.File)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to init EWF store")
+		return nil, fmt.Errorf("failed to init workflow store: %w", err)
+	}
+	// initialize workflow ewfEngine
+	ewfEngine, err := ewf.NewEngine(ewfStore)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to init EWF engine")
+		return nil, fmt.Errorf("failed to init workflow engine: %w", err)
+	}
+
+	// Create an app-level context for coordinating shutdown
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create system identity: %w", err)
@@ -151,7 +163,8 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
-		sseManager, config.SystemAccount.Network, systemIdentity, kycClient, sponsorKeyPair, sponsorAddress)
+		sseManager, ewfEngine, config.SystemAccount.Network, sshPublicKey,
+		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress)
 
 	app := &App{
 		router:        router,
@@ -165,12 +178,21 @@ func NewApp(config internal.Configuration) (*App, error) {
 		gridClient:    gridClient,
 	}
 
+	activities.RegisterEWFWorkflows(
+		ewfEngine,
+		app.config,
+		app.db,
+		app.handlers.mailService,
+		app.handlers.substrateClient,
+		app.sseManager,
+		app.handlers.kycClient,
+		sponsorAddress,
+		sponsorKeyPair,
+	)
+
 	app.registerHandlers()
 
-	app.workerManager.Start()
-
 	return app, nil
-
 }
 
 // registerHandlers registers all routes
@@ -179,6 +201,7 @@ func (app *App) registerHandlers() {
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
+		v1.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
 
 		adminGroup := v1.Group("")
 		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
@@ -239,20 +262,16 @@ func (app *App) registerHandlers() {
 
 			deploymentGroup := deployerGroup.Group("/deployments")
 			{
-				deploymentGroup.POST("", app.handlers.HandleAsyncDeploy)
+				deploymentGroup.POST("", app.handlers.HandleDeployCluster)
 				deploymentGroup.GET("", app.handlers.HandleListDeployments)
 				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
 				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
-				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteDeployment)
+				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteCluster)
 
 				// Node management routes
-				deploymentGroup.POST("/:name/nodes", app.handlers.HandleAddNodeToDeployment)
-				deploymentGroup.DELETE("/:name/nodes/:node_name", app.handlers.HandleRemoveNodeFromDeployment)
+				deploymentGroup.POST("/:name/nodes", app.handlers.HandleAddNode)
+				deploymentGroup.DELETE("/:name/nodes/:node_name", app.handlers.HandleRemoveNode)
 			}
-
-			// TODO: Task routes
-			// deployerGroup.GET("/tasks", app.handlers.ListUserTasksHandler)
-			// deployerGroup.GET("/tasks/:task_id", app.handlers.GetTaskStatusHandler)
 
 			// Notification routes
 			deployerGroup.GET("/notifications", app.handlers.GetNotificationsHandler)
@@ -275,6 +294,7 @@ func (app *App) StartBackgroundWorkers() {
 // Run starts the server
 func (app *App) Run() error {
 	app.StartBackgroundWorkers()
+	app.handlers.ewfEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", app.config.Server.Port),
 		Handler: app.router,

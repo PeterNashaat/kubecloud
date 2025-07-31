@@ -30,6 +30,7 @@ type Configuration struct {
 	DeployerWorkersNum            int                `json:"deployer_workers_num" default:"1"`
 	Invoice                       InvoiceCompanyData `json:"invoice"`
 	SSH                           SSHConfig          `json:"ssh" validate:"required,dive"`
+	Debug                         bool               `json:"debug"`
 	MonitorBalanceIntervalInHours int                `json:"monitor_balance_interval_in_hours" validate:"required,gt=0"`
 
 	// KYC Verifier config
