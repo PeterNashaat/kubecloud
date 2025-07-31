@@ -196,6 +196,7 @@ function generateClusterNameLocal() {
 
 // Navigate to SSH keys management
 function navigateToSshKeys() {
+  localStorage.setItem('dashboard-section', 'ssh')
   router.push('/dashboard');
 }
 
@@ -263,7 +264,6 @@ const clusterPayload = computed<Cluster>(() => {
 });
 
 function navigateToDasgboard() {
-  localStorage.setItem('dashboard-section', 'clusters')
   router.push('/dashboard');
 }
 
