@@ -103,7 +103,10 @@ func SetUp(t testing.TB) (*App, error) {
   "ssh": {
     "private_key_path": "%s",
     "public_key_path": "%s"
-  }
+  },
+  "monitor_balance_interval_in_hours: : 1,
+  "kyc_verifier_api_url": "https://kyc.dev.grid.tf",
+  "kyc_challenge_domain": "kyc.dev.grid.tf"
 }
 `, dbPath, mnemonic, mnemonic, workflowPath, privateKeyPath, publicKeyPath)
 
