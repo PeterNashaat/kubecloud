@@ -8,9 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"os"
-	"path/filepath"
-
 	"github.com/pkg/errors"
 	"github.com/signintech/gopdf"
 )
