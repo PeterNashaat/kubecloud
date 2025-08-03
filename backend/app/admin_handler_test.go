@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -407,4 +408,48 @@ func TestCreditUserHandler(t *testing.T) {
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusForbidden, resp.Code)
 	})
+}
+
+func TestListPendingRecordsHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+
+	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, 0, time.Now())
+	nonAdminUser := CreateTestUser(t, app, "user@example.com", "Normal User", []byte("securepassword"), true, false, 0, time.Now())
+
+	t.Run("Test ListPendingRecordsHandler successfully", func(t *testing.T) {
+		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
+		req, _ := http.NewRequest("GET", "/api/v1/pending-records", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+	})
+
+	t.Run("Test ListPendingRecordsHandler with no token", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/pending-records", nil)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	})
+
+	t.Run("Test ListPendingRecordsHandler with non-admin user", func(t *testing.T) {
+		token := GetAuthToken(t, app, nonAdminUser.ID, nonAdminUser.Email, nonAdminUser.Username, false)
+		req, _ := http.NewRequest("GET", "/api/v1/pending-records", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusForbidden, resp.Code)
+	})
+
+	t.Run("Test ListPendingRecordsHandler with non-existing user", func(t *testing.T) {
+		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/pending-records/%d", nonAdminUser.ID+1), nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusNotFound, resp.Code)
+	})
+
 }

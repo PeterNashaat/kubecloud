@@ -27,6 +27,11 @@ func SetUp(t testing.TB) (*App, error) {
 	privateKeyPath := filepath.Join(dir, "test_id_rsa")
 	publicKeyPath := privateKeyPath + ".pub"
 
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "localhost"
+	}
+
 	// Generate SSH key pair
 	cmd := exec.Command("ssh-keygen", "-t", "rsa", "-b", "2048", "-f", privateKeyPath, "-N", "")
 	err := cmd.Run()
@@ -84,14 +89,10 @@ func SetUp(t testing.TB) (*App, error) {
   "graphql_url": "https://graphql.dev.grid.tf/graphql",
   "firesquid_url": "https://firesquid.dev.grid.tf/graphql",
   "redis": {
-    "host": "localhost",
+    "host": "%s",
     "port": 6379,
     "password": "pass",
     "db": 0
-  },
-  "grid": {
-    "mne": "%s",
-    "net": "dev"
   },
   "deployer_workers_num": 3,
   "invoice": {
@@ -104,11 +105,11 @@ func SetUp(t testing.TB) (*App, error) {
     "private_key_path": "%s",
     "public_key_path": "%s"
   },
-  "monitor_balance_interval_in_hours: 1,
+  "monitor_balance_interval_in_hours": 1,
   "kyc_verifier_api_url": "https://kyc.dev.grid.tf",
   "kyc_challenge_domain": "kyc.dev.grid.tf"
 }
-`, dbPath, mnemonic, mnemonic, workflowPath, privateKeyPath, publicKeyPath)
+`, dbPath, mnemonic, redisHost, workflowPath, privateKeyPath, publicKeyPath,)
 
 	err = os.WriteFile(configPath, []byte(config), 0644)
 	if err != nil {
