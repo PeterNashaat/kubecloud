@@ -145,8 +145,8 @@ type UserBalanceResponse struct {
 
 // SSHKeyInput struct for adding SSH keys
 type SSHKeyInput struct {
-	Name      string `json:"name" binding:"required"`
-	PublicKey string `json:"public_key" binding:"required"`
+	Name      string `json:"name" validate:"required"`
+	PublicKey string `json:"public_key" validate:"required"`
 }
 
 // RegisterUserResponse holds the response for user registration
@@ -195,12 +195,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
-
-	// // password and confirm password should match
-	// if request.Password != request.ConfirmPassword {
-	// 	Error(c, http.StatusBadRequest, "Validation Error", "password and confirm password don't match")
-	// 	return
-	// }
 
 	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
@@ -565,11 +559,6 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 		return
 	}
 
-	// if request.Password != request.ConfirmPassword {
-	// 	Error(c, http.StatusBadRequest, "password mismatch", "password and confirm password don't match")
-	// 	return
-	// }
-
 	// hash password
 	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
 	if err != nil {
@@ -623,11 +612,6 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
-
-	// if request.Amount <= 0 {
-	// 	Error(c, http.StatusBadRequest, "Amount must be greater than zero", "")
-	// 	return
-	// }
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
@@ -905,6 +889,11 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
