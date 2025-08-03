@@ -31,29 +31,6 @@ const (
 	italicFontPath = "fonts/Arial-Italic.ttf"
 )
 
-func getAssetPath(subdir, filename string) (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get working directory: %w", err)
-	}
-	// Try relative to current working directory
-	path := filepath.Join(cwd, subdir, filename)
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
-	}
-	// Try one directory up (for Docker test context)
-	path = filepath.Join(cwd, "..", subdir, filename)
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
-	}
-	// Try absolute Docker path
-	path = filepath.Join("/app", subdir, filename)
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
-	}
-	return "", fmt.Errorf("file %q not found in any known path", filename)
-}
-
 type InvoicePDF struct {
 	invoice models.Invoice
 	user    models.User
