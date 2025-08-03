@@ -9,6 +9,7 @@ type DB interface {
 	UpdatePassword(email string, hashedPassword []byte) error
 	UpdateUserVerification(userID int, verified bool) error
 	ListAllUsers() ([]User, error)
+	ListAdmins() ([]User, error)
 	DeleteUserByID(userID int) error
 	CreateVoucher(voucher *Voucher) error
 	ListAllVouchers() ([]Voucher, error)
@@ -36,9 +37,15 @@ type DB interface {
 	GetUnreadNotificationCount(userID string) (int64, error)
 	DeleteNotification(notificationID uint, userID string) error
 	// Cluster methods
-	CreateCluster(cluster *Cluster) error
+	CreateCluster(userID string, cluster *Cluster) error
 	ListUserClusters(userID string) ([]Cluster, error)
 	GetClusterByName(userID string, projectName string) (Cluster, error)
 	UpdateCluster(cluster *Cluster) error
 	DeleteCluster(userID string, projectName string) error
+	// pending records methods
+	CreatePendingRecord(record *PendingRecord) error
+	ListAllPendingRecords() ([]PendingRecord, error)
+	ListOnlyPendingRecords() ([]PendingRecord, error)
+	ListUserPendingRecords(userID int) ([]PendingRecord, error)
+	UpdatePendingRecordTransferredAmount(id int, amount uint64) error
 }

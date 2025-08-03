@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -19,6 +20,20 @@ import (
 type ListNodesResponse struct {
 	Total int               `json:"total"`
 	Nodes []proxyTypes.Node `json:"nodes"`
+}
+
+// ReserveNodeResponse holds the response for reserve node response
+type ReserveNodeResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	NodeID     uint32 `json:"node_id"`
+	Email      string `json:"email"`
+}
+
+// UnreserveNodeResponse holds the response for unreserve node response
+type UnreserveNodeResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	ContractID uint32 `json:"contract_id"`
+	Email      string `json:"email"`
 }
 
 // @Summary List nodes
@@ -78,8 +93,9 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param node_id path string true "Node ID"
-// @Success 200 {object} APIResponse
+// @Success 202 {object} ReserveNodeResponse
 // @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 404 {object} APIResponse "No nodes are available for rent."
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/{node_id} [post]
@@ -138,7 +154,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("reserve-node")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowReserveNode)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -153,10 +169,10 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	Success(c, http.StatusAccepted, "Node reservation in progress. You can check its status using the workflow_id.", gin.H{
-		"workflow_id": wf.UUID,
-		"node_id":     nodeID,
-		"email":       user.Email,
+	Success(c, http.StatusAccepted, "Node reservation in progress. You can check its status using the workflow id.", ReserveNodeResponse{
+		WorkflowID: wf.UUID,
+		NodeID:     nodeID,
+		Email:      user.Email,
 	})
 
 }
@@ -190,7 +206,6 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	}
 
 	twinID, err := h.substrateClient.GetTwinByPubKey(identity.PublicKey())
-	fmt.Println(twinID)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -225,8 +240,9 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param contract_id path string true "Contract ID"
-// @Success 200 {object} APIResponse
+// @Success 202 {object} UnreserveNodeResponse
 // @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 404 {object} APIResponse "User is not found"
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/unreserve/{contract_id} [delete]
@@ -255,7 +271,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	}
 	contractID := uint32(contractID64)
 
-	wf, err := h.ewfEngine.NewWorkflow("unreserve-node")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUnreserveNode)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -270,10 +286,10 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	Success(c, http.StatusAccepted, "Node unreservation in progress. You can check its status using the workflow_id.", gin.H{
-		"workflow_id": wf.UUID,
-		"contract_id": contractID,
-		"email":       user.Email,
+	Success(c, http.StatusAccepted, "Node unreservation in progress. You can check its status using the workflow id.", UnreserveNodeResponse{
+		WorkflowID: wf.UUID,
+		ContractID: contractID,
+		Email:      user.Email,
 	})
 }
 

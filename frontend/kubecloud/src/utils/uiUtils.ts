@@ -132,3 +132,10 @@ export function throttle<T extends (...args: any[]) => any>(
     }
   }
 } 
+
+export function formatDate(dateStr: string) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}

@@ -43,8 +43,7 @@ import ErrorBoundary from './components/ErrorBoundary.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import UnifiedBackground from './components/UnifiedBackground.vue'
 import FloatingClouds from './components/FloatingClouds.vue'
-import { useDeploymentEvents } from './composables/useDeploymentEvents'
-
+import { useDeploymentEvents } from "./composables/useDeploymentEvents"
 const route = useRoute()
 const userStore = useUserStore()
 const isInitializing = ref(true)
@@ -78,15 +77,15 @@ const currentTheme = computed(() => {
   return themeMap[path] || 'default'
 })
 
+
+
 // Initialize authentication state
 onMounted(async () => {
   try {
     // Initialize auth state (check localStorage for tokens)
-    userStore.initializeAuth()
-    
-    // Add a small delay to show loading state
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // Call the composable to enable deployment events globally
+    await userStore.initializeAuth()
+
+    // Initialize deployment events for real-time updates
     useDeploymentEvents()
   } catch (error) {
     console.error('Failed to initialize authentication:', error)
@@ -94,6 +93,7 @@ onMounted(async () => {
     isInitializing.value = false
   }
 })
+
 </script>
 
 <style scoped>

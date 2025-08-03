@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/models"
 	"net/http"
 	"strconv"
@@ -21,6 +22,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
+
+	"github.com/vedhavyas/go-subkey"
 )
 
 // Handler struct holds configs for all handlers
@@ -37,6 +40,11 @@ type Handler struct {
 	sseManager      *internal.SSEManager
 	ewfEngine       *ewf.Engine
 	gridNet         string // Network name for the grid
+	sshPublicKey    string // SSH public key loaded at startup
+	systemIdentity  substrate.Identity
+	kycClient       *internal.KYCClient
+	sponsorKeyPair  subkey.KeyPair
+	sponsorAddress  string
 }
 
 // NewHandler create new handler
@@ -44,8 +52,10 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine, gridNet string,
-) *Handler {
+	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine,
+	gridNet string, sshPublicKey string, systemIdentity substrate.Identity,
+	kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string) *Handler {
+
 	return &Handler{
 		tokenManager:    tokenManager,
 		db:              db,
@@ -59,6 +69,11 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		sseManager:      sseManager,
 		ewfEngine:       ewfEngine,
 		gridNet:         gridNet,
+		sshPublicKey:    sshPublicKey,
+		systemIdentity:  systemIdentity,
+		kycClient:       kycClient,
+		sponsorKeyPair:  sponsorKeyPair,
+		sponsorAddress:  sponsorAddress,
 	}
 }
 
@@ -117,16 +132,17 @@ type RefreshTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// chargeBalanceResponse struct holds the response data after charging balance
+// ChargeBalanceResponse holds the response for charging user balance
 type ChargeBalanceResponse struct {
-	PaymentIntentID string  `json:"payment_intent_id"`
-	NewBalance      float64 `json:"new_balance"`
+	WorkflowID string `json:"workflow_id"`
+	Email      string `json:"email"`
 }
 
 // UserBalanceResponse struct holds the response data for user balance
 type UserBalanceResponse struct {
-	BalanceUSD float64 `json:"balance_usd"`
-	DebtUSD    float64 `json:"debt_usd"`
+	BalanceUSD        float64 `json:"balance_usd"`
+	DebtUSD           float64 `json:"debt_usd"`
+	PendingBalanceUSD float64 `json:"pending_balance_usd"`
 }
 
 // SSHKeyInput struct for adding SSH keys
@@ -135,19 +151,38 @@ type SSHKeyInput struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
-// @Summary Register a user
-// @Description Registers a new user to the system
+// RegisterUserResponse holds the response for user registration
+type RegisterUserResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	Email      string `json:"email"`
+}
+
+// RedeemVoucherResponse holds the response for redeeming a voucher
+type RedeemVoucherResponse struct {
+	WorkflowID  string  `json:"workflow_id"`
+	VoucherCode string  `json:"voucher_code"`
+	Amount      float64 `json:"amount"`
+	Email       string  `json:"email"`
+}
+
+type GetUserResponse struct {
+	models.User
+	PendingBalanceUSD float64 `json:"pending_balance_usd"`
+}
+
+// RegisterHandler registers user to the system
+// @Summary Register user (with KYC sponsorship)
+// @Description Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.
 // @Tags users
 // @ID register-user
 // @Accept json
 // @Produce json
 // @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse
+// @Success 201 {object} RegisterUserResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format"
 // @Failure 409 {object} APIResponse "User already registered"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/register [post]
-// RegisterHandler registers user to the system
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
 
@@ -173,7 +208,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("user-registration")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserRegistration)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
@@ -188,14 +223,10 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	// send notification that user registered
-	// same as balance funding
-
-	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow_id.", gin.H{
-		"workflow_id": wf.UUID,
-		"email":       request.Email,
+	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow id.", RegisterUserResponse{
+		WorkflowID: wf.UUID,
+		Email:      request.Email,
 	})
-
 }
 
 // @Summary Verify registration code
@@ -205,11 +236,10 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body VerifyCodeInput true "Verify Code Input"
-// @Success 201 {object} internal.TokenPair
+// @Success 202 {object} RegisterUserResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format or verification failed"
 // @Failure 500 {object} APIResponse
 // @Router /user/register/verify [post]
-// VerifyRegisterCode verifies email when signing up
 func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	var request VerifyCodeInput
 
@@ -242,7 +272,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("user-verification")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
@@ -257,14 +287,14 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "verification in progress", map[string]interface{}{
-		"workflow_id": wf.UUID,
-		"email":       user.Email,
+	Success(c, http.StatusCreated, "verification in progress", RegisterUserResponse{
+		WorkflowID: wf.UUID,
+		Email:      user.Email,
 	})
 }
 
-// @Summary Login user
-// @Description Logs a user into the system
+// @Summary Login user (KYC verification checked)
+// @Description Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.
 // @Tags users
 // @ID login-user
 // @Accept json
@@ -291,7 +321,6 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		log.Error().Err(err).Msg("failed to get user by email")
 		Error(c, http.StatusBadRequest, "verification failed", "email or password is incorrect")
 		return
-
 	}
 
 	// verify password
@@ -299,6 +328,20 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	if !match {
 		Error(c, http.StatusUnauthorized, "login failed", "email or password is incorrect")
 		return
+	}
+
+	// Check KYC verification status without blocking login
+	sponsored, err := h.kycClient.IsUserVerified(c.Request.Context(), user.AccountAddress)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check KYC verification status")
+		InternalServerError(c)
+		return
+	}
+	if user.Sponsored != sponsored {
+		user.Sponsored = sponsored
+		if err := h.db.UpdateUserByID(&user); err != nil {
+			log.Error().Err(err).Msg("failed to update user sponsorship status")
+		}
 	}
 
 	// create token pairs
@@ -528,12 +571,11 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body ChargeBalanceInput true "Charge Balance Input"
-// @Success 201 {object} ChargeBalanceResponse "Balance is charged successfully"
+// @Success 202 {object} ChargeBalanceResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format or amount"
 // @Failure 404 {object} APIResponse "User is not found"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/balance/charge [post]
-// ChargeBalance charges the user's balance
 func (h *Handler) ChargeBalance(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -572,12 +614,11 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow("charge-balance")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowChargeBalance)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
-
 	}
 
 	wf.State = ewf.State{
@@ -585,13 +626,14 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		"stripe_customer_id": user.StripeCustomerID,
 		"payment_method_id":  paymentMethod.ID,
 		"amount":             int(request.Amount),
+		"mnemonic":           user.Mnemonic,
 	}
 
-	h.ewfEngine.RunAsync(c, wf)
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow_id.", map[string]interface{}{
-		"workflow_id": wf.UUID,
-		"email":       user.Email,
+	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", ChargeBalanceResponse{
+		WorkflowID: wf.UUID,
+		Email:      user.Email,
 	})
 }
 
@@ -600,7 +642,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 // @Tags users
 // @ID get-user
 // @Produce json
-// @Success 200 {object} models.User "User is retrieved successfully"
+// @Success 200 {object} GetUserResponse "User is retrieved successfully"
 // @Failure 404 {object} APIResponse "User is not found"
 // @Failure 500 {object} APIResponse
 // @Router /user [get]
@@ -615,8 +657,32 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 		return
 	}
 
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var tftPendingAmount uint64
+	for _, record := range pendingRecords {
+		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
+	}
+
+	usdPendingAmount, err := internal.FromTFTtoUSD(h.substrateClient, tftPendingAmount)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert tft to usd")
+		InternalServerError(c)
+		return
+	}
+
+	userResponse := GetUserResponse{
+		User:              user,
+		PendingBalanceUSD: usdPendingAmount,
+	}
+
 	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
-		"user": user,
+		"user": userResponse,
 	})
 }
 
@@ -639,14 +705,37 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
+
 	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
+		return
 	}
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var tftPendingAmount uint64
+	for _, record := range pendingRecords {
+		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
+	}
+
+	usdPendingAmount, err := internal.FromTFTtoUSD(h.substrateClient, tftPendingAmount)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert tft to usd")
+		InternalServerError(c)
+		return
+	}
+
 	Success(c, http.StatusOK, "Balance is fetched", UserBalanceResponse{
-		BalanceUSD: usdBalance,
-		DebtUSD:    user.Debt,
+		BalanceUSD:        usdBalance,
+		DebtUSD:           user.Debt,
+		PendingBalanceUSD: usdPendingAmount,
 	})
 }
 
@@ -656,12 +745,11 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 // @ID redeem-voucher
 // @Param voucher_code path string true "Voucher Code"
 // @Produce json
-// @Success 202 {object} APIResponse "Voucher redeemed successfully"
-// @Failure 400 {object} APIResponse "Invalid voucher code or already redeemed"
+// @Success 202 {object} RedeemVoucherResponse "workflow_id: string, voucher_code: string, amount: float64, email: string"
+// @Failure 400 {object} APIResponse "Invalid voucher code, already redeemed, or expired"
 // @Failure 404 {object} APIResponse "User or voucher are not found"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/redeem/{voucher_code} [put]
-// RedeemVoucherHandler redeems a voucher for the user
 func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	voucherCodeParam := c.Param("voucher_code")
 	if voucherCodeParam == "" {
@@ -704,31 +792,24 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	user.CreditedBalance += voucher.Value
-	err = h.db.UpdateUserByID(&user)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
-	wf, err := h.ewfEngine.NewWorkflow("redeem-voucher")
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 	wf.State = map[string]interface{}{
+		"user_id":  user.ID,
 		"amount":   voucher.Value,
 		"mnemonic": user.Mnemonic,
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusOK, "Voucher is redeemed successfully. TFT transfer in progress.", map[string]interface{}{
-		"workflow_id":  wf.UUID,
-		"voucher_code": voucher.Code,
-		"amount":       voucher.Value,
-		"email":        user.Email,
+	Success(c, http.StatusOK, "Voucher is redeemed successfully. Money transfer in progress.", RedeemVoucherResponse{
+		WorkflowID:  wf.UUID,
+		VoucherCode: voucher.Code,
+		Amount:      voucher.Value,
+		Email:       user.Email,
 	})
 }
 
@@ -865,7 +946,7 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 }
 
 // @Summary Get workflow status
-// @Description Returns the status of a workflow by its ID
+// @Description Returns the status of a workflow by its ID.
 // @Tags workflow
 // @ID get-workflow-status
 // @Accept json
@@ -884,12 +965,59 @@ func (h *Handler) GetWorkflowStatus(c *gin.Context) {
 		return
 	}
 
-	workflow, err := h.ewfEngine.Store().LoadWorkflow(c, workflowID)
+	workflow, err := h.ewfEngine.Store().LoadWorkflowByUUID(c, workflowID)
 	if err != nil {
 		InternalServerError(c)
 		return
 	}
-
 	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
+}
 
+// @Summary List user pending records
+// @Description Returns user pending records in the system
+// @Tags users
+// @ID list-user-pending-records
+// @Accept json
+// @Produce json
+// @Success 200 {array} PendingRecordsResponse
+// @Failure 500 {object} APIResponse
+// @Security BearerAuth
+// @Router /user/pending-records [get]
+// ListUserPendingRecordsHandler returns user pending records in the system
+func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var pendingRecordsResponse []PendingRecordsResponse
+	for _, record := range pendingRecords {
+		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd amount")
+			InternalServerError(c)
+			return
+		}
+
+		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
+			InternalServerError(c)
+			return
+		}
+
+		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
+			PendingRecord:        record,
+			USDAmount:            usdAmount,
+			TransferredUSDAmount: usdTransferredAmount,
+		})
+	}
+
+	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
+		"pending_records": pendingRecordsResponse,
+	})
 }

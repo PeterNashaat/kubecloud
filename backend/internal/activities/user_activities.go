@@ -6,7 +6,9 @@ import (
 	"kubecloud/internal"
 	"kubecloud/models"
 
+	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/vedhavyas/go-subkey"
 	"github.com/xmonader/ewf"
 	"gorm.io/gorm"
 )
@@ -86,6 +88,43 @@ func CreateStripeCustomerStep() ewf.StepFn {
 	}
 }
 
+func CreateKYCSponsorship(kycClient *internal.KYCClient, sponsorAddress string, sponsorKeyPair subkey.KeyPair) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		mnemonicVal, ok := state["mnemonic"]
+		if !ok {
+			return fmt.Errorf("missing 'mnemonic' in state")
+		}
+		mnemonic, ok := mnemonicVal.(string)
+		if !ok {
+			return fmt.Errorf("'mnemonic' in state is not a string")
+		}
+
+		// Set user.AccountAddress from mnemonic
+		sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to create keypair for SS58 address")
+			return err
+		}
+
+		sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get SS58 address")
+			return err
+		}
+
+		state["sponsee_address"] = sponseeAddress
+
+		if err := kycClient.CreateSponsorship(ctx, sponsorAddress, sponsorKeyPair, sponseeAddress, sponseeKeyPair); err != nil {
+			return fmt.Errorf("failed to create KYC sponsorship: %w", err)
+		}
+
+		state["sponsored"] = true
+
+		return nil
+
+	}
+}
+
 func SaveUserStep(db models.DB, config internal.Configuration) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		nameVal, ok := state["name"]
@@ -142,6 +181,24 @@ func SaveUserStep(db models.DB, config internal.Configuration) ewf.StepFn {
 			return fmt.Errorf("'stripe_customer_id' in state is not a string")
 		}
 
+		sponseeAddressVal, ok := state["sponsee_address"]
+		if !ok {
+			return fmt.Errorf("missing 'sponsee_address' in state")
+		}
+		sponseeAddress, ok := sponseeAddressVal.(string)
+		if !ok {
+			return fmt.Errorf("'sponseeAddress' in state is not a string")
+		}
+
+		sponsoredVal, ok := state["sponsored"]
+		if !ok {
+			return fmt.Errorf("missing 'sponsored' in state")
+		}
+		sponsored, ok := sponsoredVal.(bool)
+		if !ok {
+			return fmt.Errorf("'sponsored' in state is not a string")
+		}
+
 		// hash password
 		hashedPassword, err := internal.HashAndSaltPassword([]byte(password))
 		if err != nil {
@@ -155,10 +212,11 @@ func SaveUserStep(db models.DB, config internal.Configuration) ewf.StepFn {
 			Email:            email,
 			Password:         hashedPassword,
 			Code:             code,
-			Verified:         false,
 			Admin:            isAdmin,
 			Mnemonic:         mnemonic,
 			StripeCustomerID: stripeID,
+			AccountAddress:   sponseeAddress,
+			Sponsored:        sponsored,
 		}
 
 		existingUser, err := db.GetUserByEmail(email)
@@ -176,7 +234,7 @@ func SaveUserStep(db models.DB, config internal.Configuration) ewf.StepFn {
 
 		err = db.RegisterUser(&user)
 		if err != nil {
-			return fmt.Errorf("db register failed: %w", err)
+			return fmt.Errorf("user registration failed: %w", err)
 		}
 		return nil
 	}
@@ -275,7 +333,50 @@ func CreatePaymentIntentStep(currency string) ewf.StepFn {
 	}
 }
 
-func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
+func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, systemMnemonic string) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		amountVal, ok := state["amount"]
+		if !ok {
+			return fmt.Errorf("missing 'amount' in state")
+		}
+		var amountInt int
+		switch v := amountVal.(type) {
+		case int:
+			amountInt = v
+		case float64:
+			amountInt = int(v)
+		default:
+			return fmt.Errorf("'amount' in state is not a number")
+		}
+
+		userIDVal, ok := state["user_id"]
+		if !ok {
+			return fmt.Errorf("missing 'user_id' in state")
+		}
+		userID, ok := userIDVal.(int)
+		if !ok {
+			return fmt.Errorf("'userID' in state is not a int")
+		}
+
+		requestedTFTs, err := internal.FromUSDToTFT(substrateClient, float64(amountInt))
+		if err != nil {
+			log.Error().Err(err).Msg("error converting usd")
+			return err
+		}
+
+		if err = db.CreatePendingRecord(&models.PendingRecord{
+			UserID:    userID,
+			TFTAmount: requestedTFTs,
+		}); err != nil {
+			log.Error().Err(err).Send()
+			return err
+		}
+
+		return nil
+	}
+}
+
+func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		userIDVal, ok := state["user_id"]
 		if !ok {
@@ -304,18 +405,29 @@ func UpdateUserBalanceStep(db models.DB) ewf.StepFn {
 		if err != nil {
 			return fmt.Errorf("user not found: %w", err)
 		}
+
 		user.CreditCardBalance += amount
 		if err := db.UpdateUserByID(&user); err != nil {
 			return fmt.Errorf("error updating user: %w", err)
 		}
+
 		state["new_balance"] = user.CreditCardBalance
 		state["mnemonic"] = user.Mnemonic
 		return nil
 	}
 }
 
-func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf.StepFn {
+func UpdateCreditedBalanceStep(db models.DB) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		userIDVal, ok := state["user_id"]
+		if !ok {
+			return fmt.Errorf("missing 'user_id' in state")
+		}
+		userID, ok := userIDVal.(int)
+		if !ok {
+			return fmt.Errorf("'user_id' in state is not an int")
+		}
+
 		amountVal, ok := state["amount"]
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
@@ -330,18 +442,15 @@ func TransferTFTsStep(substrate *substrate.Substrate, systemMnemonic string) ewf
 			return fmt.Errorf("'amount' in state is not a float64 or int")
 		}
 
-		mnemonicVal, ok := state["mnemonic"]
-		if !ok {
-			return fmt.Errorf("missing 'mnemonic' in state")
-		}
-		mnemonic, ok := mnemonicVal.(string)
-		if !ok {
-			return fmt.Errorf("'mnemonic' in state is not a string")
-		}
-		err := internal.TransferTFTs(substrate, uint64(amount), mnemonic, systemMnemonic)
+		user, err := db.GetUserByID(userID)
 		if err != nil {
-			return fmt.Errorf("error transferring TFTs: %w", err)
+			return fmt.Errorf("user not found: %w", err)
 		}
+		user.CreditedBalance += amount
+		if err := db.UpdateUserByID(&user); err != nil {
+			return fmt.Errorf("error updating user: %w", err)
+		}
+		state["new_balance"] = user.CreditedBalance
 		return nil
 	}
 }

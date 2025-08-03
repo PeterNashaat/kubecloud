@@ -5,9 +5,15 @@
       <p class="dashboard-card-subtitle">Add funds to your account balance</p>
     </div>
     <div class="dashboard-card-content">
+      <div class="balance-container">
       <div class="balance-row">
         <span>Current Balance:</span>
         <span class="balance-value">${{ userStore.netBalance.toFixed(2) }}</span>
+      </div>
+      <div class="balance-row" v-if="userStore.pendingBalance > 0">
+        <span class="pending-balance-text">Pending Balance:</span>
+        <span class="pending-balance-value">${{ userStore.pendingBalance.toFixed(2) }}</span>
+      </div>
       </div>
       <div class="amount-row">
         <span>Amount:</span>
@@ -118,11 +124,13 @@ async function chargeBalance() {
       payment_method_id: tokenId, // This is now a 'tok_' id
       amount: Number(selectedAmount)
     })
+    await userStore.updateNetBalance()
     // Clear the form
     if (cardElement.value) cardElement.value.clear()
     amount.value = 5
     customAmount.value = null
   } catch (err: any) {
+    console.error('Failed to charge balance:', err)
   } finally {
     loading.value = false
   }
@@ -151,6 +159,16 @@ function getSelectedAmount() {
   display: flex;
   flex-direction: column;
 }
+.balance-container {
+  margin-bottom: 1.3rem;
+  font-size: 1.1rem;
+}
+.balance-row {
+  display: flex;
+  gap: 2rem;
+  justify-content: space-between;
+  align-items: center;
+}
 .dashboard-card-header {
   margin-bottom: 1.5rem;
   width: 100%;
@@ -168,17 +186,16 @@ function getSelectedAmount() {
 .dashboard-card-content {
   width: 100%;
 }
-.balance-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.3rem;
-  font-size: 1.1rem;
-}
+
 .balance-value {
   color: #10B981;
   font-weight: 700;
   font-size: 1.2rem;
+}
+.pending-balance-value {
+  color: rgba(203, 213, 225, 0.5);
+  font-weight: 700;
+  font-size: 1rem;
 }
 .amount-row {
   display: flex;
@@ -233,6 +250,10 @@ function getSelectedAmount() {
   min-height: 44px;
   min-width: 29rem;
   display: block;
+}
+.pending-balance-text {
+  font-size: 1rem;
+  color: rgba(203, 213, 225, 0.8);
 }
 .action-btn {
   margin-top: 1.2rem;

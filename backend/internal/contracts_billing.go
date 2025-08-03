@@ -27,9 +27,7 @@ func ListContractBillReportsPerMonth(graphqlClient graphql.GraphQl, contractID u
 	monthAgo := currentTime.AddDate(0, -1, 0)
 
 	options := fmt.Sprintf(`(where: {contractID_eq: %v, timestamp_lte: %v, timestamp_gte: %v}, orderBy: id_ASC)`, contractID, currentTime.Unix(), monthAgo.Unix())
-	fmt.Println(options)
 	billingReportsCount, err := graphqlClient.GetItemTotalCount("contractBillReports", options)
-	fmt.Printf("billingReportsCount: %v\n", billingReportsCount)
 	if err != nil {
 		return ContractBillReports{}, err
 	}

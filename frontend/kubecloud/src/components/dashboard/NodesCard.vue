@@ -242,10 +242,8 @@ const handleUnreserve = async () => {
     await unreserveNode(selectedNode.value.rentContractId.toString())
     showUnreserveDialog.value = false
     selectedNode.value = null
-    notificationStore.success('Success', 'Node unreserved successfully.')
   } catch (err) {
-    notificationStore.error('Error', 'Failed to unreserve node. Please try again.')
-    console.error('Failed to unreserve node:', err)
+    console.error('Failed to unreserve node. Please try again.')
   } finally {
     unreservingNode.value = null
   }
@@ -504,4 +502,4 @@ function formatStorage(val: number) {
     margin-top: 0.5rem;
   }
 }
-</style> 
+</style>

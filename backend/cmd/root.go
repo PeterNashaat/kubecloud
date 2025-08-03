@@ -148,6 +148,24 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind invoice.governorate flag: %w", err)
 	}
 
+	// === Debug ===
+	if err := bindBoolFlag(rootCmd, "debug", false, "Enable debug logging"); err != nil {
+		return fmt.Errorf("failed to bind debug flag: %w", err)
+	}
+
+	// === Monitor Balance Interval In Hours ===
+	if err := bindIntFlag(rootCmd, "monitor_balance_interval_in_hours", 1, "Number of hours to monitor balance"); err != nil {
+		return fmt.Errorf("failed to bind monitor_balance_interval_in_hours flag: %w", err)
+	}
+
+	// === KYC Verifier ===
+	if err := bindStringFlag(rootCmd, "kyc_verifier_api_url", "", "KYC verifier API URL"); err != nil {
+		return fmt.Errorf("failed to bind kyc_verifier_api_url flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "kyc_challenge_domain", "", "KYC challenge domain"); err != nil {
+		return fmt.Errorf("failed to bind kyc_challenge_domain flag: %w", err)
+	}
+
 	return nil
 }
 
@@ -197,6 +215,14 @@ It supports:
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to read configurations")
 			return fmt.Errorf("failed to read configuration: %w", err)
+		}
+
+		// Set log level based on debug configuration
+		if config.Debug {
+			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+			log.Debug().Msg("Debug logging enabled")
+		} else {
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		}
 
 		app, err := app.NewApp(config)
@@ -262,6 +288,15 @@ func bindIntFlag(cmd *cobra.Command, key string, defaultVal int, usage string) e
 	}
 	// Ensure the value is set as an integer in viper
 	viper.Set(key, viper.GetInt(key))
+
+	return nil
+}
+
+func bindBoolFlag(cmd *cobra.Command, key string, defaultVal bool, usage string) error {
+	cmd.PersistentFlags().Bool(key, defaultVal, usage)
+	if err := viper.BindPFlag(key, cmd.PersistentFlags().Lookup(key)); err != nil {
+		return fmt.Errorf("failed to bind flag %s: %w", key, err)
+	}
 
 	return nil
 }

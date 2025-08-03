@@ -34,18 +34,18 @@
             <div class="modern-cluster-info">
               <div class="cluster-info-grid">
                 <div class="info-label">Project Name</div>
-                <div>{{ cluster.project_name || '-' }}</div>
-                <div class="info-label">vCPU</div>
-                <div>{{ totalVcpu }}</div>
+                <div>{{ cluster.cluster.name || '-' }}</div>
+                <div class="info-label">CPU</div>
+                <div>{{ totalCPU }}</div>
                 <div class="info-label">Created</div>
                 <div>{{ formatDate(cluster.created_at) }}</div>
                 <div class="info-label">Storage</div>
-                <div>{{ totalStorage }} MB</div>
+                <div>{{ Math.round(totalStorage / 1024) }} GB</div>
                 <div class="info-label">Last Updated</div>
                 <div>{{ formatDate(cluster.updated_at) }}</div>
 
                 <div class="info-label">RAM</div>
-                <div>{{ totalRam }} MB</div>
+                <div>{{ Math.round(totalRam / 1024) }} GB</div>
               </div>
             </div>
             <div class="nodes-section mt-8">
@@ -69,25 +69,20 @@
                 </thead>
                 <tbody>
                   <tr v-for="node in filteredNodes" :key="node.node_id">
-                    <td>{{ node.name }}</td>
+                    <td>{{ node.original_name }}</td>
                     <td>{{ node.type }}</td>
                     <td>{{ node.cpu }}</td>
-                    <td>{{ node.memory }} MB</td>
-                    <td>{{ node.root_size + node.disk_size }} MB</td>
+                    <td>{{ Math.round(node.memory / 1024) }} GB</td>
+                    <td>{{ Math.round((node.root_size + node.disk_size) / 1024) }} GB</td>
                     <td>
                       <span class="truncate-cell">
                         {{ node.ip || '-' }}
                       </span>
                     </td>
                     <td>
-                      <v-tooltip activator="parent" location="top" v-if="node.mycelium_ip">
-                        <template #activator="{ props }">
-                          <span class="truncate-cell" v-bind="props">
-                            {{ node.mycelium_ip }}
-                          </span>
-                        </template>
-                        <span>{{ node.mycelium_ip }}</span>
-                      </v-tooltip>
+                      <span v-if="node.mycelium_ip" class="full-ip-cell">
+                        {{ node.mycelium_ip }}
+                      </span>
                       <span v-else>-</span>
                     </td>
                     <td>
@@ -141,48 +136,40 @@
       :add-form-node="addFormNode"
       :can-assign-to-node="canAssignToNode"
       :add-node-loading="addNodeLoading"
+      :available-ssh-keys="sshKeys"
       @add-node="addNode"
-      @nodes-updated="editNodes = $event"
+      @remove-node="handleRemoveNode"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 import { api } from '../../utils/api'
-import { useNotificationStore } from '../../stores/notifications'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
-import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer';
-import { formatDate } from '../../utils/dateUtils';
-// Import dialogs
-import EditClusterNodesDialog from './EditClusterNodesDialog.vue';
-import KubeconfigDialog from './KubeconfigDialog.vue';
-import DeleteClusterDialog from './DeleteClusterDialog.vue';
+import { useNotificationStore } from '../../stores/notifications'
 
-function getClusterUsedResources(nodeId: number) {
-  // Sums up vcpu, ram, storage for all editNodes with this nodeId
-  // editNodes may contain extended node objects with vcpu/ram/storage or cpu/memory/storage
-  return (editNodes.value || []).filter((n: RentedNode) => n.nodeId === nodeId).reduce((acc: { vcpu: number, ram: number, storage: number }, n: RentedNode) => {
-    acc.vcpu += ('vcpu' in n ? (n as any).vcpu : (n as any).cpu) || 0;
-    acc.ram += ('ram' in n ? (n as any).ram : (n as any).memory) || 0;
-    acc.storage += (n as any).storage || 0;
-    return acc;
-  }, { vcpu: 0, ram: 0, storage: 0 });
-}
+import { getAvailableCPU, getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer'
+
+import { formatDate } from '../../utils/dateUtils'
+
+// Import dialogs
+const EditClusterNodesDialog = defineAsyncComponent(() => import('./EditClusterNodesDialog.vue'))
+const KubeconfigDialog = defineAsyncComponent(() => import('./KubeconfigDialog.vue'))
+const DeleteClusterDialog = defineAsyncComponent(() => import('./DeleteClusterDialog.vue'))
 
 const router = useRouter()
 const route = useRoute()
 const clusterStore = useClusterStore()
-const notificationStore = useNotificationStore()
 
 const loading = ref(true)
 const notFound = ref(false)
 
 const projectName = computed(() => route.params.id?.toString() || '')
 const cluster = computed(() =>
-  clusterStore.clusters.find(c => c.project_name === projectName.value)
+  clusterStore.clusters.find(c => c.cluster.name === projectName.value)
 )
 
 const filteredNodes = computed(() => {
@@ -192,7 +179,7 @@ const filteredNodes = computed(() => {
   return []
 })
 
-const totalVcpu = computed(() => {
+const totalCPU = computed(() => {
   return filteredNodes.value.length
     ? filteredNodes.value.reduce((sum, node) => sum + (typeof node.cpu === 'number' ? node.cpu : 0), 0)
     : '-'
@@ -262,9 +249,16 @@ const deletingCluster = ref(false)
 async function confirmDelete() {
   deletingCluster.value = true
   showDeleteModal.value = false
+
   if (cluster.value) {
-    await clusterStore.deleteCluster(cluster.value.project_name)
-    router.push('/dashboard/clusters')
+    try {
+      await clusterStore.deleteCluster(cluster.value.cluster.name)
+      notificationStore.info('Cluster Removal Started', 'Cluster is being removed in the background. You will be notified when the operation completes.');
+      goBack()
+    } catch (e: any) {
+      const errorMessage = e?.message || 'Failed to delete cluster';
+      notificationStore.error('Delete Cluster Failed', errorMessage);
+    }
   }
   deletingCluster.value = false
 }
@@ -293,6 +287,17 @@ const loadCluster = async () => {
 onMounted(loadCluster)
 watch(() => projectName.value, loadCluster)
 
+// Watch for cluster updates and refresh data when needed
+watch(() => clusterStore.clusters, (newClusters) => {
+  // Update editNodes if dialog is open
+  if (editClusterNodesDialog.value && cluster.value) {
+    const updatedCluster = newClusters.find(c => c.project_name === cluster.value?.project_name)
+    if (updatedCluster?.cluster?.nodes && Array.isArray(updatedCluster.cluster.nodes)) {
+      editNodes.value = updatedCluster.cluster.nodes.map((n: any) => ({ ...n }))
+    }
+  }
+}, { deep: true })
+
 const goBack = () => {
   router.push('/dashboard')
 }
@@ -313,19 +318,22 @@ async function openEditClusterNodesDialog() {
 const addNodeLoading = ref(false)
 const availableNodes = computed<RentedNode[]>(() => {
   return rentedNodes.value.filter((node: RentedNode) => {
-    const clusterUsed = getClusterUsedResources(node.nodeId);
-    const availCPU = getAvailableCPU(node) - clusterUsed.vcpu;
-    const availRAM = getAvailableRAM(node) - clusterUsed.ram;
-    const availStorage = getAvailableStorage(node) - clusterUsed.storage;
-    return availCPU > 0 && availRAM > 0 && availStorage > 0;
+    const availRAM = getAvailableRAM(node);
+    const availStorage = getAvailableStorage(node);
+    return availRAM > 0 && availStorage > 0;
   });
 });
 
-const { rentedNodes, loading: nodesLoading, fetchRentedNodes } = useNodeManagement()
+const { rentedNodes, loading: nodesLoading, fetchRentedNodes, addNodeToDeployment, removeNodeFromDeployment } = useNodeManagement()
 
+// Notification store
+const notificationStore = useNotificationStore()
+
+// SSH keys state
+const sshKeys = ref<any[]>([])
 const addFormNodeId = ref(null);
 const addFormRole = ref('master');
-const addFormVcpu = ref(1);
+const addFormCpu = ref(1);
 const addFormRam = ref(1);
 const addFormStorage = ref(1);
 const addFormError = ref('');
@@ -336,23 +344,23 @@ const canAssignToNode = computed(() => {
   const node = addFormNode.value;
   if (!node) return false;
   return (
-    addFormVcpu.value > 0 &&
+    addFormCpu.value > 0 &&
     addFormRam.value > 0 &&
     addFormStorage.value > 0 &&
-    addFormVcpu.value <= getAvailableCPU(node) &&
+    addFormCpu.value <= getAvailableCPU(node) &&
     addFormRam.value <= getAvailableRAM(node) &&
     addFormStorage.value <= getAvailableStorage(node)
   );
 });
 
-watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
+watch([addFormNodeId, addFormCpu, addFormRam, addFormStorage], () => {
   const node = addFormNode.value;
   if (!node) {
     addFormError.value = '';
     return;
   }
   if (
-    addFormVcpu.value > getAvailableCPU(node) ||
+    addFormCpu.value > getAvailableCPU(node) ||
     addFormRam.value > getAvailableRAM(node) ||
     addFormStorage.value > getAvailableStorage(node)
   ) {
@@ -362,42 +370,41 @@ watch([addFormNodeId, addFormVcpu, addFormRam, addFormStorage], () => {
   }
 });
 
-async function addNode(payload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
-  const node = availableNodes.value.find(n => n.nodeId === payload.nodeId);
-  if (!node) return;
-  if (payload.vcpu <= 0 || payload.ram <= 0 || payload.storage <= 0) {
-    addFormError.value = 'All resources must be greater than 0.';
-    return;
-  }
-  if (payload.vcpu > getAvailableCPU(node) || payload.ram > getAvailableRAM(node) || payload.storage > getAvailableStorage(node)) {
-    addFormError.value = 'Requested resources exceed available.';
+async function addNode(payload: any) {
+  // Accepts a cluster payload with a nodes array
+  if (!payload || !payload.name || !Array.isArray(payload.nodes) || payload.nodes.length === 0) {
+    addFormError.value = 'Invalid node payload.';
+    notificationStore.error('Add Node Error', 'Invalid node payload.');
     return;
   }
   addNodeLoading.value = true;
   addFormError.value = '';
   try {
-    if (!cluster.value?.cluster?.name) throw new Error('Cluster name missing');
-    await clusterStore.addNodesToCluster(cluster.value.cluster.name, {
-      nodes: [{
-        nodeId: node.nodeId,
-        role: payload.role,
-        vcpu: payload.vcpu,
-        ram: payload.ram,
-        storage: payload.storage
-      }]
-    });
-    await clusterStore.fetchClusters();
-    editNodes.value.push({ ...node, role: payload.role, vcpu: payload.vcpu, ram: payload.ram, storage: payload.storage });
+    await addNodeToDeployment(payload.name, payload);
+
     // Reset add form state
     addFormNodeId.value = null;
     addFormRole.value = 'master';
-    addFormVcpu.value = 1;
+    addFormCpu.value = 1;
     addFormRam.value = 1;
     addFormStorage.value = 1;
   } catch (e: any) {
-    addFormError.value = e?.message || 'Failed to add node';
+    const errorMessage = e?.message || 'Failed to add node';
+    addFormError.value = errorMessage;
+    notificationStore.error('Add Node Failed', errorMessage);
   } finally {
     addNodeLoading.value = false;
+  }
+}
+
+async function handleRemoveNode(nodeName: string) {
+  if (!cluster.value?.cluster?.name) return;
+  try {
+    await removeNodeFromDeployment(cluster.value.cluster.name, nodeName);
+    notificationStore.info('Node Removal Started', `Node is being removed from the cluster in the background. You will be notified when the operation completes.`);
+  } catch (e: any) {
+    const errorMessage = e?.message || 'Failed to remove node';
+    notificationStore.error('Remove Node Failed', errorMessage);
   }
 }
 
@@ -485,6 +492,14 @@ async function addNode(payload: { nodeId: number, role: string, vcpu: number, ra
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+.full-ip-cell {
+  display: inline-flex;
+  align-items: center;
+  word-break: break-all;
+  white-space: normal;
+  vertical-align: bottom;
+  max-width: 300px;
 }
 .empty-message {
   color: var(--color-text-muted);

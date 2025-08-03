@@ -1,14 +1,34 @@
-import { api } from './api'
+import { WorkflowStatus } from '@/types/ewf'
+import { api, createWorkflowStatusChecker } from './api'
 import type { ApiResponse } from './authService'
+import type { ChargeBalanceResponse } from './stripeService'
+import { useNotificationStore } from '@/stores/notifications'
 
 export interface ReserveNodeRequest {
   // Add any required fields if needed
 }
 
+export interface ReserveNodeResponse {
+  workflow_id: string
+  node_id: number
+  email: string
+}
+export interface UnreserveNodeResponse {
+  workflow_id: string
+  contract_id: number,
+  email: string,
+}
 export interface ChargeBalanceRequest {
   card_type: string
   payment_method_id: string
   amount: number
+}
+
+export interface RedeemVoucherResponse {
+  amount: number,
+  email: string,
+  voucher_code: string,
+  workflow_id: string
 }
 
 export interface Node {
@@ -91,6 +111,24 @@ export interface AddSshKeyRequest {
   public_key: string
 }
 
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
+  created_at: string;
+}
+
+export interface PendingRecord {
+  created_at: string;
+  id: number;
+  tft_amount: number;
+  transferred_tft_amount: number;
+  transferred_usd_amount: number;
+  updated_at: string;
+  usd_amount: number;
+  user_id: number;
+}
+
 export class UserService {
   // List all available nodes
   async listNodes(filters?: any) {
@@ -102,9 +140,9 @@ export class UserService {
         }
       })
     }
-    
+
     const endpoint = `/v1/nodes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-    return api.get<NodesResponse>(endpoint, { 
+    return api.get<NodesResponse>(endpoint, {
       requiresAuth: true,
       showNotifications: false // Don't show notifications for node listing
     })
@@ -112,7 +150,23 @@ export class UserService {
 
   // Reserve a node
   async reserveNode(nodeId: number, data: ReserveNodeRequest = {}) {
-    return api.post(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })
+    const response = await api.post<ApiResponse<ReserveNodeResponse>>(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
+    const status = await workflowChecker.status
+    if(status === WorkflowStatus.StatusCompleted){
+      useNotificationStore().success(
+        'Node Reserved',
+        'Node has been successfully reserved.',
+      )
+    }
+    if (status === WorkflowStatus.StatusFailed) {
+      useNotificationStore().error(
+        'Node reservation error',
+        'Failed to reserve node',
+      )
+      throw new Error('Failed to reserve node')
+    }
+    
   }
 
   // List reserved nodes
@@ -122,12 +176,42 @@ export class UserService {
 
   // Unreserve a node
   async unreserveNode(contractId: string) {
-    return api.delete(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
+    const response = await api.delete<ApiResponse<UnreserveNodeResponse>>(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      useNotificationStore().error(
+        'Node unreservation error',
+        'Failed to unreserve node',
+      )
+      throw new Error('Failed to unreserve node')
+    }
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().success(
+        'Node Unreservation Success',
+        'Node has been successfully unreserved.',
+      )
+    }
   }
 
   // Charge balance
   async chargeBalance(data: ChargeBalanceRequest) {
-    return api.post('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
+    const response = await api.post<ApiResponse<ChargeBalanceResponse>>('/v1/user/balance/charge', data, { requiresAuth: true, showNotifications: true })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 2000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusFailed) {
+      useNotificationStore().error(
+        'Charge Failed',
+        'Failed to charge balance',
+      )
+      throw new Error('Failed to charge balance')
+    }
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().success(
+        'Charge Success',
+        'Charge balance successful',
+      )
+    }
   }
 
   // Create a PaymentIntent (to be implemented)
@@ -139,7 +223,7 @@ export class UserService {
   // List all invoices for the current user
   async listUserInvoices(): Promise<UserInvoice[]> {
     const response = await api.get<{ data: { invoices: UserInvoice[] } }>(
-      '/v1/user/invoice/',
+      '/v1/user/invoice',
       { requiresAuth: true, showNotifications: true, errorMessage: 'Failed to load invoices' }
     )
     return response.data.data.invoices
@@ -156,23 +240,45 @@ export class UserService {
   }
 
   // Redeem a voucher
-  async redeemVoucher(voucherCode: string): Promise<any> {
-    return api.put(`/v1/user/redeem/${voucherCode}`, {}, {
+  async redeemVoucher(voucherCode: string) {
+    const res = await api.put<ApiResponse<RedeemVoucherResponse>>(`/v1/user/redeem/${voucherCode}`, {}, {
       requiresAuth: true,
       showNotifications: true,
-      successMessage: 'Voucher redeemed successfully',
       errorMessage: 'Failed to redeem voucher'
     })
+    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
+    const status = await workflowChecker.status
+    if(status === WorkflowStatus.StatusCompleted){
+      useNotificationStore().success(
+        'Voucher Redemption Success',
+        'Voucher has been successfully redeemed.',
+      )
+    }
+    if (status === WorkflowStatus.StatusFailed) {
+      useNotificationStore().error(
+        'Voucher Redemption Failed',
+        'Failed to redeem voucher',
+      )
+      throw new Error('Failed to redeem voucher')
+    }
   }
 
   // Fetch the user's current balance
-  async fetchBalance(): Promise<number> {
-    const response = await api.get<{ data: { balance_usd: number, debt_usd: number } }>(
+  async fetchBalance(): Promise<{balance: number, pending_balance: number}> {
+    try {
+    const response = await api.get<{ data: { balance_usd: number, debt_usd: number, pending_balance_usd: number } }>(
       '/v1/user/balance',
       { requiresAuth: true, showNotifications: false }
     )
-    const { balance_usd, debt_usd } = response.data.data
-    return (balance_usd || 0) - (debt_usd || 0)
+    const { balance_usd, debt_usd, pending_balance_usd } = response.data.data
+    return {balance: (balance_usd || 0) - (debt_usd || 0), pending_balance: pending_balance_usd || 0}
+  }catch(e){
+    useNotificationStore().error(
+      'Error',
+      'Failed to fetch balance',
+    )
+    return {balance: 0, pending_balance: 0}
+  }
   }
 
   // List all SSH keys for the current user
@@ -204,6 +310,34 @@ export class UserService {
       errorMessage: 'Failed to delete SSH key'
     })
   }
+  // Add node to deployment
+  async addNodeToDeployment(deploymentName: string, clusterPayload: { name: string, nodes: any[] }) {
+    return api.post<TaskResponse>(`/v1/deployments/${deploymentName}/nodes`, clusterPayload, { requiresAuth: true, showNotifications: true });
+  }
+
+  // Remove node from deployment
+  async removeNodeFromDeployment(deploymentName: string, nodeName: string) {
+    return api.delete(`/v1/deployments/${deploymentName}/nodes/${nodeName}`, { requiresAuth: true, showNotifications: true })
+  }
+
+  // List all pending records
+  async listPendingRecords(): Promise<PendingRecord[]> {
+    const response = await api.get<ApiResponse<PendingRecord[]>>('/v1/user/pending-records', {
+      requiresAuth: true,
+      showNotifications: true,
+      errorMessage: 'Failed to load pending records'
+    })
+    return response.data.data
+  }
+
+  async listUserPendingRecords(): Promise<PendingRecord[]> {
+    const response = await api.get<{ data: { pending_records: PendingRecord[] } }>(`/v1/user/pending-records`, {
+      requiresAuth: true,
+      showNotifications: true,
+      errorMessage: 'Failed to load pending records'
+    })
+    return response.data.data.pending_records
+  }
 }
 
-export const userService = new UserService() 
+export const userService = new UserService()

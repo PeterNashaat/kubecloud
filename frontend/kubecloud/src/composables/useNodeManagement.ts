@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
 import { userService } from '@/utils/userService'
-import { useNotificationStore } from '@/stores/notifications'
 
 // Interface for rented nodes (matches the grid proxy structure)
 export interface RentedNode {
@@ -100,7 +99,6 @@ export function useNodeManagement() {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const reserveNodeLoading = ref(false)
-  const notificationStore = useNotificationStore()
 
   // Fetch user's rented nodes
   async function fetchRentedNodes() {
@@ -109,7 +107,7 @@ export function useNodeManagement() {
     try {
       const response = await userService.listReservedNodes()
       const responseData = response.data as any
-      
+
       if (responseData.data?.nodes) {
         // Map the grid proxy node structure to our frontend structure
         rentedNodes.value = responseData.data.nodes.map((node: any) => ({
@@ -157,11 +155,9 @@ export function useNodeManagement() {
   async function reserveNode(nodeId: number) {
     reserveNodeLoading.value = true
     try {
-      const response = await userService.reserveNode(nodeId)
+      await userService.reserveNode(nodeId)
       // Refresh the rented nodes list after successful reservation
       await fetchRentedNodes()
-      notificationStore.success('Node Reserved', 'Node has been successfully reserved.')
-      return response
     } catch (err: any) {
       console.error('Failed to reserve node:', err)
       throw err
@@ -172,13 +168,31 @@ export function useNodeManagement() {
 
   // Unreserve a node
   async function unreserveNode(contractId: string) {
+    await userService.unreserveNode(contractId)
+    // Optimistically remove the node from the list
+    rentedNodes.value = rentedNodes.value.filter(node => node.rentContractId?.toString() !== contractId)
+  }
+
+  // Add node to deployment
+  async function addNodeToDeployment(deploymentName: string, clusterPayload: { name: string, nodes: any[] }) {
     try {
-      const response = await userService.unreserveNode(contractId)
-      // Optimistically remove the node from the list
-      rentedNodes.value = rentedNodes.value.filter(node => node.rentContractId?.toString() !== contractId)
+      const response = await userService.addNodeToDeployment(deploymentName, clusterPayload)
+      // Optionally refresh data or handle response
       return response
     } catch (err: any) {
-      console.error('Failed to unreserve node:', err)
+      console.error('Failed to add node to deployment:', err)
+      throw err
+    }
+  }
+
+  // Remove node from deployment
+  async function removeNodeFromDeployment(deploymentName: string, nodeName: string) {
+    try {
+      const response = await userService.removeNodeFromDeployment(deploymentName, nodeName)
+      // Optionally refresh data or handle response
+      return response
+    } catch (err: any) {
+      console.error('Failed to remove node from deployment:', err)
       throw err
     }
   }
@@ -191,11 +205,11 @@ export function useNodeManagement() {
   })
 
   // Get nodes by status
-  const healthyNodes = computed(() => 
+  const healthyNodes = computed(() =>
     rentedNodes.value.filter(node => node.healthy)
   )
 
-  const unhealthyNodes = computed(() => 
+  const unhealthyNodes = computed(() =>
     rentedNodes.value.filter(node => !node.healthy)
   )
 
@@ -207,9 +221,11 @@ export function useNodeManagement() {
     fetchRentedNodes,
     reserveNode,
     unreserveNode,
+    addNodeToDeployment,
+    removeNodeFromDeployment,
     totalMonthlyCost,
     healthyNodes,
     unhealthyNodes,
     reserveNodeLoading
   }
-} 
+}

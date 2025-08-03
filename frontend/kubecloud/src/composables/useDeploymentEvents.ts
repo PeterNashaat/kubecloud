@@ -1,32 +1,81 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useNotificationStore } from '../stores/notifications'
+import { useUserStore } from '../stores/user'
+import { useClusterStore } from '../stores/clusters'
+import { useNodeManagement } from './useNodeManagement'
+
+export interface DeploymentEvent {
+  type: string
+  data: any
+  message?: string
+  timestamp: string
+}
 
 export function useDeploymentEvents() {
   const eventSource = ref<EventSource | null>(null)
   const notificationStore = useNotificationStore()
+  const userStore = useUserStore()
+  const clusterStore = useClusterStore()
+  const { fetchRentedNodes } = useNodeManagement()
+
+  const isConnected = ref(false)
+  const reconnectAttempts = ref(0)
+  const maxReconnectAttempts = 5
+  const reconnectDelay = 2000 // 2 seconds
 
   function connect() {
     if (eventSource.value) return
-    eventSource.value = new EventSource('/api/v1/events', { withCredentials: true })
-    eventSource.value.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        const type = data.type || 'info'
-        const message = data.message || JSON.stringify(data)
-        if (type === 'success') {
-          notificationStore.success('Deployment', message)
-        } else if (type === 'error') {
-          notificationStore.error('Deployment Error', message)
-        } else {
-          notificationStore.info('Deployment', message)
-        }
-      } catch (err) {
-        notificationStore.info('Deployment', event.data)
-      }
+
+    const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+    const token = userStore.token || ''
+    const url = backendBaseUrl + '/api/v1/events?token=' + encodeURIComponent(token)
+
+    eventSource.value = new EventSource(url, { withCredentials: true })
+
+    eventSource.value.onopen = () => {
+      isConnected.value = true
+      reconnectAttempts.value = 0
+      console.log('SSE connection established')
     }
-    eventSource.value.onerror = () => {
-      disconnect()
-      setTimeout(connect, 3000)
+
+    eventSource.value.onmessage = (event) => {
+        const data = JSON.parse(event.data) as DeploymentEvent
+        const type = data.type || 'info'
+
+        if (type === 'connected') {
+          isConnected.value = true
+          return
+        }
+
+        // Handle workflow updates
+        if (type === 'workflow_update') {
+          const message = data.message || data.data?.message
+          if (message) {
+            // Check if workflow failed based on message content
+            if (message.toLowerCase().includes('failed')) {
+              notificationStore.error('Workflow', message)
+            } else if (message.toLowerCase().includes('completed')) {
+              notificationStore.success('Workflow', message)
+            }
+          }
+
+          // Always refresh data when workflow completes (success or failure)
+          refreshClusterData()
+        }
+    }
+
+    eventSource.value.onerror = (err) => {
+      isConnected.value = false
+      console.error('SSE connection error:', err)
+
+      // Attempt to reconnect
+      if (reconnectAttempts.value < maxReconnectAttempts) {
+        setTimeout(() => {
+          reconnectAttempts.value++
+          disconnect()
+          connect()
+        }, reconnectDelay * reconnectAttempts.value)
+      }
     }
   }
 
@@ -35,10 +84,43 @@ export function useDeploymentEvents() {
       eventSource.value.close()
       eventSource.value = null
     }
+    isConnected.value = false
   }
 
-  onMounted(connect)
-  onUnmounted(disconnect)
+  // Refresh all cluster-related data
+  async function refreshClusterData() {
+    await Promise.all([
+      clusterStore.fetchClusters(),
+      fetchRentedNodes()
+    ])
+  }
 
-  return { connect, disconnect }
-} 
+  // Watch for token changes to reconnect
+  watch(() => userStore.token, (newToken) => {
+    if (newToken && !isConnected.value) {
+      connect()
+    }
+    if (!newToken && isConnected.value) {
+      disconnect()
+    }
+  }, { immediate: true })
+
+  onMounted(() => {
+    // Simple fallback: if token exists but not connected after a short delay, connect
+    setTimeout(() => {
+      if (userStore.token && !isConnected.value) {
+        connect()
+      }
+    }, 100)
+  })
+
+  onUnmounted(() => {
+    disconnect()
+  })
+
+  return {
+    connect,
+    disconnect,
+    refreshClusterData
+  }
+}
