@@ -123,7 +123,7 @@ func TestListUserInvoicesHandler(t *testing.T) {
 
 	t.Run("Test List user invoices with empty list", func(t *testing.T) {
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		req, _ := http.NewRequest("GET", "/api/v1/user/invoice/", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/user/invoice", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
@@ -155,7 +155,7 @@ func TestListUserInvoicesHandler(t *testing.T) {
 
 	t.Run("Test List user invoices successfully", func(t *testing.T) {
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		req, _ := http.NewRequest("GET", "/api/v1/user/invoice/", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/user/invoice", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
@@ -167,7 +167,7 @@ func TestListUserInvoicesHandler(t *testing.T) {
 	})
 
 	t.Run("Test List user invoices with no token", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/user/invoice/", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/user/invoice", nil)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
