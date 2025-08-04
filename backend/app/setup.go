@@ -109,7 +109,7 @@ func SetUp(t testing.TB) (*App, error) {
   "kyc_verifier_api_url": "https://kyc.dev.grid.tf",
   "kyc_challenge_domain": "kyc.dev.grid.tf"
 }
-`, dbPath, mnemonic, redisHost, workflowPath, privateKeyPath, publicKeyPath,)
+`, dbPath, mnemonic, redisHost, workflowPath, privateKeyPath, publicKeyPath)
 
 	err = os.WriteFile(configPath, []byte(config), 0644)
 	if err != nil {

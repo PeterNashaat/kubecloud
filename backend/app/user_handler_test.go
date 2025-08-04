@@ -1013,3 +1013,59 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 }
+
+func TestListUserPendingRecordsHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+	user := CreateTestUser(t, app, "pendinguser@example.com", "Pending User", []byte("securepassword"), true, false, 0, time.Now())
+	token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
+	t.Run("Test list user pending records successfully", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/v1/user/pending-records", nil)
+		assert.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+		var result map[string]interface{}
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
+		assert.Equal(t, "Pending records are retrieved successfully", result["message"])
+		assert.NotNil(t, result["data"])
+	})
+
+	t.Run("Test list user pending records with no records", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/v1/user/pending-records", nil)
+		assert.NoError(t, err)
+
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+		var result map[string]interface{}
+		err = json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
+		assert.Equal(t, "Pending records are retrieved successfully", result["message"])
+		assert.NotNil(t, result["data"])
+	})
+
+	t.Run("Test list user pending records with no token", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/v1/user/pending-records", nil)
+		assert.NoError(t, err)
+
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	})
+
+	t.Run("Test list user pending records with invalid token", func(t *testing.T) {
+		req, err := http.NewRequest("GET", "/api/v1/user/pending-records", nil)
+		assert.NoError(t, err)
+
+		req.Header.Set("Authorization", "Bearer invalidtoken")
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	})
+
+}
