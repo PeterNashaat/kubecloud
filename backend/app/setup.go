@@ -143,16 +143,25 @@ func GetAuthToken(t *testing.T, app *App, id int, email, username string, isAdmi
 
 // Helper to create a test user
 func CreateTestUser(t *testing.T, app *App, email, username string, hashedPassword []byte, verified, admin bool, code int, updatedAt time.Time) *models.User {
-	user := &models.User{
-		Username:  username,
-		Email:     email,
-		Password:  hashedPassword,
-		Verified:  verified,
-		Admin:     admin,
-		Code:      code,
-		UpdatedAt: updatedAt,
+	mnemonic := os.Getenv("TEST_MNEMONIC")
+	if mnemonic == "" {
+		t.Fatal("TEST_MNEMONIC environment variable must be set for tests")
 	}
-	err := app.handlers.db.RegisterUser(user)
+	sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
+	require.NoError(t, err)
+	sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
+	require.NoError(t, err)
+	user := &models.User{
+		Username:       username,
+		Email:          email,
+		Password:       hashedPassword,
+		Verified:       verified,
+		Admin:          admin,
+		Code:           code,
+		UpdatedAt:      updatedAt,
+		AccountAddress: sponseeAddress,
+	}
+	err = app.handlers.db.RegisterUser(user)
 	require.NoError(t, err)
 	return user
 }
