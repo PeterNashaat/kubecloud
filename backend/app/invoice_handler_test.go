@@ -19,8 +19,8 @@ func TestListAllInvoicesHandler(t *testing.T) {
 	require.NoError(t, err)
 	router := app.router
 
-	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, 0, time.Now())
-	nonAdminUser := CreateTestUser(t, app, "user@example.com", "Normal User", []byte("securepassword"), true, false, 0, time.Now())
+	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, false, 0, time.Now())
+	nonAdminUser := CreateTestUser(t, app, "user@example.com", "Normal User", []byte("securepassword"), true, false, false, 0, time.Now())
 
 	t.Run("Test List all invoices with empty list", func(t *testing.T) {
 		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
@@ -119,7 +119,7 @@ func TestListUserInvoicesHandler(t *testing.T) {
 	require.NoError(t, err)
 	router := app.router
 
-	user := CreateTestUser(t, app, "user@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
+	user := CreateTestUser(t, app, "user@example.com", "Test User", []byte("securepassword"), true, false, false, 0, time.Now())
 
 	t.Run("Test List user invoices with empty list", func(t *testing.T) {
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
@@ -180,7 +180,7 @@ func TestDownloadInvoiceHandler(t *testing.T) {
 	require.NoError(t, err)
 	router := app.router
 
-	user1 := CreateTestUser(t, app, "user1@example.com", "User One", []byte("securepassword"), true, false, 0, time.Now())
+	user1 := CreateTestUser(t, app, "user1@example.com", "User One", []byte("securepassword"), true, false, false, 0, time.Now())
 
 	invoice := &models.Invoice{
 		ID:        1,

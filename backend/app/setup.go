@@ -142,13 +142,19 @@ func GetAuthToken(t *testing.T, app *App, id int, email, username string, isAdmi
 }
 
 // Helper to create a test user
-func CreateTestUser(t *testing.T, app *App, email, username string, hashedPassword []byte, verified, admin bool, code int, updatedAt time.Time) *models.User {
-	mnemonic, _, err := internal.SetupUserOnTFChain(app.handlers.substrateClient, app.config)
-	require.NoError(t, err)
-	sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
-	require.NoError(t, err)
-	sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
-	require.NoError(t, err)
+func CreateTestUser(t *testing.T, app *App, email, username string, hashedPassword []byte, verified, admin bool, mnemonicRequired bool, code int, updatedAt time.Time) *models.User {
+	mnemonic := ""
+	sponseeAddress := ""
+	if !mnemonicRequired {
+		mnemonic = ""
+	} else {
+		mnemonic, _, err := internal.SetupUserOnTFChain(app.handlers.substrateClient, app.config)
+		require.NoError(t, err)
+		sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
+		require.NoError(t, err)
+		sponseeAddress, err = internal.AccountAddressFromKeypair(sponseeKeyPair)
+		require.NoError(t, err)
+	}
 	user := &models.User{
 		Username:       username,
 		Email:          email,
@@ -160,7 +166,7 @@ func CreateTestUser(t *testing.T, app *App, email, username string, hashedPasswo
 		Mnemonic:       mnemonic,
 		AccountAddress: sponseeAddress,
 	}
-	err = app.handlers.db.RegisterUser(user)
+	err := app.handlers.db.RegisterUser(user)
 	require.NoError(t, err)
 	return user
 }

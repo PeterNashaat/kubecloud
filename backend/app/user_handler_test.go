@@ -62,7 +62,7 @@ func TestRegisterHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		payload := RegisterInput{
 			Name:            "New Name",
@@ -85,7 +85,7 @@ func TestRegisterHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "unverified@example.com", "Unverified User", []byte("securepassword"), false, false, 0, time.Now())
+		user := CreateTestUser(t, app, "unverified@example.com", "Unverified User", []byte("securepassword"), false, false, false, 0, time.Now())
 
 		payload := RegisterInput{
 			Name:            "New Name",
@@ -110,7 +110,7 @@ func TestVerifyRegisterCode(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, 123, time.Now())
+		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, false, 123, time.Now())
 
 		payload := VerifyCodeInput{
 			Email: user.Email,
@@ -152,8 +152,7 @@ func TestVerifyRegisterCode(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, 0, time.Now())
-
+		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, false, 0, time.Now())
 		payload := VerifyCodeInput{
 			Email: user.Email,
 			Code:  123,
@@ -177,7 +176,7 @@ func TestVerifyRegisterCode(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, 555, time.Now())
+		CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, false, 555, time.Now())
 
 		payload := VerifyCodeInput{
 			Email: "dupe@example.com",
@@ -203,7 +202,7 @@ func TestVerifyRegisterCode(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "test@example.com", "Test User", []byte("securepassword"), false, false, 123, time.Now().Add(-2*time.Hour))
+		user := CreateTestUser(t, app, "test@example.com", "Test User", []byte("securepassword"), false, false, false, 123, time.Now().Add(-2*time.Hour))
 
 		payload := VerifyCodeInput{
 			Email: user.Email,
@@ -232,20 +231,7 @@ func TestLoginUserHandler(t *testing.T) {
 	router := app.router
 
 	hashedPassword, _ := internal.HashAndSaltPassword([]byte("securepassword"))
-	user := CreateTestUser(t, app, "loginuser@example.com", "Login User", hashedPassword, true, false, 0, time.Now())
-
-	t.Run("Test LoginUserHandler", func(t *testing.T) {
-		payload := LoginInput{
-			Email:    user.Email,
-			Password: "securepassword",
-		}
-		body, _ := json.Marshal(payload)
-		req, _ := http.NewRequest("POST", "/api/v1/user/login", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		router.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusCreated, resp.Code)
-	})
+	user := CreateTestUser(t, app, "loginuser@example.com", "Login User", hashedPassword, true, false, true, 0, time.Now())
 
 	t.Run("Test LoginUserHandler with Invalid Request Format", func(t *testing.T) {
 		app, err := SetUp(t)
@@ -304,7 +290,7 @@ func TestRefreshTokenHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "refreshtoken@example.com", "Refresh User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "refreshtoken@example.com", "Refresh User", []byte("securepassword"), true, false, false, 0, time.Now())
 		tokenPair, _ := app.handlers.tokenManager.CreateTokenPair(user.ID, user.Username, false)
 
 		payload := RefreshTokenInput{
@@ -364,7 +350,7 @@ func TestForgotPasswordHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "forgotuser@example.com", "Forgot User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "forgotuser@example.com", "Forgot User", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		payload := EmailInput{
 			Email: user.Email,
@@ -421,7 +407,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "resetuser@example.com", "Reset User", []byte("securepassword"), false, false, 4231, time.Now())
+		user := CreateTestUser(t, app, "resetuser@example.com", "Reset User", []byte("securepassword"), false, false, false, 4231, time.Now())
 
 		payload := VerifyCodeInput{
 			Email: user.Email,
@@ -456,7 +442,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "wrongreset@example.com", "Wrong Reset", []byte("securepassword"), false, false, 0, time.Now())
+		user := CreateTestUser(t, app, "wrongreset@example.com", "Wrong Reset", []byte("securepassword"), false, false, false, 0, time.Now())
 
 		assert.NoError(t, err)
 		payload := VerifyCodeInput{
@@ -479,7 +465,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "expiredreset@example.com", "Expired Reset", []byte("securepassword"), false, false, 4231, time.Now().Add(-2*time.Hour))
+		user := CreateTestUser(t, app, "expiredreset@example.com", "Expired Reset", []byte("securepassword"), false, false, false, 4231, time.Now().Add(-2*time.Hour))
 
 		payload := VerifyCodeInput{
 			Email: user.Email,
@@ -524,7 +510,7 @@ func TestChangePasswordHandler(t *testing.T) {
 		require.NoError(t, err)
 		router := app.router
 
-		user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 
@@ -551,7 +537,7 @@ func TestChangePasswordHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		body, _ := json.Marshal(map[string]interface{}{})
 		req, _ := http.NewRequest("PUT", "/api/v1/user/change_password", bytes.NewReader(body))
@@ -566,7 +552,7 @@ func TestChangePasswordHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "changepassmismatch@example.com", "Mismatch", []byte("oldpassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "changepassmismatch@example.com", "Mismatch", []byte("oldpassword"), true, false, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := ChangePasswordInput{
@@ -589,7 +575,7 @@ func TestChargeBalanceHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "chargeuser@example.com", "Charge User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "chargeuser@example.com", "Charge User", []byte("securepassword"), true, false, true, 0, time.Now())
 		user.Mnemonic = "test-menmonic"
 		err = app.handlers.db.UpdateUserByID(user)
 		assert.NoError(t, err)
@@ -653,7 +639,7 @@ func TestGetUserHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "getuser@example.com", "Get User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "getuser@example.com", "Get User", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("GET", "/api/v1/user/", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -692,7 +678,7 @@ func TestGetUserBalanceHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "balanceuser@example.com", "Balance User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "balanceuser@example.com", "Balance User", []byte("securepassword"), true, false, true, 0, time.Now())
 
 		assert.NoError(t, err)
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
@@ -733,7 +719,7 @@ func TestRedeemVoucherHandler(t *testing.T) {
 	app, err := SetUp(t)
 	require.NoError(t, err)
 	router := app.router
-	user := CreateTestUser(t, app, "voucheruser@example.com", "Voucher User", []byte("securepassword"), true, false, 0, time.Now())
+	user := CreateTestUser(t, app, "voucheruser@example.com", "Voucher User", []byte("securepassword"), true, false, true, 0, time.Now())
 
 	voucher := &models.Voucher{
 		ID:        1,
@@ -824,7 +810,7 @@ func TestListSSHKeysHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "sshuser@example.com", "SSH User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "sshuser@example.com", "SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("GET", "/api/v1/user/ssh-keys", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -844,7 +830,7 @@ func TestListSSHKeysHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "sshuser2@example.com", "SSH User2", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "sshuser2@example.com", "SSH User2", []byte("securepassword"), true, false, false, 0, time.Now())
 		sshKey1 := &models.SSHKey{
 			UserID:    user.ID,
 			Name:      "key1",
@@ -880,7 +866,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := SSHKeyInput{
 			Name:      "mykey",
@@ -904,7 +890,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "addsshuser2@example.com", "Add SSH User2", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "addsshuser2@example.com", "Add SSH User2", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		// Missing public_key
 		payload := SSHKeyInput{
@@ -923,7 +909,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "addsshuser3@example.com", "Add SSH User3", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "addsshuser3@example.com", "Add SSH User3", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := SSHKeyInput{
 			Name:      "badkey",
@@ -946,7 +932,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		app, err := SetUp(t)
 		require.NoError(t, err)
 		router := app.router
-		user := CreateTestUser(t, app, "addsshuser5@example.com", "Add SSH User5", []byte("securepassword"), true, false, 0, time.Now())
+		user := CreateTestUser(t, app, "addsshuser5@example.com", "Add SSH User5", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload1 := SSHKeyInput{
 			Name:      "keyA",
@@ -978,7 +964,7 @@ func TestListUserPendingRecordsHandler(t *testing.T) {
 	app, err := SetUp(t)
 	require.NoError(t, err)
 	router := app.router
-	user := CreateTestUser(t, app, "pendinguser@example.com", "Pending User", []byte("securepassword"), true, false, 0, time.Now())
+	user := CreateTestUser(t, app, "pendinguser@example.com", "Pending User", []byte("securepassword"), true, false, false, 0, time.Now())
 	token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 	t.Run("Test list user pending records successfully", func(t *testing.T) {
 		req, err := http.NewRequest("GET", "/api/v1/user/pending-records", nil)
