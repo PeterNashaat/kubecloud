@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
 	"net/http"
@@ -729,24 +730,23 @@ func TestGetUserBalanceHandler(t *testing.T) {
 }
 
 func TestRedeemVoucherHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+	user := CreateTestUser(t, app, "voucheruser@example.com", "Voucher User", []byte("securepassword"), true, false, 0, time.Now())
+
+	voucher := &models.Voucher{
+		ID:        1,
+		Code:      "VOUCHER123",
+		Value:     50.0,
+		Redeemed:  false,
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+	}
+	err = app.handlers.db.CreateVoucher(voucher)
+	assert.NoError(t, err)
 	t.Run("Test redeem voucher successfully", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "voucheruser@example.com", "Voucher User", []byte("securepassword"), true, false, 0, time.Now())
-		user.Mnemonic = app.config.SystemAccount.Mnemonic
-		err = app.handlers.db.UpdateUserByID(user)
-		assert.NoError(t, err)
-		voucher := &models.Voucher{
-			ID:        1,
-			Code:      "VOUCHER123",
-			Value:     50.0,
-			Redeemed:  false,
-			CreatedAt: time.Now(),
-			ExpiresAt: time.Now().Add(1 * time.Hour),
-		}
-		err = app.handlers.db.CreateVoucher(voucher)
-		assert.NoError(t, err)
+
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("PUT", "/api/v1/user/redeem/VOUCHER123", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -756,19 +756,12 @@ func TestRedeemVoucherHandler(t *testing.T) {
 		var result map[string]interface{}
 		err = json.Unmarshal(resp.Body.Bytes(), &result)
 		assert.NoError(t, err)
-		assert.Equal(t, "Voucher is redeemed successfully. TFT transfer in progress.", result["message"])
+		assert.Equal(t, "Voucher is redeemed successfully. Money transfer in progress.", result["message"])
 		assert.NotNil(t, result["data"])
 		assert.NotEmpty(t, result["data"].(map[string]interface{})["workflow_id"])
 	})
 
 	t.Run("Test redeem non-existing voucher", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "voucheruser2@example.com", "Voucher User2", []byte("securepassword"), true, false, 0, time.Now())
-		user.Mnemonic = app.config.SystemAccount.Mnemonic
-		err = app.handlers.db.UpdateUserByID(user)
-		assert.NoError(t, err)
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("PUT", "/api/v1/user/redeem/Voucher123", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -778,25 +771,8 @@ func TestRedeemVoucherHandler(t *testing.T) {
 	})
 
 	t.Run("Test redeem already redeemed voucher", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "voucheruser3@example.com", "Voucher User3", []byte("securepassword"), true, false, 0, time.Now())
-		user.Mnemonic = app.config.SystemAccount.Mnemonic
-		err = app.handlers.db.UpdateUserByID(user)
-		assert.NoError(t, err)
-		voucher := &models.Voucher{
-			ID:        2,
-			Code:      "REDEEMEDVOUCHER",
-			Value:     30.0,
-			Redeemed:  true,
-			CreatedAt: time.Now(),
-			ExpiresAt: time.Now().Add(1 * time.Hour),
-		}
-		err = app.handlers.db.CreateVoucher(voucher)
-		assert.NoError(t, err)
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
-		req, _ := http.NewRequest("PUT", "/api/v1/user/redeem/REDEEMEDVOUCHER", nil)
+		req, _ := http.NewRequest("PUT", fmt.Sprintf("/api/v1/user/redeem/%s", voucher.Code), nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
@@ -804,13 +780,6 @@ func TestRedeemVoucherHandler(t *testing.T) {
 	})
 
 	t.Run("Test redeem expired voucher", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "voucheruser4@example.com", "Voucher User4", []byte("securepassword"), true, false, 0, time.Now())
-		user.Mnemonic = app.config.SystemAccount.Mnemonic
-		err = app.handlers.db.UpdateUserByID(user)
-		assert.NoError(t, err)
 		voucher := &models.Voucher{
 			ID:        3,
 			Code:      "EXPIREDVOUCHER",
@@ -830,9 +799,6 @@ func TestRedeemVoucherHandler(t *testing.T) {
 	})
 
 	t.Run("Test redeem voucher for non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 		token := GetAuthToken(t, app, 999, "notfound@example.com", "Not Found", false)
 		req, _ := http.NewRequest("PUT", "/api/v1/user/redeem/VOUCHER123", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -842,13 +808,7 @@ func TestRedeemVoucherHandler(t *testing.T) {
 	})
 
 	t.Run("Test redeem voucher with missing code param", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "voucheruser5@example.com", "Voucher User5", []byte("securepassword"), true, false, 0, time.Now())
-		user.Mnemonic = app.config.SystemAccount.Mnemonic
-		err = app.handlers.db.UpdateUserByID(user)
-		assert.NoError(t, err)
+
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("PUT", "/api/v1/user/redeem/", nil)
 		req.Header.Set("Authorization", "Bearer "+token)

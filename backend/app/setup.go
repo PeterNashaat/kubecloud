@@ -143,10 +143,8 @@ func GetAuthToken(t *testing.T, app *App, id int, email, username string, isAdmi
 
 // Helper to create a test user
 func CreateTestUser(t *testing.T, app *App, email, username string, hashedPassword []byte, verified, admin bool, code int, updatedAt time.Time) *models.User {
-	mnemonic := os.Getenv("TEST_MNEMONIC")
-	if mnemonic == "" {
-		t.Fatal("TEST_MNEMONIC environment variable must be set for tests")
-	}
+	mnemonic, _, err := internal.SetupUserOnTFChain(app.handlers.substrateClient, app.config)
+	require.NoError(t, err)
 	sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
 	require.NoError(t, err)
 	sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
@@ -159,6 +157,7 @@ func CreateTestUser(t *testing.T, app *App, email, username string, hashedPasswo
 		Admin:          admin,
 		Code:           code,
 		UpdatedAt:      updatedAt,
+		Mnemonic:       mnemonic,
 		AccountAddress: sponseeAddress,
 	}
 	err = app.handlers.db.RegisterUser(user)
