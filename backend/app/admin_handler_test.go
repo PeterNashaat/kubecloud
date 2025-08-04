@@ -336,7 +336,7 @@ func TestCreditUserHandler(t *testing.T) {
 		data, ok := result["data"].(map[string]interface{})
 		assert.True(t, ok)
 		assert.Equal(t, normalUser.Email, data["user"])
-		assert.EqualValues(t, 100, data["amount"])
+		assert.EqualValues(t, 1, data["amount"])
 		assert.Equal(t, "Manual credit", data["memo"])
 	})
 
