@@ -318,7 +318,7 @@ func TestCreditUserHandler(t *testing.T) {
 	t.Run("Test Credit user successfully", func(t *testing.T) {
 		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
 		payload := CreditRequestInput{
-			Amount: 100,
+			Amount: 1,
 			Memo:   "Manual credit",
 		}
 		body, _ := json.Marshal(payload)
@@ -354,7 +354,7 @@ func TestCreditUserHandler(t *testing.T) {
 	t.Run("Test Credit user with invalid user id", func(t *testing.T) {
 		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
 		payload := CreditRequestInput{
-			Amount: 100,
+			Amount: 1,
 			Memo:   "Manual credit",
 		}
 		body, _ := json.Marshal(payload)
@@ -369,7 +369,7 @@ func TestCreditUserHandler(t *testing.T) {
 	t.Run("Test Credit non-existing user", func(t *testing.T) {
 		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
 		payload := CreditRequestInput{
-			Amount: 100,
+			Amount: 1,
 			Memo:   "Manual credit",
 		}
 		body, _ := json.Marshal(payload)
@@ -383,7 +383,7 @@ func TestCreditUserHandler(t *testing.T) {
 
 	t.Run("Test Credit user with no token", func(t *testing.T) {
 		payload := CreditRequestInput{
-			Amount: 100,
+			Amount: 1,
 			Memo:   "Manual credit",
 		}
 		body, _ := json.Marshal(payload)
@@ -397,7 +397,7 @@ func TestCreditUserHandler(t *testing.T) {
 	t.Run("Test Credit user with non-admin user", func(t *testing.T) {
 		token := GetAuthToken(t, app, normalUser.ID, normalUser.Email, normalUser.Username, false)
 		payload := CreditRequestInput{
-			Amount: 100,
+			Amount: 1,
 			Memo:   "Manual credit",
 		}
 		body, _ := json.Marshal(payload)
