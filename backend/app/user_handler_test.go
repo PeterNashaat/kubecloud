@@ -806,11 +806,21 @@ func TestRedeemVoucherHandler(t *testing.T) {
 }
 
 func TestListSSHKeysHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+	user := CreateTestUser(t, app, "sshuser@example.com", "SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
+	sshKey1 := &models.SSHKey{
+		UserID:    user.ID,
+		Name:      "key1",
+		PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC1",
+	}
+	sshKey2 := &models.SSHKey{
+		UserID:    user.ID,
+		Name:      "key2",
+		PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2",
+	}
 	t.Run("Test list SSH keys with no keys", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "sshuser@example.com", "SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("GET", "/api/v1/user/ssh-keys", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -827,20 +837,7 @@ func TestListSSHKeysHandler(t *testing.T) {
 	})
 
 	t.Run("Test list SSH keys with multiple keys", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "sshuser2@example.com", "SSH User2", []byte("securepassword"), true, false, false, 0, time.Now())
-		sshKey1 := &models.SSHKey{
-			UserID:    user.ID,
-			Name:      "key1",
-			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC1",
-		}
-		sshKey2 := &models.SSHKey{
-			UserID:    user.ID,
-			Name:      "key2",
-			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2",
-		}
+
 		err = app.handlers.db.CreateSSHKey(sshKey1)
 		assert.NoError(t, err)
 		err = app.handlers.db.CreateSSHKey(sshKey2)
@@ -862,11 +859,11 @@ func TestListSSHKeysHandler(t *testing.T) {
 }
 
 func TestAddSSHKeyHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+	user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 	t.Run("Add SSH key successfully", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := SSHKeyInput{
 			Name:      "mykey",
@@ -887,10 +884,6 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with invalid request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "addsshuser2@example.com", "Add SSH User2", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		// Missing public_key
 		payload := SSHKeyInput{
@@ -906,10 +899,6 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with invalid SSH key format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "addsshuser3@example.com", "Add SSH User3", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := SSHKeyInput{
 			Name:      "badkey",
@@ -929,10 +918,6 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with duplicate public key", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "addsshuser5@example.com", "Add SSH User5", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload1 := SSHKeyInput{
 			Name:      "keyA",
