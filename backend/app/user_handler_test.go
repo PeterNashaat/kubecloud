@@ -859,11 +859,12 @@ func TestListSSHKeysHandler(t *testing.T) {
 }
 
 func TestAddSSHKeyHandler(t *testing.T) {
-	app, err := SetUp(t)
-	require.NoError(t, err)
-	router := app.router
-	user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 	t.Run("Add SSH key successfully", func(t *testing.T) {
+		app, err := SetUp(t)
+		require.NoError(t, err)
+		router := app.router
+		user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
+		
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := SSHKeyInput{
 			Name:      "mykey",
@@ -884,6 +885,11 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with invalid request format", func(t *testing.T) {
+		app, err := SetUp(t)
+		require.NoError(t, err)
+		router := app.router
+		user := CreateTestUser(t, app, "addsshuser2@example.com", "Add SSH User2", []byte("securepassword"), true, false, false, 0, time.Now())
+		
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		// Missing public_key
 		payload := SSHKeyInput{
@@ -899,6 +905,11 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with invalid SSH key format", func(t *testing.T) {
+		app, err := SetUp(t)
+		require.NoError(t, err)
+		router := app.router
+		user := CreateTestUser(t, app, "addsshuser3@example.com", "Add SSH User3", []byte("securepassword"), true, false, false, 0, time.Now())
+		
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := SSHKeyInput{
 			Name:      "badkey",
@@ -918,14 +929,18 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with duplicate public key", func(t *testing.T) {
+		app, err := SetUp(t)
+		require.NoError(t, err)
+		router := app.router
+		user := CreateTestUser(t, app, "addsshuser4@example.com", "Add SSH User4", []byte("securepassword"), true, false, false, 0, time.Now())
+		
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
+		publicKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com"
+		
+		// Add first SSH key
 		payload1 := SSHKeyInput{
 			Name:      "keyA",
-			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
-		}
-		payload2 := SSHKeyInput{
-			Name:      "keyA",
-			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDzy9yGz+CsKhjYB3FLr27SaoPQVi/tOZDZ06LnO7NuVUj0yR3e7IJO26cxs6j7tRAGTrA7choRMlQJdCFQfkDCaAL+31fPSihHhB3kxUTnZymaWgZ6s/JxjI/2/kKcLjxMWpMYTs18ZdRJf1DgoiyTV6yhlxAhWJvMxTtC5++h5+Ir7mHoN5QdrRt5AjKEcTEJjoKC3it4itHz7w45hi4y07kFYIk4HcMGrInh1IC/BriU7xKlwYcP2tp0W4GIraDJoD8OR3cgcYd/AFXSnVDtomCq5MaKBUli6FWLCK7E3+0AtYxxLkQ/zFkPsYSFAGGqVp8uq2hI46d0TxhgcG2EsWiF/2yOjtMdX1ab3Ns23p8Q0l/8JxXn6WT9xhme9eb2v8UjukN0AR8j+hp5xoQuSEgXAxkg4PFEa2seYEcE8xZPOSavuQl4wEAjXH/1BHnRHxrBBWixN2xdclHRAKQRwR+EHg8wDQ0EAAxtoCCAVHOepBrmV0JDxJGHQ8euvbs= test@gmail.com",
+			PublicKey: publicKey,
 		}
 		body1, _ := json.Marshal(payload1)
 		req1, _ := http.NewRequest("POST", "/api/v1/user/ssh-keys", bytes.NewReader(body1))
@@ -934,6 +949,11 @@ func TestAddSSHKeyHandler(t *testing.T) {
 		resp1 := httptest.NewRecorder()
 		router.ServeHTTP(resp1, req1)
 		assert.Equal(t, http.StatusCreated, resp1.Code)
+		
+		payload2 := SSHKeyInput{
+			Name:      "keyB",
+			PublicKey: publicKey,
+		}
 		body2, _ := json.Marshal(payload2)
 		req2, _ := http.NewRequest("POST", "/api/v1/user/ssh-keys", bytes.NewReader(body2))
 		req2.Header.Set("Authorization", "Bearer "+token)
