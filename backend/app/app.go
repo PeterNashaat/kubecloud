@@ -97,6 +97,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 	// start gridclient
 	gridClient, err := deployer.NewTFPluginClient(
 		config.SystemAccount.Mnemonic,
+		deployer.WithNetwork(config.SystemAccount.Network),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
