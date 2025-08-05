@@ -343,7 +343,11 @@ func (app *App) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	// app.gridClient.Close()
+	if app.handlers.substrateClient != nil {
+		app.handlers.substrateClient.Close()
+	}
+
+	app.gridClient.Close()
 
 	return nil
 }

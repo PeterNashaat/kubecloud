@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -43,14 +44,6 @@ func SetUp(t testing.TB) (*App, error) {
 	if mnemonic == "" {
 		return nil, fmt.Errorf("TEST_MNEMONIC environment variable must be set for tests")
 	}
-
-	t.Cleanup(func() {
-		os.Remove(privateKeyPath)
-		os.Remove(publicKeyPath)
-		os.Remove(configPath)
-		os.Remove(dbPath)
-		os.Remove(workflowPath)
-	})
 
 	config := fmt.Sprintf(`
 {
@@ -132,6 +125,26 @@ func SetUp(t testing.TB) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	t.Cleanup(func() {
+		// Shutdown the app gracefully to close all connections
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := app.Shutdown(ctx); err != nil {
+			t.Logf("Warning: failed to shutdown app cleanly: %v", err)
+		}
+
+		// Clean up files
+		os.Remove(privateKeyPath)
+		os.Remove(publicKeyPath)
+		os.Remove(configPath)
+		os.Remove(dbPath)
+		os.Remove(workflowPath)
+
+		// Reset viper to avoid config leakage between tests
+		viper.Reset()
+	})
 
 	return app, nil
 }
