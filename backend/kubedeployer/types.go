@@ -20,7 +20,7 @@ const (
 )
 
 type Cluster struct {
-	Name  string `json:"name" validate:"required,min=3"`
+	Name  string `json:"name" validate:"required,min=3,alphanum"`
 	Token string `json:"token" validate:"required"`
 	Nodes []Node `json:"nodes" validate:"required,min=1,dive"`
 
@@ -30,7 +30,7 @@ type Cluster struct {
 }
 
 type Node struct {
-	Name   string   `json:"name" validate:"required"`
+	Name   string   `json:"name" validate:"required,min=3,alphanum"`
 	Type   NodeType `json:"type" validate:"required,oneof=worker master leader"`
 	NodeID uint32   `json:"node_id" validate:"required"`
 
