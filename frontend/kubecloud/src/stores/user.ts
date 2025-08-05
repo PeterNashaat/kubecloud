@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authService, type LoginRequest, type RegisterRequest, type VerifyCodeRequest } from '@/utils/authService'
+import { authService, type LoginRequest, type RegisterRequest } from '@/utils/authService'
 import { api } from '@/utils/api'
 import type { ApiResponse } from '@/utils/authService'
 import { userService } from '@/utils/userService'
@@ -13,6 +13,7 @@ export interface User {
   verified: boolean
   updated_at: string
   balance_usd?: number
+  pending_balance_usd?: number
 }
 
 export interface AuthState {
@@ -31,6 +32,7 @@ export const useUserStore = defineStore('user',
     const isLoading = ref(false)
     const error = ref<string | null>(null)
     const netBalance = ref(0)
+    const pendingBalance = ref(0)
 
     // Computed properties
     const isAdmin = computed(() => user.value?.admin)
@@ -96,33 +98,6 @@ export const useUserStore = defineStore('user',
       }
     }
 
-    const verifyCode = async (email: string, code: number) => {
-      isLoading.value = true
-      error.value = null
-
-      try {
-        const verifyData: VerifyCodeRequest = { email, code }
-        const response = await authService.verifyCode(verifyData)
-        
-        // Store tokens
-        authService.storeTokens(response.access_token, response.refresh_token)
-        
-        // Set token in store
-        token.value = response.access_token
-        
-        // Fetch user profile from backend
-        const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
-        user.value = userRes.data.data.user
-        
-        return response
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : 'Verification failed'
-        throw err
-      } finally {
-        isLoading.value = false
-      }
-    }
-
     const updateProfile = async (updates: Partial<User>) => {
       if (!user.value) throw new Error('User not logged in')
 
@@ -170,7 +145,9 @@ export const useUserStore = defineStore('user',
     }
 
     const updateNetBalance = async () => {
-      netBalance.value = await userService.fetchBalance()
+      const balance = await userService.fetchBalance()
+      netBalance.value = balance.balance
+      pendingBalance.value = balance.pending_balance
     }
 
     return {
@@ -180,6 +157,7 @@ export const useUserStore = defineStore('user',
       isLoading,
       error,
       netBalance,
+      pendingBalance,
 
       // Computed
       isAdmin,
@@ -189,7 +167,6 @@ export const useUserStore = defineStore('user',
       login,
       logout,
       register,
-      verifyCode,
       updateProfile,
       refreshToken,
       initializeAuth,

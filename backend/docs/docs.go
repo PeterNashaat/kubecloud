@@ -115,6 +115,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "AdminMiddleware": []
+                    }
+                ],
+                "description": "Returns all pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List pending records",
+                "operationId": "list-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user": {
             "get": {
                 "description": "Retrieves all data of the user",
@@ -130,7 +168,7 @@ const docTemplate = `{
                     "200": {
                         "description": "User is retrieved successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/app.GetUserResponse"
                         }
                     },
                     "404": {
@@ -207,8 +245,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Balance is charged successfully",
+                    "202": {
+                        "description": "workflow_id: string, email: string",
                         "schema": {
                             "$ref": "#/definitions/app.ChargeBalanceResponse"
                         }
@@ -226,7 +264,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -477,7 +515,7 @@ const docTemplate = `{
         },
         "/user/login": {
             "post": {
-                "description": "Logs a user into the system",
+                "description": "Logs a user in. Checks KYC verification status and updates user sponsorship status if needed. Login is not blocked by KYC errors.",
                 "consumes": [
                     "application/json"
                 ],
@@ -487,7 +525,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Login user",
+                "summary": "Login user (KYC verification checked)",
                 "operationId": "login-user",
                 "parameters": [
                     {
@@ -595,14 +633,20 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
+                            "$ref": "#/definitions/app.UnreserveNodeResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User is not found",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -645,16 +689,60 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
+                            "$ref": "#/definitions/app.ReserveNodeResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No nodes are available for rent.",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/pending-records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns user pending records in the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List user pending records",
+                "operationId": "list-user-pending-records",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/app.PendingRecordsResponse"
+                            }
                         }
                     },
                     "500": {
@@ -688,13 +776,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "202": {
-                        "description": "Voucher redeemed successfully",
+                        "description": "workflow_id: string, voucher_code: string, amount: float64, email: string",
                         "schema": {
-                            "$ref": "#/definitions/app.APIResponse"
+                            "$ref": "#/definitions/app.RedeemVoucherResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid voucher code or already redeemed",
+                        "description": "Invalid voucher code, already redeemed, or expired",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -706,7 +794,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -769,7 +857,7 @@ const docTemplate = `{
         },
         "/user/register": {
             "post": {
-                "description": "Registers a new user to the system",
+                "description": "Registers a new user, sets up blockchain account, and creates KYC sponsorship. Sends verification code to email.",
                 "consumes": [
                     "application/json"
                 ],
@@ -779,7 +867,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Register a user",
+                "summary": "Register user (with KYC sponsorship)",
                 "operationId": "register-user",
                 "parameters": [
                     {
@@ -794,9 +882,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "workflow_id: string, email: string",
                         "schema": {
-                            "$ref": "#/definitions/app.RegisterResponse"
+                            "$ref": "#/definitions/app.RegisterUserResponse"
                         }
                     },
                     "400": {
@@ -812,7 +900,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -846,14 +934,176 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "202": {
+                        "description": "workflow_id: string, email: string",
                         "schema": {
-                            "$ref": "#/definitions/internal.TokenPair"
+                            "$ref": "#/definitions/app.RegisterUserResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request format or verification failed",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/ssh-keys": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists all SSH keys for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List user SSH keys",
+                "operationId": "list-ssh-keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SSHKey"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a new SSH key for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Add SSH key",
+                "operationId": "add-ssh-key",
+                "parameters": [
+                    {
+                        "description": "SSH Key Input",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app.SSHKeyInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.SSHKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/ssh-keys/{ssh_key_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes an SSH key for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Delete SSH key",
+                "operationId": "delete-ssh-key",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "SSH Key ID",
+                        "name": "ssh_key_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid SSH key ID",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "SSH key not found",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -1112,6 +1362,57 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/workflow/{workflow_id}": {
+            "get": {
+                "description": "Returns the status of a workflow by its ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "workflow"
+                ],
+                "summary": "Get workflow status",
+                "operationId": "get-workflow-status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Workflow ID",
+                        "name": "workflow_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Workflow status returned successfully",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or missing workflow ID",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Workflow not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1173,10 +1474,10 @@ const docTemplate = `{
         "app.ChargeBalanceResponse": {
             "type": "object",
             "properties": {
-                "new_balance": {
-                    "type": "number"
+                "email": {
+                    "type": "string"
                 },
-                "payment_intent_id": {
+                "workflow_id": {
                     "type": "string"
                 }
             }
@@ -1242,6 +1543,69 @@ const docTemplate = `{
                 }
             }
         },
+        "app.GetUserResponse": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "account_address": {
+                    "type": "string"
+                },
+                "admin": {
+                    "type": "boolean"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "credit_card_balance": {
+                    "description": "money from credit card",
+                    "type": "number"
+                },
+                "credited_balance": {
+                    "description": "manually added by admin or from vouchers",
+                    "type": "number"
+                },
+                "debt": {
+                    "type": "number"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "password": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "pending_balance_usd": {
+                    "type": "number"
+                },
+                "sponsored": {
+                    "type": "boolean"
+                },
+                "ssh_key": {
+                    "type": "string"
+                },
+                "stripe_customer_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "verified": {
+                    "type": "boolean"
+                }
+            }
+        },
         "app.LoginInput": {
             "type": "object",
             "required": [
@@ -1256,6 +1620,53 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 64,
                     "minLength": 3
+                }
+            }
+        },
+        "app.PendingRecordsResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "tft_amount": {
+                    "description": "TFTs are multiplied by 1e7",
+                    "type": "integer"
+                },
+                "transferred_tft_amount": {
+                    "type": "integer"
+                },
+                "transferred_usd_amount": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "usd_amount": {
+                    "type": "number"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app.RedeemVoucherResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "voucher_code": {
+                    "type": "string"
+                },
+                "workflow_id": {
+                    "type": "string"
                 }
             }
         },
@@ -1284,8 +1695,7 @@ const docTemplate = `{
                 "confirm_password",
                 "email",
                 "name",
-                "password",
-                "ssh_key"
+                "password"
             ],
             "properties": {
                 "confirm_password": {
@@ -1303,9 +1713,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 64,
                     "minLength": 8
-                },
-                "ssh_key": {
-                    "type": "string"
                 }
             }
         },
@@ -1320,6 +1727,60 @@ const docTemplate = `{
                 }
             }
         },
+        "app.RegisterUserResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.ReserveNodeResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "node_id": {
+                    "type": "integer"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.SSHKeyInput": {
+            "type": "object",
+            "required": [
+                "name",
+                "public_key"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "public_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.UnreserveNodeResponse": {
+            "type": "object",
+            "properties": {
+                "contract_id": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
         "app.UserBalanceResponse": {
             "type": "object",
             "properties": {
@@ -1327,6 +1788,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "debt_usd": {
+                    "type": "number"
+                },
+                "pending_balance_usd": {
                     "type": "number"
                 }
             }
@@ -1413,6 +1877,38 @@ const docTemplate = `{
                 }
             }
         },
+        "models.SSHKey": {
+            "type": "object",
+            "required": [
+                "name",
+                "public_key",
+                "userID"
+            ],
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Primary key",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Unique name per user",
+                    "type": "string"
+                },
+                "public_key": {
+                    "description": "Unique public key per user",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "userID": {
+                    "description": "User owner",
+                    "type": "integer"
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "required": [
@@ -1421,6 +1917,9 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
+                "account_address": {
+                    "type": "string"
+                },
                 "admin": {
                     "type": "boolean"
                 },
@@ -1449,6 +1948,9 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "sponsored": {
+                    "type": "boolean"
                 },
                 "ssh_key": {
                     "type": "string"

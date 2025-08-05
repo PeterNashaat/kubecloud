@@ -1,4 +1,6 @@
-import { api } from './api'
+import { WorkflowStatus } from '@/types/ewf'
+import { api, createWorkflowStatusChecker } from './api'
+import { useNotificationStore } from '@/stores/notifications'
 
 // Types for auth requests and responses
 export interface RegisterRequest {
@@ -10,12 +12,17 @@ export interface RegisterRequest {
 
 export interface RegisterResponse {
   email: string
-  timeout: string
+  workflow_id: string
 }
 
 export interface VerifyCodeRequest {
   email: string
   code: number
+}
+
+export interface VerifyCodeResponse {
+  email: string
+  workflow_id: string
 }
 
 export interface LoginRequest {
@@ -94,25 +101,52 @@ export class AuthService {
   }
 
   // Register a new user
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
+  async register(data: RegisterRequest): Promise<void> {
     const response = await api.post<ApiResponse<RegisterResponse>>('/v1/user/register', data, {
       showNotifications: true,
       loadingMessage: 'Creating your account...',
-      successMessage: 'Verification code sent to your email!',
       errorMessage: 'Registration failed',
       timeout: 60000
     })
-    return response.data.data
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 15000,interval: 3000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().success(
+        'Registration Success',
+        'User registered successfully',
+      )
+    }
+    if (status === WorkflowStatus.StatusFailed) {
+      useNotificationStore().error(
+        'Registration Failed',
+        'Failed to register user',
+      )
+      throw new Error('Failed to register user')
+    }
+    
   }
 
   // Verify registration code
-  async verifyCode(data: VerifyCodeRequest): Promise<LoginResponse> {
-    const response = await api.post<ApiResponse<LoginResponse>>('/v1/user/register/verify', data, {
+  async verifyCode(data: VerifyCodeRequest): Promise<void> {
+    const response = await api.post<ApiResponse<VerifyCodeResponse>>('/v1/user/register/verify', data, {
       showNotifications: true,
-      successMessage: 'Account verified successfully!',
       errorMessage: 'Verification failed'
     })
-    return response.data.data
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 2000 })
+    const status = await workflowChecker.status
+    if (status === WorkflowStatus.StatusCompleted) {
+      useNotificationStore().success(
+        'Verification Success',
+        'User verified successfully',
+      )
+    }
+    if (status === WorkflowStatus.StatusFailed) {
+      useNotificationStore().error(
+        'Verification Failed',
+        'Failed to verify user',
+      )
+      throw new Error('Failed to verify user')
+    }
   }
 
   // Login user
@@ -155,7 +189,7 @@ export class AuthService {
 
   // Change password (requires authentication)
   async changePassword(data: ChangePasswordRequest): Promise<ChangePasswordResponse> {
-    const response = await api.post<ApiResponse<ChangePasswordResponse>>('/v1/user/change_password', data, {
+    const response = await api.put<ApiResponse<ChangePasswordResponse>>('/v1/user/change_password', data, {
       requiresAuth: true,
       showNotifications: true,
       loadingMessage: 'Updating password...',

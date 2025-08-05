@@ -5,7 +5,7 @@
         <h1 class="hero-title">Deploy New Cluster</h1>
         <p class="section-subtitle">Create and configure your Kubernetes cluster in just a few steps</p>
       </div>
-      
+
       <div class="deploy-content-wrapper">
         <div class="deploy-card">
           <!-- Progress Indicator -->
@@ -43,6 +43,7 @@
               :isStep1Valid="isStep1Valid"
               :sshKeysLoading="sshKeysLoading"
               @nextStep="nextStep"
+              @navigateToSshKeys="navigateToSshKeys"
             />
             <Step2AssignNodes
               v-else-if="step === 2"
@@ -195,7 +196,8 @@ function generateClusterNameLocal() {
 
 // Navigate to SSH keys management
 function navigateToSshKeys() {
-  router.push('/dashboard?section=ssh');
+  localStorage.setItem('dashboard-section', 'ssh')
+  router.push('/dashboard');
 }
 
 
@@ -230,7 +232,6 @@ function prevStep() {
 }
 
 const clusterPayload = computed<Cluster>(() => {
-  const networkName = clusterNetworkName.value || `${clusterName.value}_network`;
   const token = clusterToken.value;
 
   function buildNode(vm: VM, type: 'master' | 'worker'): ClusterNode {
@@ -257,11 +258,15 @@ const clusterPayload = computed<Cluster>(() => {
 
   return {
     name: clusterName.value,
-    network: networkName,
     token: token,
     nodes: nodes,
   };
 });
+
+function navigateToDasgboard() {
+  localStorage.setItem('dashboard-section', 'clusters')
+  router.push('/dashboard');
+}
 
 async function onDeployCluster() {
   deploying.value = true;
@@ -277,6 +282,7 @@ async function onDeployCluster() {
     // Optionally handle error
   } finally {
     deploying.value = false;
+    navigateToDasgboard();
   }
 }
 

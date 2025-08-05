@@ -19,7 +19,6 @@ export interface ClusterNode {
 
 export interface Cluster {
   name: string;
-  network: string;
   token: string;
   nodes: ClusterNode[];
 } 

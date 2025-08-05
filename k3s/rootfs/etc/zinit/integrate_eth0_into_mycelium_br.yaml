@@ -1,4 +1,0 @@
-exec: /scripts/integrate_eth0_into_mycelium_br.sh
-oneshot: true
-after:
-  - adjust_mycelium_routes
