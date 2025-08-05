@@ -54,6 +54,7 @@
 import { defineProps, defineEmits, watch, ref, computed } from 'vue';
 import type { PropType } from 'vue';
 import type { VM, SshKey } from '../composables/useDeployCluster';
+import { required, min, isAlphanumeric, max } from '@/utils/validation';
 const props = defineProps({
   node: { type: Object as PropType<VM>, required: true },
   visible: { type: Boolean, required: true },
@@ -82,24 +83,28 @@ watch(
 const errors = computed(() => {
   const node = localNode.value;
   const errs: Record<string, string> = {};
-  if (!node.name || !node.name.trim()) errs.name = 'Name is required.';
-  if (!node.vcpu || node.vcpu <= 0) errs.vcpu = 'vCPU must be a positive number.';
-  if (!node.ram || node.ram <= 0) errs.ram = 'RAM must be a positive number.';
-  if (!node.disk || node.disk <= 0) errs.disk = 'Disk size must be positive.';
+  errs.name = required('Name is required')(node.name) || isAlphanumeric('Node name can only contain letters, and numbers.')(node.name) || "";
+  errs.vcpu = min('vCPU must be at least 1', 1)(node.vcpu)|| max('vCPU must be at most 32', 32)(node.vcpu) || "";
+  errs.ram = min('RAM must be at least 0.5GB', 0.5)(node.ram)|| max('RAM must be at most 256GB', 256)(node.ram) || "";
+  errs.disk = min('Disk must be at least 15GB', 15)(node.disk)|| max('Disk must be at most 10000GB', 10000)(node.disk) || "";
   // Only require SSH key if there are any available
   if (props.availableSshKeys.length > 0 && !selectedSshKeyId.value) errs.ssh = 'At least one SSH key must be selected.';
   return errs;
 });
-const valid = computed(() => Object.keys(errors.value).length === 0);
+
+const valid = computed(() => {
+  return Object.values(errors.value).every(e => !e);
+});
 function onSave() {
   if (valid.value) {
     emit('save', { ...localNode.value, sshKeyIds: selectedSshKeyId.value !== null ? [selectedSshKeyId.value] : [] });
   }
 }
+
 </script>
 <style scoped>
 .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
-.edit-node-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #232946; color: #fff; border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25); padding: 2rem 2.5rem; z-index: 1001; min-width: 320px; max-width: 90vw; }
+.edit-node-modal { position: fixed; top: 55%; left: 50%; transform: translate(-50%, -50%); background: #232946; color: #fff; border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25); padding: 2rem 2.5rem; z-index: 1001; width: 30vw; min-width: 320px; max-width: 90vw; }
 .edit-node-modal h3 { margin-top: 0; margin-bottom: 1.2rem; font-size: 1.3rem; font-weight: 700; }
 .modal-fields label { display: block; margin-top: 1rem; font-weight: 500; }
 .modal-fields input[type="number"], .modal-fields input[type="text"] { width: 100%; margin-top: 0.3rem; padding: 0.4em 0.7em; border-radius: 6px; border: 1px solid #4f8cff; background: #1a1f2b; color: #fff; }

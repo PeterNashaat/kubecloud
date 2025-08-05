@@ -41,17 +41,19 @@
           <div v-else class="empty-list">No nodes in this cluster.</div>
         </div>
         <div v-else-if="editTab === 'add'">
-          <div class="add-form-wrapper">
-            <v-text-field v-model="addFormName" label="Name" />
-            <v-text-field v-model.number="addFormCpu" label="CPU" type="number" min="1" />
-            <v-text-field v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" />
-            <v-text-field v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" />
+          <v-form  v-model="formValid">
+            <div class="add-form-wrapper">
+              <v-text-field validate-on="eager" :rules="[validateNodeName]" v-model="addFormName" label="Name" />
+              <v-text-field validate-on="eager" :rules="[validateCPU]" v-model.number="addFormCpu" label="CPU" type="number" min="1" />
+              <v-text-field validate-on="eager" :rules="[validateRAM]" v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" />
+              <v-text-field validate-on="eager" :rules="[validateStorage]" v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" />
             <v-select
               v-model="addFormNodeId"
               :items="availableNodesWithName"
               item-title="name"
               item-value="nodeId"
               label="Select Node"
+              :error-messages="addFormError"
             >
               <template #item="{ item, props }">
                 <div class="d-flex pa-3" v-bind="props">
@@ -133,13 +135,14 @@
                 <span>No SSH keys found. Please add one in your dashboard.</span>
               </div>
             </div>
-            <div v-if="addFormError" class="polished-error">{{ addFormError }}</div>
+            
           </div>
+        </v-form>
         </div>
       </template>
       <template #actions>
         <div v-if="editTab === 'add'" class="add-form-actions">
-          <v-btn variant="outlined" color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading" @click="confirmAddForm" class="add-node-btn">Add Node</v-btn>
+          <v-btn variant="outlined" color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading || !formValid" @click="confirmAddForm" class="add-node-btn">Add Node</v-btn>
           <v-btn variant="outlined" @click="editTab = 'list'">Cancel</v-btn>
         </div>
       </template>
@@ -154,7 +157,7 @@ import type { RentedNode } from '../../composables/useNodeManagement';
 import BaseDialogCard from './BaseDialogCard.vue';
 import { userService } from '../../utils/userService';
 import { useNotificationStore } from '../../stores/notifications';
-
+import {isAlphanumeric, required, min, max} from "../../utils/validation"
 const notificationStore = useNotificationStore();
 const props = defineProps<{
   modelValue: boolean,
@@ -197,7 +200,24 @@ const addFormSshKey = ref<number|null>(null);
 const sshKeys = ref<any[]>([]);
 const sshKeysLoading = ref(false);
 const sshKeysError = ref('');
+const formValid = ref(false);
 
+const validateNodeName = (value: string) :string|boolean =>  {
+  const msg = required('Name is required')(value) || isAlphanumeric('Node name can only contain letters, and numbers.')(value);
+  return msg ? msg : true;
+};
+const validateCPU = (value: string) :string|boolean =>  {
+  const msg = required('CPU is required')(value) || min('CPU must be at least 1',1)(+value)|| max('CPU must be at most 32',32)(+value);
+  return msg ? msg : true;
+};
+const validateRAM = (value: string) :string|boolean =>  {
+  const msg = required('RAM is required')(value) || min('RAM must be at least 0.5GB',0.5)(+value)|| max('RAM must be at most 256GB',256)(+value);
+  return msg ? msg : true;
+};
+const validateStorage = (value: string) :string|boolean =>  {
+  const msg = required('Storage is required')(value) || min('Storage must be at least 15GB',15)(+value)|| max('Storage must be at most 10000GB',10000)(+value);
+  return msg ? msg : true;
+};
 onMounted(async () => {
   sshKeysLoading.value = true;
   try {
@@ -225,8 +245,8 @@ const canAssignToNode = computed(() => {
 });
 watch([addFormNodeId, addFormRam, addFormStorage], () => {
   const node = addFormNode.value;
+  addFormError.value = '';
   if (!node) {
-    addFormError.value = '';
     return;
   }
   if (
@@ -268,3 +288,8 @@ const availableNodesWithName = computed(() =>
   }) as RentedNode & { name: string })
 );
 </script>
+<style scoped>
+.polished-error {
+  color: red;
+}
+</style>
