@@ -39,4 +39,3 @@ jobs:
         run: cd backend && go test -v ./app -timeout=20m -p=1 -count=1
         env: 
           TEST_MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
-          REDIS_HOST: redis-db
