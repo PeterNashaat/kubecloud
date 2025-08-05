@@ -20,13 +20,11 @@ func SetUp(t testing.TB) (*App, error) {
 	gin.SetMode(gin.TestMode)
 	dir := t.TempDir()
 
-	// Use unique file names to avoid conflicts between parallel tests
-	timestamp := time.Now().UnixNano()
-	configPath := filepath.Join(dir, fmt.Sprintf("config_%d.json", timestamp))
-	dbPath := filepath.Join(dir, fmt.Sprintf("testing_%d.db", timestamp))
-	workflowPath := filepath.Join(dir, fmt.Sprintf("workflow_testing_%d.db", timestamp))
+	configPath := filepath.Join(dir, "config.json")
+	dbPath := filepath.Join(dir, "testing.db")
+	workflowPath := filepath.Join(dir, "workflow_testing.db")
 
-	privateKeyPath := filepath.Join(dir, fmt.Sprintf("test_id_rsa_%d", timestamp))
+	privateKeyPath := filepath.Join(dir, "test_id_rsa_%d")
 	publicKeyPath := privateKeyPath + ".pub"
 
 	redisHost := os.Getenv("REDIS_HOST")
@@ -34,7 +32,7 @@ func SetUp(t testing.TB) (*App, error) {
 		redisHost = "localhost"
 	}
 
-	// Generate SSH key pair with faster parameters
+	// Generate SSH key pair 
 	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-f", privateKeyPath, "-N", "", "-q")
 	err := cmd.Run()
 	if err != nil {
@@ -118,7 +116,7 @@ func SetUp(t testing.TB) (*App, error) {
 		return nil, err
 	}
 
-	viper.Reset() // Clear any previous config
+	viper.Reset()
 	viper.SetConfigFile(configPath)
 	err = viper.ReadInConfig()
 	if err != nil {
