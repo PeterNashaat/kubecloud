@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"kubecloud/models"
@@ -56,6 +57,15 @@ func (s *Sqlite) Close() error {
 		return err
 	}
 	return sqlDB.Close()
+}
+
+// Ping implements the DB interface health check
+func (s *Sqlite) Ping(ctx context.Context) error {
+	sqlDB, err := s.db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.PingContext(ctx)
 }
 
 // RegisterUser registers a new user to the system

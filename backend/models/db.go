@@ -1,7 +1,10 @@
 package models
 
+import "context"
+
 // DB interface for databases
 type DB interface {
+	Ping(ctx context.Context) error
 	RegisterUser(user *User) error
 	GetUserByEmail(email string) (User, error)
 	GetUserByID(userID int) (User, error)

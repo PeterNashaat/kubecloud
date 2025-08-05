@@ -6,14 +6,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
-	"kubecloud/models/sqlite"
-
 	"github.com/gin-gonic/gin"
-	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"golang.org/x/sync/errgroup"
 )
+
+const healthTimeout = 2 * time.Second
 
 type HealthStatus struct {
 	Status  string `json:"status"`
@@ -22,55 +24,79 @@ type HealthStatus struct {
 
 type HealthChecker func(ctx context.Context) HealthStatus
 
-func (h *Handler) checkDatabase(ctx context.Context) HealthStatus {
-	sqliteDB, ok := h.db.(*sqlite.Sqlite)
-	if !ok {
-		return HealthStatus{Status: "unhealthy", Message: "not a sqlite DB"}
-	}
-	db, err := sqliteDB.SQLDB()
-	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
+var healthHTTPClient = &http.Client{Timeout: healthTimeout}
+
+func healthy() HealthStatus {
 	return HealthStatus{Status: "healthy"}
+}
+
+func unhealthy(message string) HealthStatus {
+	return HealthStatus{Status: "unhealthy", Message: message}
+}
+
+func (h *Handler) checkDatabase(ctx context.Context) HealthStatus {
+	type pinger interface {
+		Ping(ctx context.Context) error
+	}
+
+	dbPinger, ok := h.db.(pinger)
+	if !ok {
+		return unhealthy("database does not support Ping")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
+	defer cancel()
+
+	if err := dbPinger.Ping(ctx); err != nil {
+		return unhealthy(err.Error())
+	}
+	return healthy()
 }
 
 func (h *Handler) checkRedis(ctx context.Context) HealthStatus {
 	if h.redis == nil || h.redis.Client() == nil {
-		return HealthStatus{Status: "unhealthy", Message: "redis client not initialized"}
+		return unhealthy("redis client not initialized")
 	}
-	err := h.redis.Client().Ping(ctx).Err()
+
+	if err := h.redis.Client().Ping(ctx).Err(); err != nil {
+		return unhealthy(err.Error())
+	}
+	return healthy()
+}
+
+func httpHealthCheck(ctx context.Context, url string) HealthStatus {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
+		return unhealthy(err.Error())
 	}
-	return HealthStatus{Status: "healthy"}
+
+	resp, err := healthHTTPClient.Do(req)
+	if err != nil {
+		return unhealthy(err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return unhealthy(fmt.Sprintf("unexpected status: %s", resp.Status))
+	}
+	return healthy()
+}
+
+func healthURL(baseURL string) (string, error) {
+	if strings.TrimSpace(baseURL) == "" {
+		return "", fmt.Errorf("URL not set")
+	}
+	return url.JoinPath(baseURL, "health")
 }
 
 func (h *Handler) checkGridProxy(ctx context.Context) HealthStatus {
-	if strings.TrimSpace(h.config.GridProxyURL) == "" {
-		return HealthStatus{Status: "unhealthy", Message: "gridproxy URL not set"}
-	}
-	client := &http.Client{Timeout: 2 * time.Second}
-	healthURL, err := url.JoinPath(h.config.GridProxyURL, "health")
+	url, err := healthURL(h.config.GridProxyURL)
 	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
+		return unhealthy(fmt.Sprintf("gridproxy %s", err.Error()))
 	}
-	resp, err := client.Get(healthURL)
-	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return HealthStatus{Status: "unhealthy", Message: fmt.Sprintf("unexpected status: %s", resp.Status)}
-	}
-	return HealthStatus{Status: "healthy"}
+	return httpHealthCheck(ctx, url)
 }
 
-// tfchainHealthURL converts wss://.../ws to https://.../health
 func tfchainHealthURL(tfchainURL string) (string, error) {
 	if tfchainURL == "" {
 		return "", fmt.Errorf("tfchain_url is empty")
@@ -80,106 +106,121 @@ func tfchainHealthURL(tfchainURL string) (string, error) {
 	return url, nil
 }
 
-func (h *Handler) checkTFChainHealth(ctx context.Context) HealthStatus {
-	healthURL, err := tfchainHealthURL(h.config.TFChainURL)
-	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(healthURL)
-	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return HealthStatus{Status: "unhealthy", Message: fmt.Sprintf("unexpected status: %s", resp.Status)}
-	}
-	var health struct {
-		Peers           int  `json:"peers"`
-		IsSyncing       bool `json:"isSyncing"`
-		ShouldHavePeers bool `json:"shouldHavePeers"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	if health.IsSyncing || !health.ShouldHavePeers || health.Peers == 0 {
-		return HealthStatus{Status: "unhealthy", Message: fmt.Sprintf("syncing: %v, shouldHavePeers: %v, peers: %d", health.IsSyncing, health.ShouldHavePeers, health.Peers)}
-	}
-	return HealthStatus{Status: "healthy"}
+type tfchainHealth struct {
+	Peers           int  `json:"peers"`
+	IsSyncing       bool `json:"isSyncing"`
+	ShouldHavePeers bool `json:"shouldHavePeers"`
 }
 
-// TODO: Cache identity/account to avoid deriving on every request for performance
-func (h *Handler) checkSystemAccountBalance(ctx context.Context) HealthStatus {
-	if h.substrateClient == nil {
-		return HealthStatus{Status: "unhealthy", Message: "client not initialized"}
-	}
-	identity, idErr := substrate.NewIdentityFromSr25519Phrase(h.config.SystemAccount.Mnemonic)
-	if idErr != nil {
-		return HealthStatus{Status: "unhealthy", Message: idErr.Error()}
-	}
-	address := identity.Address()
-	account, accErr := substrate.FromAddress(address)
-	if accErr != nil {
-		return HealthStatus{Status: "unhealthy", Message: accErr.Error()}
-	}
-	_, err := h.substrateClient.GetBalance(account)
+func (h *Handler) checkTFChainHealth(ctx context.Context) HealthStatus {
+	url, err := tfchainHealthURL(h.config.TFChainURL)
 	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
+		return unhealthy(err.Error())
 	}
-	return HealthStatus{Status: "healthy"}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return unhealthy(err.Error())
+	}
+
+	resp, err := healthHTTPClient.Do(req)
+	if err != nil {
+		return unhealthy(err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return unhealthy(fmt.Sprintf("unexpected status: %s", resp.Status))
+	}
+
+	var health tfchainHealth
+	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+		return unhealthy(err.Error())
+	}
+
+	if health.IsSyncing || !health.ShouldHavePeers || health.Peers == 0 {
+		return unhealthy(fmt.Sprintf("syncing: %v, shouldHavePeers: %v, peers: %d",
+			health.IsSyncing, health.ShouldHavePeers, health.Peers))
+	}
+
+	return healthy()
 }
 
 func (h *Handler) checkActivationService(ctx context.Context) HealthStatus {
-	if strings.TrimSpace(h.config.ActivationServiceURL) == "" {
-		return HealthStatus{Status: "unhealthy", Message: "activation service URL not set"}
-	}
-	client := &http.Client{Timeout: 2 * time.Second}
-	healthURL, err := url.JoinPath(h.config.ActivationServiceURL, "health")
+	url, err := healthURL(h.config.ActivationServiceURL)
 	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
+		return unhealthy(fmt.Sprintf("activation service %s", err.Error()))
 	}
-	resp, err := client.Get(healthURL)
+	return httpHealthCheck(ctx, url)
+}
+
+func checkGraphQLClient(client interface {
+	Query(string, map[string]any) (map[string]any, error)
+}) HealthStatus {
+	_, err := client.Query("{ __typename }", map[string]any{})
 	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
+		return unhealthy(err.Error())
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return HealthStatus{Status: "unhealthy", Message: fmt.Sprintf("unexpected status: %s", resp.Status)}
-	}
-	return HealthStatus{Status: "healthy"}
+	return healthy()
 }
 
 func (h *Handler) checkGraphQL(ctx context.Context) HealthStatus {
-	_, err := h.graphqlClient.Query("{ __typename }", map[string]interface{}{})
-	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	return HealthStatus{Status: "healthy"}
+	return checkGraphQLClient(&h.graphqlClient)
 }
 
 func (h *Handler) checkFiresquid(ctx context.Context) HealthStatus {
-	_, err := h.firesquidClient.Query("{ __typename }", map[string]interface{}{})
-	if err != nil {
-		return HealthStatus{Status: "unhealthy", Message: err.Error()}
-	}
-	return HealthStatus{Status: "healthy"}
+	return checkGraphQLClient(&h.firesquidClient)
 }
 
 func (h *Handler) HealthHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	checks := map[string]HealthChecker{
-		"database":               h.checkDatabase,
-		"redis":                  h.checkRedis,
-		"gridproxy":              h.checkGridProxy,
-		"tfchain_health":         h.checkTFChainHealth,
-		"system_account_balance": h.checkSystemAccountBalance,
-		"activation_service":     h.checkActivationService,
-		"graphql":                h.checkGraphQL,
-		"firesquid":              h.checkFiresquid,
+		"database":           h.checkDatabase,
+		"redis":              h.checkRedis,
+		"gridproxy":          h.checkGridProxy,
+		"tfchain_health":     h.checkTFChainHealth,
+		"activation_service": h.checkActivationService,
+		"graphql":            h.checkGraphQL,
+		"firesquid":          h.checkFiresquid,
 	}
-	resp := make(map[string]HealthStatus)
-	for name, check := range checks {
-		resp[name] = check(ctx)
+
+	results := h.runChecks(ctx, checks)
+
+	statusCode := http.StatusOK
+	for _, status := range results {
+		if status.Status != "healthy" {
+			statusCode = http.StatusServiceUnavailable
+			break
+		}
 	}
-	c.JSON(http.StatusOK, resp)
+
+	c.JSON(statusCode, results)
+}
+
+func (h *Handler) runChecks(ctx context.Context, checks map[string]HealthChecker) map[string]HealthStatus {
+	results := make(map[string]HealthStatus, len(checks))
+	var mu sync.Mutex
+	var g errgroup.Group
+
+	for name, checker := range checks {
+		name, checker := name, checker
+		g.Go(func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					results[name] = unhealthy(fmt.Sprintf("panic: %v\n%s", r, string(debug.Stack())))
+					mu.Unlock()
+				}
+			}()
+
+			status := checker(ctx)
+			mu.Lock()
+			results[name] = status
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	_ = g.Wait()
+	return results
 }
