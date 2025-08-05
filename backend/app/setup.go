@@ -32,7 +32,7 @@ func SetUp(t testing.TB) (*App, error) {
 		redisHost = "localhost"
 	}
 
-	// Generate SSH key pair 
+	// Generate SSH key pair
 	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-f", privateKeyPath, "-N", "", "-q")
 	err := cmd.Run()
 	if err != nil {
