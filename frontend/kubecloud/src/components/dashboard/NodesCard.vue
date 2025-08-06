@@ -14,7 +14,7 @@
         <v-btn
           color="primary"
           variant="outlined"
-          :loading="loading"
+          :disabled="loading"
           prepend-icon="mdi-refresh"
           @click="fetchRentedNodes"
           class="refresh-btn"

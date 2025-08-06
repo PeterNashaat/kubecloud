@@ -86,7 +86,7 @@
                 <v-btn
                   color="primary"
                   variant="outlined"
-                  :loading="loading"
+                  :disabled="loading"
                   @click="fetchNodes"
                   prepend-icon="mdi-refresh"
                   class="refresh-btn"
@@ -98,9 +98,9 @@
               <p class="card-description">
                 Browse through our available nodes and select the one that best fits your requirements.
               </p>
-              
+
               <v-divider class="my-6" color="primary" />
-              
+
               <div v-if="loading" class="loading-section">
                 <v-skeleton-loader type="card, card, card, card" :loading="loading" class="w-100" />
                 <p class="loading-text">Loading available nodes...</p>
