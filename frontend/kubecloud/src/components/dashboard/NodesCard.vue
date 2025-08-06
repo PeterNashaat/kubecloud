@@ -10,7 +10,18 @@
           Manage your rented nodes and their resources.
         </p>
       </div>
-      <div class="header-actions">
+      <div class="header-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+        <v-btn
+          color="primary"
+          variant="outlined"
+          :loading="loading"
+          prepend-icon="mdi-refresh"
+          @click="fetchRentedNodes"
+          class="refresh-btn"
+          style="min-width: 110px;"
+        >
+          Refresh
+        </v-btn>
         <v-btn
           color="primary"
           variant="elevated"
