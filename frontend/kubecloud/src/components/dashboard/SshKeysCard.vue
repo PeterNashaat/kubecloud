@@ -30,13 +30,13 @@
                 <pre class="ssh-key-fingerprint">{{ truncateKey(key.public_key) }}</pre>
                 <v-tooltip location="top">
                   <template #activator="{ props }">
-                    <v-btn icon small v-bind="props" @click="copyKey(key.public_key)" title="Copy full public key">
+                    <v-btn icon small v-bind="props" @click="copyKey(key.public_key, key.ID)" title="Copy full public key">
                       <v-icon size="18">mdi-content-copy</v-icon>
                     </v-btn>
                   </template>
                   <span>Copy full public key</span>
                 </v-tooltip>
-                <span v-if="copySuccess" class="copy-success">{{ copySuccess }}</span>
+                <span v-if="lastCopiedId === key.ID" class="copy-success">Copied!</span>
               </div>
               <div class="ssh-key-date">Added {{ new Date(key.created_at).toLocaleDateString() }}</div>
             </div>
@@ -105,7 +105,7 @@ const addError = ref('')
 const nameError = ref('')
 const keyError = ref('')
 const nameField = ref()
-const copySuccess = ref('')
+const lastCopiedId = ref<number | null>(null)
 
 async function fetchSshKeys() {
   sshKeys.value = await userService.listSshKeys()
@@ -159,11 +159,11 @@ function openAddDialog() {
   })
 }
 
-async function copyKey(key: string) {
+async function copyKey(key: string, id: number) {
   try {
     await navigator.clipboard.writeText(key)
-    copySuccess.value = 'Copied!'
-    setTimeout(() => (copySuccess.value = ''), 1200)
+    lastCopiedId.value = id
+    setTimeout(() => lastCopiedId.value = null, 1200)
   } catch {}
 }
 
