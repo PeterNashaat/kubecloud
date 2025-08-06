@@ -1,6 +1,244 @@
+<template>
+  <div class="nodes-card">
+    <!-- Header Section -->
+    <div class="card-header">
+      <div class="header-content">
+        <h2 class="card-title kubecloud-gradient kubecloud-glow-blue">
+          My Nodes
+        </h2>
+        <p class="card-description">
+          Manage your rented nodes and their resources.
+        </p>
+      </div>
+      <div class="header-actions">
+        <v-btn
+          color="primary"
+          variant="elevated"
+          prepend-icon="mdi-plus"
+          @click="navigateToReserve"
+        >
+          Reserve New Node
+        </v-btn>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-section">
+      <v-row>
+        <v-col
+          v-for="(stat, index) in statCards"
+          :key="index"
+          cols="12"
+          sm="6"
+          md="3"
+        >
+          <v-card class="stat-card" flat>
+            <div class="stat-content">
+              <div class="stat-icon">
+                <v-icon size="32" :color="stat.color">{{ stat.icon }}</v-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value">{{ stat.value() }}</div>
+                <div class="stat-label">{{ stat.label }}</div>
+              </div>
+            </div>
+          </v-card>
+        </v-col>
+      </v-row>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-section">
+      <v-progress-circular
+        indeterminate
+        color="primary"
+        size="64"
+      />
+      <p class="loading-text">Loading your nodes...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error" class="error-section">
+      <v-icon size="64" color="error" class="mb-4">mdi-alert-circle</v-icon>
+      <h3>Failed to load nodes</h3>
+      <p>{{ error }}</p>
+      <v-btn
+        color="primary"
+        variant="outlined"
+        @click="fetchRentedNodes"
+      >
+        Try Again
+      </v-btn>
+    </div>
+
+    <!-- Empty State -->
+    <div v-else-if="rentedNodes.length === 0" class="empty-section">
+      <v-icon size="64" color="primary" class="mb-4">mdi-server-network</v-icon>
+      <h3>No nodes rented yet</h3>
+      <p>Start by reserving your first node to deploy your applications.</p>
+      <v-btn
+        color="primary"
+        variant="elevated"
+        @click="navigateToReserve"
+      >
+        Reserve Your First Node
+      </v-btn>
+    </div>
+
+    <div v-else class="nodes-section">
+      <v-row class="nodes-grid">
+        <v-col
+          v-for="node in rentedNodes"
+          :key="node.id"
+          cols="12"
+          sm="6"
+          md="4"
+          lg="4"
+        >
+          <NodeCard
+            :node="normalizeNode(node)"
+            :isAuthenticated="true"
+            :loading="unreservingNode === node.rentContractId?.toString()"
+            :disabled="false"
+            @reserve="confirmUnreserve(node)"
+          />
+        </v-col>
+      </v-row>
+    </div>
+
+    <!-- Unreserve Confirmation Dialog -->
+    <v-dialog v-model="showUnreserveDialog" max-width="400">
+      <v-card class="pa-3">
+        <v-card-title>Confirm Unreservation</v-card-title>
+        <v-card-text>
+          Are you sure you want to unreserve this node? This action cannot be undone if there is an active cluster on the node.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            color="grey"
+            variant="text"
+            @click="showUnreserveDialog = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="outlined"
+            @click="handleUnreserve"
+            :loading="unreservingNode === selectedNode?.rentContractId?.toString()"
+          >
+            Unreserve
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
+import { useNotificationStore } from '../../stores/notifications'
+import NodeCard from '../NodeCard.vue'
+
+function normalizeNode(node: RentedNode) {
+  return {
+    nodeId: node.nodeId,
+    price_usd: node.price_usd ?? 'N/A',
+    cpu: Math.round(node.total_resources?.cru ?? 0),
+    ram: Math.round(node.total_resources?.mru ? node.total_resources.mru / (1024*1024*1024) : 0),
+    storage: Math.round(node.total_resources?.sru ? node.total_resources.sru / (1024*1024*1024) : 0),
+    country: node.country,
+    gpu: !!node.num_gpu,
+    locationString: node.country || '',
+    city: node.city || '',
+    status: node.status || '',
+    healthy: node.healthy ?? true,
+    id: node.id,
+    rentable: false,
+    rented: true,
+    dedicated: false,
+    certificationType: '',
+  }
+}
+
+const router = useRouter()
+const {
+  rentedNodes,
+  loading,
+  error,
+  fetchRentedNodes,
+  unreserveNode,
+  totalMonthlyCost,
+  healthyNodes,
+  unhealthyNodes
+} = useNodeManagement()
+
+const notificationStore = useNotificationStore()
+
+// Dialog state
+const showUnreserveDialog = ref(false)
+const selectedNode = ref<RentedNode | null>(null)
+const unreservingNode = ref<string | null>(null)
+
+onMounted(() => {
+  fetchRentedNodes()
+})
+
+const navigateToReserve = () => {
+  router.push('/nodes')
+}
+
+const confirmUnreserve = (node: RentedNode) => {
+  selectedNode.value = node
+  showUnreserveDialog.value = true
+}
+
+const handleUnreserve = async () => {
+  if (!selectedNode.value?.rentContractId) return
+  unreservingNode.value = selectedNode.value.rentContractId.toString()
+  try {
+    await unreserveNode(selectedNode.value.rentContractId.toString())
+    showUnreserveDialog.value = false
+    selectedNode.value = null
+  } catch (err) {
+    console.error('Failed to unreserve node. Please try again.')
+  } finally {
+    unreservingNode.value = null
+  }
+}
+
+const statCards = [
+  {
+    icon: 'mdi-server-network',
+    color: 'primary',
+    value: () => rentedNodes.value.length,
+    label: 'Total Nodes'
+  },
+  {
+    icon: 'mdi-check-circle',
+    color: 'success',
+    value: () => healthyNodes.value.length,
+    label: 'Healthy'
+  },
+  {
+    icon: 'mdi-alert-circle',
+    color: 'warning',
+    value: () => unhealthyNodes.value.length,
+    label: 'Unhealthy'
+  },
+  {
+    icon: 'mdi-currency-usd',
+    color: 'info',
+    value: () => totalMonthlyCost.value,
+    label: 'Monthly Cost'
+  }
+]
+</script>
 <style scoped>
 .nodes-card {
-  background: rgba(10, 25, 47, 0.85);
   border: 1px solid rgba(96, 165, 250, 0.15);
   border-radius: 1rem;
   padding: 2rem;
@@ -111,249 +349,3 @@
   }
 }
 </style>
-<template>
-  <div class="nodes-card">
-    <!-- Header Section -->
-    <div class="card-header">
-      <div class="header-content">
-        <h2 class="card-title kubecloud-gradient kubecloud-glow-blue">
-          My Nodes
-        </h2>
-        <p class="card-description">
-          Manage your rented nodes and their resources.
-        </p>
-      </div>
-      <div class="header-actions">
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-plus"
-          @click="navigateToReserve"
-        >
-          Reserve New Node
-        </v-btn>
-      </div>
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="stats-section">
-      <v-row>
-        <v-col cols="12" sm="6" md="3">
-          <v-card class="stat-card" flat>
-            <div class="stat-content">
-              <div class="stat-icon">
-                <v-icon size="32" color="primary">mdi-server-network</v-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ rentedNodes.length }}</div>
-                <div class="stat-label">Total Nodes</div>
-              </div>
-            </div>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="3">
-          <v-card class="stat-card" flat>
-            <div class="stat-content">
-              <div class="stat-icon">
-                <v-icon size="32" color="success">mdi-check-circle</v-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ healthyNodes.length }}</div>
-                <div class="stat-label">Healthy</div>
-              </div>
-            </div>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="3">
-          <v-card class="stat-card" flat>
-            <div class="stat-content">
-              <div class="stat-icon">
-                <v-icon size="32" color="warning">mdi-alert-circle</v-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">{{ unhealthyNodes.length }}</div>
-                <div class="stat-label">Unhealthy</div>
-              </div>
-            </div>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="3">
-          <v-card class="stat-card" flat>
-            <div class="stat-content">
-              <div class="stat-icon">
-                <v-icon size="32" color="info">mdi-currency-usd</v-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-value">${{ totalMonthlyCost.toFixed(2) }}</div>
-                <div class="stat-label">Monthly Cost</div>
-              </div>
-            </div>
-          </v-card>
-        </v-col>
-      </v-row>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="loading" class="loading-section">
-      <v-progress-circular
-        indeterminate
-        color="primary"
-        size="64"
-      />
-      <p class="loading-text">Loading your nodes...</p>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="error" class="error-section">
-      <v-icon size="64" color="error" class="mb-4">mdi-alert-circle</v-icon>
-      <h3>Failed to load nodes</h3>
-      <p>{{ error }}</p>
-      <v-btn
-        color="primary"
-        variant="outlined"
-        @click="fetchRentedNodes"
-      >
-        Try Again
-      </v-btn>
-    </div>
-
-    <!-- Empty State -->
-    <div v-else-if="rentedNodes.length === 0" class="empty-section">
-      <v-icon size="64" color="primary" class="mb-4">mdi-server-network</v-icon>
-      <h3>No nodes rented yet</h3>
-      <p>Start by reserving your first node to deploy your applications.</p>
-      <v-btn
-        color="primary"
-        variant="elevated"
-        @click="navigateToReserve"
-      >
-        Reserve Your First Node
-      </v-btn>
-    </div>
-
-    <div v-else class="nodes-section">
-      <v-row class="nodes-grid">
-        <v-col
-          v-for="node in rentedNodes"
-          :key="node.id"
-          cols="12"
-          sm="6"
-          md="4"
-          lg="4"
-        >
-          <NodeCard
-            :node="normalizeNode(node)"
-            :isAuthenticated="true"
-            :loading="unreservingNode === node.rentContractId?.toString()"
-            :disabled="false"
-            @reserve="confirmUnreserve(node)"
-          />
-        </v-col>
-      </v-row>
-    </div>
-
-    <!-- Unreserve Confirmation Dialog -->
-    <v-dialog v-model="showUnreserveDialog" max-width="400">
-      <v-card class="pa-3">
-        <v-card-title>Confirm Unreservation</v-card-title>
-        <v-card-text>
-          Are you sure you want to unreserve this node? This action cannot be undone if there is an active cluster on the node.
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn
-            color="grey"
-            variant="text"
-            @click="showUnreserveDialog = false"
-          >
-            Cancel
-          </v-btn>
-          <v-btn
-            color="error"
-            variant="outlined"
-            @click="handleUnreserve"
-            :loading="unreservingNode === selectedNode?.rentContractId?.toString()"
-          >
-            Unreserve
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
-import { useNotificationStore } from '../../stores/notifications'
-import NodeCard from '../NodeCard.vue'
-function normalizeNode(node: RentedNode) {
-  return {
-    nodeId: node.nodeId,
-    price_usd: node.price_usd ?? 'N/A',
-    cpu: Math.round(node.total_resources?.cru ?? 0),
-    ram: Math.round(node.total_resources?.mru ? node.total_resources.mru / (1024*1024*1024) : 0),
-    storage: Math.round(node.total_resources?.sru ? node.total_resources.sru / (1024*1024*1024) : 0),
-    country: node.country,
-    gpu: !!node.num_gpu,
-    locationString: node.country || '',
-    city: node.city || '',
-    status: node.status || '',
-    healthy: node.healthy ?? true,
-    id: node.id,
-    rentable: false,
-    rented: true,
-    dedicated: false,
-    certificationType: '',
-  }
-}
-
-const router = useRouter()
-const {
-  rentedNodes,
-  loading,
-  error,
-  fetchRentedNodes,
-  unreserveNode,
-  totalMonthlyCost,
-  healthyNodes,
-  unhealthyNodes
-} = useNodeManagement()
-
-const notificationStore = useNotificationStore()
-
-// Dialog state
-const showUnreserveDialog = ref(false)
-const selectedNode = ref<RentedNode | null>(null)
-const unreservingNode = ref<string | null>(null)
-
-onMounted(() => {
-  fetchRentedNodes()
-})
-
-const navigateToReserve = () => {
-  router.push('/nodes')
-}
-
-const confirmUnreserve = (node: RentedNode) => {
-  selectedNode.value = node
-  showUnreserveDialog.value = true
-}
-
-const handleUnreserve = async () => {
-  if (!selectedNode.value?.rentContractId) return
-  unreservingNode.value = selectedNode.value.rentContractId.toString()
-  try {
-    await unreserveNode(selectedNode.value.rentContractId.toString())
-    showUnreserveDialog.value = false
-    selectedNode.value = null
-  } catch (err) {
-    console.error('Failed to unreserve node. Please try again.')
-  } finally {
-    unreservingNode.value = null
-  }
-}
-
-</script>
-

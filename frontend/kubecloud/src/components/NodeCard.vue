@@ -1,38 +1,28 @@
 <template>
   <v-card class="node-card mb-4" elevation="0">
-    <div class="price-area px-4 pt-4 pb-2">
+    <div class="price-area px-4 pt-4 pb-2 mb-3">
       <div class="d-flex align-center mb-1">
-        <span style="color:#10B981; font-size:1.5rem; font-weight:700; letter-spacing:0.01em;">${{ node.price_usd ?? 'N/A' }}</span>
-        <span class="text-caption ml-2" style="color:#a3a3a3; font-size:1.1rem; font-weight:500;">/month</span>
+        <span :style="`color:${priceColor}; font-size:1.5rem; font-weight:700; letter-spacing:0.01em;`">${{ monthlyPrice }}</span>
+        <span class="text-caption ml-2" :style="`color:${priceLabelColor}; font-size:1.1rem; font-weight:500;`">/month</span>
       </div>
       <div class="d-flex align-center">
-        <span style="color:#10B981; font-size:1.1rem; font-weight:600;">${{ node.price_usd ? (Number(node.price_usd)/720).toFixed(2) : 'N/A' }}</span>
-        <span class="text-caption ml-1" style="color:#a3a3a3; font-size:1.05rem; font-weight:500;">/hr</span>
+        <span :style="`color:${priceColor}; font-size:1.1rem; font-weight:600;`">${{ hourlyPrice }}</span>
+        <span class="text-caption ml-1" :style="`color:${priceLabelColor}; font-size:1.05rem; font-weight:500;`">/hr</span>
       </div>
     </div>
-    <div class="d-flex align-center justify-space-between px-4 pb-1">
+    <div class="d-flex align-center justify-space-between px-4 pb-1 mb-3">
       <span class="text-h6 font-weight-bold text-white">Node {{ node.nodeId }}</span>
       <v-chip v-if="node.gpu" color="#0ea5e9" variant="outlined" size="small" class="ml-2">GPU</v-chip>
     </div>
     <div v-if="node.country" class="d-flex align-center px-4 pb-1">
-      <v-icon size="16" class="mr-1" color="#a3a3a3">mdi-map-marker</v-icon>
-      <span class="text-body-2" style="color:#a3a3a3;">{{ node.country }}</span>
+      <v-icon size="16" class="mr-1" :color="priceLabelColor">mdi-map-marker</v-icon>
+      <span class="text-body-2" :style="`color:${priceLabelColor};`">{{ node.country }}</span>
     </div>
     <v-card-text class="py-0 px-4">
-      <div class="d-flex align-center mb-2 w-100">
-        <v-icon size="18" color="#0ea5e9" class="mr-1">mdi-cpu-64-bit</v-icon>
-        <span class="font-weight-medium" style="color:#a3a3a3; min-width:40px;">CPU:</span>
-        <span class="text-white ml-1">{{ node.cpu }} vCPU</span>
-      </div>
-      <div class="d-flex align-center mb-2 w-100">
-        <v-icon size="18" color="#10B981" class="mr-1">mdi-memory</v-icon>
-        <span class="font-weight-medium" style="color:#a3a3a3; min-width:40px;">RAM:</span>
-        <span class="text-white ml-1">{{ node.ram }} GB</span>
-      </div>
-      <div class="d-flex align-center mb-2 w-100">
-        <v-icon size="18" color="#38bdf8" class="mr-1">mdi-harddisk</v-icon>
-        <span class="font-weight-medium" style="color:#a3a3a3; min-width:40px;">Storage:</span>
-        <span class="text-white ml-1">{{ node.storage }} GB</span>
+      <div v-for="r in resources" :key="r.label" class="resource-row">
+        <span class="resource-icon"><v-icon size="18" :color="r.color">{{ r.icon }}</v-icon></span>
+        <span class="font-weight-medium" :style="`color:${priceLabelColor}; min-width:40px;`">{{ r.label }}</span>
+        <span class="text-white ml-1">{{ r.value() }}</span>
       </div>
     </v-card-text>
     <v-card-actions class="pt-3 px-4 pb-4">
@@ -55,28 +45,85 @@
 
 <script setup lang="ts">
 import type { NormalizedNode } from '../types/normalizedNode';
-import { defineProps, defineEmits } from 'vue';
+import { defineProps, defineEmits, computed } from 'vue';
 
 const props = defineProps<{ node: NormalizedNode; loading?: boolean; disabled?: boolean }>();
 const emit = defineEmits(['reserve', 'signin']);
+
+const monthlyPrice = computed(() => props.node.price_usd ?? 'N/A');
+
+const hourlyPrice = computed(() => {
+  const price = props.node.price_usd;
+  if (price && !isNaN(Number(price))) {
+    return (Number(price) / 720).toFixed(2);
+  }
+  return 'N/A';
+});
+
+const resources = [
+  {
+    icon: 'mdi-cpu-64-bit',
+    color: '#0ea5e9',
+    label: 'CPU:',
+    value: () => `${props.node.cpu} vCPU`
+  },
+  {
+    icon: 'mdi-memory',
+    color: '#10B981',
+    label: 'RAM:',
+    value: () => `${props.node.ram} GB`
+  },
+  {
+    icon: 'mdi-harddisk',
+    color: '#38bdf8',
+    label: 'Storage:',
+    value: () => `${props.node.storage} GB`
+  }
+];
+
+const priceColor = '#10B981';
+const priceLabelColor = '#a3a3a3';
 </script>
 
 <style scoped>
 .node-card {
-  border-radius: 14px;
+  border-radius: 16px;
   transition: box-shadow 0.2s, transform 0.2s;
 }
 .node-card:hover {
-  transform: translateY(-2px) scale(1.01);
+  transform: translateY(-3px) scale(1.015);
 }
 .price-area {
   background: rgba(16,185,129,0.07);
-  border-radius: 12px;
+}
+.v-card-text {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+.resource-row {
+  background: rgba(16,185,129,0.03);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+}
+.resource-row:last-child {
+  margin-bottom: 0;
+}
+.resource-icon {
+  background: rgba(16,185,129,0.10);
+  border-radius: 6px;
+  padding: 4px;
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.font-weight-medium {
+  font-weight: 500;
+}
+.text-white {
+  color: #f8fafc;
 }
 </style>
