@@ -16,10 +16,10 @@ import (
 )
 
 func TestRegisterHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Register User Successfully", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		payload := RegisterInput{
 			Name:            "Test User",
@@ -42,10 +42,6 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Register User with Invalid Request Format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
 		body, _ := json.Marshal(map[string]interface{}{})
 
 		req, _ := http.NewRequest("POST", "/api/v1/user/register", bytes.NewReader(body))
@@ -58,10 +54,6 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Register Existing Verified User", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
 		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		payload := RegisterInput{
@@ -81,10 +73,6 @@ func TestRegisterHandler(t *testing.T) {
 	})
 
 	t.Run("Register Existing Not Verified User", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
 		user := CreateTestUser(t, app, "unverified@example.com", "Unverified User", []byte("securepassword"), false, false, false, 0, time.Now())
 
 		payload := RegisterInput{
@@ -105,13 +93,11 @@ func TestRegisterHandler(t *testing.T) {
 }
 
 func TestVerifyRegisterCode(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+	user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, false, 123, time.Now())
 	t.Run("Test Verify Register Code", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
-		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, false, 123, time.Now())
-
 		payload := VerifyCodeInput{
 			Email: user.Email,
 			Code:  user.Code,
@@ -127,10 +113,6 @@ func TestVerifyRegisterCode(t *testing.T) {
 	})
 
 	t.Run("Test Verify Register Code with Invalid request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
 		payload := VerifyCodeInput{
 			Email: "dupe@example.com",
 		}
@@ -148,13 +130,9 @@ func TestVerifyRegisterCode(t *testing.T) {
 
 	})
 	t.Run("Test Verify Register Code with registered user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
-		user := CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), true, false, false, 0, time.Now())
+		registeredUser := CreateTestUser(t, app, "registered@example.com", "Registered User", []byte("securepassword"), true, false, false, 123, time.Now())
 		payload := VerifyCodeInput{
-			Email: user.Email,
+			Email: registeredUser.Email,
 			Code:  123,
 		}
 		body, _ := json.Marshal(payload)
@@ -172,14 +150,10 @@ func TestVerifyRegisterCode(t *testing.T) {
 	})
 
 	t.Run("Test Verify Register Code with wrong code", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
-		CreateTestUser(t, app, "dupe@example.com", "Test User", []byte("securepassword"), false, false, false, 555, time.Now())
+		user2 := CreateTestUser(t, app, "dupe2@example.com", "Test User2", []byte("securepassword"), false, false, false, 123, time.Now())
 
 		payload := VerifyCodeInput{
-			Email: "dupe@example.com",
+			Email: user2.Email,
 			Code:  333,
 		}
 		body, _ := json.Marshal(payload)
@@ -198,15 +172,11 @@ func TestVerifyRegisterCode(t *testing.T) {
 	})
 
 	t.Run("Test Verify Register Code with expired code", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
-		user := CreateTestUser(t, app, "test@example.com", "Test User", []byte("securepassword"), false, false, false, 123, time.Now().Add(-2*time.Hour))
+		user2 := CreateTestUser(t, app, "test@example.com", "Test User", []byte("securepassword"), false, false, false, 123, time.Now().Add(-2*time.Hour))
 
 		payload := VerifyCodeInput{
-			Email: user.Email,
-			Code:  user.Code,
+			Email: user2.Email,
+			Code:  user2.Code,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -234,10 +204,6 @@ func TestLoginUserHandler(t *testing.T) {
 	user := CreateTestUser(t, app, "loginuser@example.com", "Login User", hashedPassword, true, false, true, 0, time.Now())
 
 	t.Run("Test LoginUserHandler with Invalid Request Format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
 		body, _ := json.Marshal(map[string]interface{}{"email": "abc"})
 		req, _ := http.NewRequest("POST", "/api/v1/user/login", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -247,9 +213,6 @@ func TestLoginUserHandler(t *testing.T) {
 	})
 
 	t.Run("Test LoginUserHandler with non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		payload := LoginInput{
 			Email:    "notfound@example.com",
@@ -285,10 +248,10 @@ func TestLoginUserHandler(t *testing.T) {
 }
 
 func TestRefreshTokenHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Test RefreshTokenHandler", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		user := CreateTestUser(t, app, "refreshtoken@example.com", "Refresh User", []byte("securepassword"), true, false, false, 0, time.Now())
 		tokenPair, _ := app.handlers.tokenManager.CreateTokenPair(user.ID, user.Username, false)
@@ -311,9 +274,6 @@ func TestRefreshTokenHandler(t *testing.T) {
 	})
 
 	t.Run("Test RefreshTokenHandler with Invalid Request Format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		body, _ := json.Marshal(map[string]interface{}{})
 		req, _ := http.NewRequest("POST", "/api/v1/user/refresh", bytes.NewReader(body))
@@ -324,9 +284,6 @@ func TestRefreshTokenHandler(t *testing.T) {
 	})
 
 	t.Run("Test RefreshTokenHandler with Invalid or Expired Token", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		payload := RefreshTokenInput{
 			RefreshToken: "invalidtoken",
@@ -345,10 +302,10 @@ func TestRefreshTokenHandler(t *testing.T) {
 }
 
 func TestForgotPasswordHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Test ForgotPasswordHandler", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		user := CreateTestUser(t, app, "forgotuser@example.com", "Forgot User", []byte("securepassword"), true, false, false, 0, time.Now())
 
@@ -369,9 +326,6 @@ func TestForgotPasswordHandler(t *testing.T) {
 	})
 
 	t.Run("Test ForgotPasswordHandler with Invalid Request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 		body, _ := json.Marshal(map[string]interface{}{})
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -381,9 +335,7 @@ func TestForgotPasswordHandler(t *testing.T) {
 	})
 
 	t.Run("Test ForgotPasswordHandler with non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		payload := EmailInput{
 			Email: "notfound@example.com",
 		}
@@ -402,10 +354,10 @@ func TestForgotPasswordHandler(t *testing.T) {
 }
 
 func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Test VerifyForgetPasswordCodeHandler", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
 
 		user := CreateTestUser(t, app, "resetuser@example.com", "Reset User", []byte("securepassword"), false, false, false, 4231, time.Now())
 
@@ -427,9 +379,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 	})
 
 	t.Run("Test VerifyForgetPasswordCodeHandler with Invalid request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		body, _ := json.Marshal(map[string]interface{}{})
 		req, _ := http.NewRequest("POST", "/api/v1/user/forgot_password/verify", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -439,9 +389,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 	})
 
 	t.Run("Test VerifyForgetPasswordCodeHandler with wrong code", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "wrongreset@example.com", "Wrong Reset", []byte("securepassword"), false, false, false, 0, time.Now())
 
 		assert.NoError(t, err)
@@ -462,9 +410,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 	})
 
 	t.Run("Test VerifyForgetPasswordCodeHandler with expired code", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "expiredreset@example.com", "Expired Reset", []byte("securepassword"), false, false, false, 4231, time.Now().Add(-2*time.Hour))
 
 		payload := VerifyCodeInput{
@@ -484,9 +430,7 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 	})
 
 	t.Run("Test VerifyForgetPasswordCodeHandler with non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		payload := VerifyCodeInput{
 			Email: "notfoundreset@example.com",
 			Code:  4321,
@@ -505,13 +449,12 @@ func TestVerifyForgetPasswordCodeHandler(t *testing.T) {
 }
 
 func TestChangePasswordHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+	user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, false, 0, time.Now())
+
 	t.Run("Test ChangePasswordHandler", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-
-		user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, false, 0, time.Now())
-
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 
 		payload := ChangePasswordInput{
@@ -534,10 +477,6 @@ func TestChangePasswordHandler(t *testing.T) {
 	})
 
 	t.Run("Test ChangePasswordHandler with Invalid Request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "changepass@example.com", "Change Pass", []byte("oldpassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		body, _ := json.Marshal(map[string]interface{}{})
 		req, _ := http.NewRequest("PUT", "/api/v1/user/change_password", bytes.NewReader(body))
@@ -549,11 +488,6 @@ func TestChangePasswordHandler(t *testing.T) {
 	})
 
 	t.Run("Test ChangePasswordHandler with passwords mismatch", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
-		user := CreateTestUser(t, app, "changepassmismatch@example.com", "Mismatch", []byte("oldpassword"), true, false, false, 0, time.Now())
-
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		payload := ChangePasswordInput{
 			Email:           user.Email,
@@ -571,10 +505,11 @@ func TestChangePasswordHandler(t *testing.T) {
 }
 
 func TestChargeBalanceHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Test ChargeBalance with Invalid Request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "chargeuser@example.com", "Charge User", []byte("securepassword"), true, false, true, 0, time.Now())
 		user.Mnemonic = "test-menmonic"
 		err = app.handlers.db.UpdateUserByID(user)
@@ -594,9 +529,7 @@ func TestChargeBalanceHandler(t *testing.T) {
 	})
 
 	t.Run("Test ChargeBalance with invalid amount", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		email := "chargeuser3@example.com"
 		username := "Charge User3"
 		token := GetAuthToken(t, app, 1, email, username, false)
@@ -615,9 +548,7 @@ func TestChargeBalanceHandler(t *testing.T) {
 	})
 
 	t.Run("Test ChargeBalance with non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		token := GetAuthToken(t, app, 1, "notfound@example.com", "Not Found", false)
 		payload := ChargeBalanceInput{
 			CardType:     "visa",
@@ -635,10 +566,11 @@ func TestChargeBalanceHandler(t *testing.T) {
 }
 
 func TestGetUserHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Test Get user successfully", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "getuser@example.com", "Get User", []byte("securepassword"), true, false, false, 0, time.Now())
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
 		req, _ := http.NewRequest("GET", "/api/v1/user/", nil)
@@ -657,9 +589,7 @@ func TestGetUserHandler(t *testing.T) {
 	})
 
 	t.Run("Test Get non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		token := GetAuthToken(t, app, 999, "notfound@example.com", "Not Found", false)
 		req, _ := http.NewRequest("GET", "/api/v1/user/", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -674,10 +604,11 @@ func TestGetUserHandler(t *testing.T) {
 }
 
 func TestGetUserBalanceHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Test Get balance successfully", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "balanceuser@example.com", "Balance User", []byte("securepassword"), true, false, true, 0, time.Now())
 
 		assert.NoError(t, err)
@@ -698,9 +629,7 @@ func TestGetUserBalanceHandler(t *testing.T) {
 	})
 
 	t.Run("Test Get balance for non-existing user", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		token := GetAuthToken(t, app, 999, "notfound@example.com", "Not Found", false)
 		req, _ := http.NewRequest("GET", "/api/v1/user/balance", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -859,10 +788,11 @@ func TestListSSHKeysHandler(t *testing.T) {
 }
 
 func TestAddSSHKeyHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
 	t.Run("Add SSH key successfully", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "addsshuser@example.com", "Add SSH User", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
@@ -885,9 +815,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with invalid request format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "addsshuser2@example.com", "Add SSH User2", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
@@ -905,9 +833,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with invalid SSH key format", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "addsshuser3@example.com", "Add SSH User3", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)
@@ -929,9 +855,7 @@ func TestAddSSHKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Add SSH key with duplicate public key", func(t *testing.T) {
-		app, err := SetUp(t)
-		require.NoError(t, err)
-		router := app.router
+
 		user := CreateTestUser(t, app, "addsshuser4@example.com", "Add SSH User4", []byte("securepassword"), true, false, false, 0, time.Now())
 
 		token := GetAuthToken(t, app, user.ID, user.Email, user.Username, false)

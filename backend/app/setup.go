@@ -25,7 +25,7 @@ func SetUp(t testing.TB) (*App, error) {
 	dbPath := filepath.Join(dir, "testing.db")
 	workflowPath := filepath.Join(dir, "workflow_testing.db")
 
-	privateKeyPath := filepath.Join(dir, "test_id_rsa_%d")
+	privateKeyPath := filepath.Join(dir, "test_id_rsa")
 	publicKeyPath := privateKeyPath + ".pub"
 
 	redisHost := os.Getenv("REDIS_HOST")
@@ -126,9 +126,11 @@ func SetUp(t testing.TB) (*App, error) {
 		return nil, err
 	}
 
+	app.httpServer = nil
+
 	t.Cleanup(func() {
 		// Shutdown the app gracefully to close all connections
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		if err := app.Shutdown(ctx); err != nil {
@@ -136,11 +138,11 @@ func SetUp(t testing.TB) (*App, error) {
 		}
 
 		// Clean up files
-		os.Remove(privateKeyPath)
-		os.Remove(publicKeyPath)
-		os.Remove(configPath)
-		os.Remove(dbPath)
-		os.Remove(workflowPath)
+		_ = os.Remove(privateKeyPath)
+		_ = os.Remove(publicKeyPath)
+		_ = os.Remove(configPath)
+		_ = os.Remove(dbPath)
+		_ = os.Remove(workflowPath)
 
 		// Reset viper to avoid config leakage between tests
 		viper.Reset()
