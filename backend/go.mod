@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
+	github.com/mattn/go-sqlite3 v1.14.29
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.12.0
@@ -35,6 +36,7 @@ require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.12 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/base58 v1.0.5 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
@@ -64,10 +66,10 @@ require (
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
-	github.com/mattn/go-sqlite3 v1.14.29 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/phpdave11/gofpdi v1.0.14-0.20211212211723-1f10f9844311 // indirect
 	github.com/pierrec/xxHash v0.1.5 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
@@ -75,7 +77,6 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.16.9-0.20250714083056-4943cdc054d8 // indirect
 	github.com/threefoldtech/zosbase v0.1.10 // indirect
