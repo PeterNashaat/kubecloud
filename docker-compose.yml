@@ -37,24 +37,13 @@ services:
     volumes:
       - ./backend/kubecloud.db:/app/kubecloud.db
       - ./backend/config.json:/app/config.json
-      - /root/.ssh:/root/.ssh:ro
+      - /Users/codescalerseg/.ssh:/root/.ssh:ro
     environment:
       - MYCELIUM_HOST=localhost
       - REDIS_HOST=redis-db
-      - REDIS_PORT=6379
     command: ["/kubecloud", "--config", "/app/config.json"]
     network_mode: "service:mycelium" # inherits mycelium's network, including app-network access
-
-  backend-test:
-    build: ./backend
-    depends_on:
-      - redis-db
-    command: go test -v ./app
-    volumes:
-      - ./backend:/app
-    environment: 
-      - TEST_MNEMONIC=your test mnemonic
-      
+ 
   frontend:
     environment:
       - VITE_API_BASE_URL=http://localhost:8080/api

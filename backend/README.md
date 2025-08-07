@@ -82,38 +82,3 @@ The priority order for configuration is:
 4. Default values
 
 This allows you to override specific settings without modifying the configuration file.
-
-### Running Tests with Docker Compose
-
-To run backend tests in a containerized environment, use Docker Compose. You must provide a test mnemonic via the `TEST_MNEMONIC` environment variable, as tests will fail if it is not set.
-
-Example `docker-compose.yml` service:
-
-```yaml
-backend-test:
-  build: ./backend
-  depends_on:
-    - redis-db
-  command: go test -v ./app
-  volumes:
-    - ./backend:/app
-  environment:
-    - TEST_MNEMONIC=your test mnemonic here
-```
-
-**How to run tests:**
-
-```sh
-docker compose run --rm backend-test
-```
-
-**Note:**
-
-- Replace `your test mnemonic here` with your actual test mnemonic (never use production mnemonics for testing).
-- If you do not set `TEST_MNEMONIC`, tests that require blockchain or wallet operations will fail to start.
-
-You can also set the environment variable at runtime:
-
-```sh
-TEST_MNEMONIC="your test mnemonic here" docker compose run --rm backend-test
-```
