@@ -98,6 +98,9 @@ func NewApp(config internal.Configuration) (*App, error) {
 	gridClient, err := deployer.NewTFPluginClient(
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
+		deployer.WithGraphQlURL(config.GraphqlURL),
+		deployer.WithProxyURL(config.GridProxyURL),
+		deployer.WithSubstrateURL(config.TFChainURL),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
@@ -343,7 +346,11 @@ func (app *App) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	// app.gridClient.Close()
+	if app.handlers.substrateClient != nil {
+		app.handlers.substrateClient.Close()
+	}
+
+	app.gridClient.Close()
 
 	return nil
 }
