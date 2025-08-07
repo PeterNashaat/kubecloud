@@ -22,7 +22,18 @@ func NewGormStorage(dialector gorm.Dialector) (DB, error) {
 	}
 
 	// Migrate models
-	err = db.AutoMigrate(&User{}, &Voucher{}, Transaction{}, Invoice{}, NodeItem{}, UserNodes{}, &Notification{}, &SSHKey{}, &Cluster{})
+	err = db.AutoMigrate(
+		&User{},
+		&Voucher{},
+		Transaction{},
+		Invoice{},
+		NodeItem{},
+		UserNodes{},
+		&Notification{},
+		&SSHKey{},
+		&Cluster{},
+		&PendingRecord{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -116,12 +127,24 @@ func (s *GormDB) ListAllUsers() ([]User, error) {
 		return nil, err
 	}
 	return users, nil
+}
 
+// ListAdmins gets all admins
+func (s *GormDB) ListAdmins() ([]User, error) {
+	var admins []User
+	return admins, s.db.Where("admin = true and verified = true").Find(&admins).Error
 }
 
 // DeleteUserByID deletes user by its ID
 func (s *GormDB) DeleteUserByID(userID int) error {
-	return s.db.Where("id = ?", userID).Delete(&User{}).Error
+	result := s.db.Where("id = ?", userID).Delete(&User{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // CreateVoucher creates new voucher in system
@@ -382,4 +405,32 @@ func (s *GormDB) UpdateCluster(cluster *Cluster) error {
 // DeleteCluster deletes a cluster by name for a specific user
 func (s *GormDB) DeleteCluster(userID string, projectName string) error {
 	return s.db.Where("user_id = ? AND project_name = ?", userID, projectName).Delete(&Cluster{}).Error
+}
+
+func (s *GormDB) CreatePendingRecord(record *PendingRecord) error {
+	record.CreatedAt = time.Now()
+	return s.db.Create(record).Error
+}
+
+func (s *GormDB) ListAllPendingRecords() ([]PendingRecord, error) {
+	var pendingRecords []PendingRecord
+	return pendingRecords, s.db.Find(&pendingRecords).Error
+}
+
+func (s *GormDB) ListOnlyPendingRecords() ([]PendingRecord, error) {
+	var pendingRecords []PendingRecord
+	return pendingRecords, s.db.Where("tft_amount > transferred_tft_amount").Find(&pendingRecords).Error
+}
+
+func (s *GormDB) ListUserPendingRecords(userID int) ([]PendingRecord, error) {
+	var pendingRecords []PendingRecord
+	return pendingRecords, s.db.Where("user_id = ?", userID).Find(&pendingRecords).Error
+}
+
+func (s *GormDB) UpdatePendingRecordTransferredAmount(id int, amount uint64) error {
+	return s.db.Model(&PendingRecord{}).
+		Where("id = ?", id).
+		UpdateColumn("transferred_tft_amount", gorm.Expr("transferred_tft_amount + ?", amount)).
+		UpdateColumn("updated_at", gorm.Expr("?", time.Now())).
+		Error
 }

@@ -1,7 +1,9 @@
 <template>
   <nav class="navbar">
     <div class="navbar-content">
-      <router-link to="/" class="navbar-logo">KubeCloud</router-link>
+      <router-link to="/" class="navbar-logo">
+        <img :src="logo" alt="KubeCloud Logo" class="logo" width="200">
+      </router-link>
       <div class="navbar-main-links">
         <router-link v-for="link in publicLinks" :key="link.to" :to="link.to" class="navbar-link" active-class="active-link">
           {{ link.label }}
@@ -64,7 +66,8 @@
 <script setup lang="ts">
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
-import { computed, nextTick, watch } from 'vue'
+import { computed, nextTick } from 'vue'
+import logo from '@/assets/logo.png'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -89,12 +92,12 @@ const userName = computed(() => {
   if (userStore.user?.username) {
     return userStore.user.username
   }
-  
+
   // If we're logged in but don't have user data, try to extract from token
   if (userStore.isLoggedIn && userStore.token) {
     return userStore.user?.username
   }
-  
+
   return 'User'
 })
 const isAdmin = computed(() => userStore.isAdmin)
@@ -130,13 +133,6 @@ const handleLogout = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 1.2rem 2.5rem;
-}
-.navbar-logo {
-  font-size: 2rem;
-  font-weight: 500;
-  color: #fff;
-  letter-spacing: -1px;
-  text-decoration: none;
 }
 .navbar-main-links {
   display: flex;
@@ -200,9 +196,6 @@ const handleLogout = async () => {
   .navbar-main-links {
     gap: 0.7rem;
     margin-left: 1.2rem;
-  }
-  .navbar-logo {
-    font-size: 1.4rem;
   }
 }
 .user-name {

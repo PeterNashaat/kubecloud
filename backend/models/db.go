@@ -13,6 +13,7 @@ type DB interface {
 	UpdatePassword(email string, hashedPassword []byte) error
 	UpdateUserVerification(userID int, verified bool) error
 	ListAllUsers() ([]User, error)
+	ListAdmins() ([]User, error)
 	DeleteUserByID(userID int) error
 	CreateVoucher(voucher *Voucher) error
 	ListAllVouchers() ([]Voucher, error)
@@ -45,4 +46,10 @@ type DB interface {
 	GetClusterByName(userID string, projectName string) (Cluster, error)
 	UpdateCluster(cluster *Cluster) error
 	DeleteCluster(userID string, projectName string) error
+	// pending records methods
+	CreatePendingRecord(record *PendingRecord) error
+	ListAllPendingRecords() ([]PendingRecord, error)
+	ListOnlyPendingRecords() ([]PendingRecord, error)
+	ListUserPendingRecords(userID int) ([]PendingRecord, error)
+	UpdatePendingRecordTransferredAmount(id int, amount uint64) error
 }

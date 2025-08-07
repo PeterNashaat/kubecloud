@@ -1,4 +1,0 @@
-exec: /scripts/multus_setup.sh
-oneshot: true
-after:
-  - k3s

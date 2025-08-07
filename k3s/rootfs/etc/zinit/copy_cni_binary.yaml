@@ -1,4 +1,0 @@
-exec: bash -c "/scripts/wait_for_path.sh /mnt/data/data/cni/ && cp /scripts/{mycelium-cni,cleanup-cni} /mnt/data/data/cni/"
-oneshot: true
-after:
-  - k3s

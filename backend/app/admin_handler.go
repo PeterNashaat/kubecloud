@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 // GenerateVouchersInput holds all data needed when creating vouchers
@@ -30,6 +32,12 @@ type CreditUserResponse struct {
 	User   string `json:"user"`
 	Amount uint64 `json:"amount"`
 	Memo   string `json:"memo"`
+}
+
+type PendingRecordsResponse struct {
+	models.PendingRecord
+	USDAmount            float64 `json:"usd_amount"`
+	TransferredUSDAmount float64 `json:"transferred_usd_amount"`
 }
 
 // @Summary Get all users
@@ -92,8 +100,11 @@ func (h *Handler) DeleteUsersHandler(c *gin.Context) {
 
 	err = h.db.DeleteUserByID(id)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("Failed to delete user")
-		InternalServerError(c)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "User not found", "")
+		} else {
+			InternalServerError(c)
+		}
 		return
 	}
 
@@ -228,6 +239,32 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
+	systemBalanceUSD, err := internal.GetUserBalanceUSD(h.substrateClient, h.config.SystemAccount.Mnemonic)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	if systemBalanceUSD < float64(request.Amount) {
+		Error(c, http.StatusBadRequest, fmt.Sprintf("System balance is not enough, only %v$ is available", systemBalanceUSD), "")
+		return
+	}
+
+	requestedTFTs, err := internal.FromUSDToTFT(h.substrateClient, float64(request.Amount))
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
 	if err := h.db.CreateTransaction(&transaction); err != nil {
 		log.Error().Err(err).Msg("Failed to create credit transaction")
 		InternalServerError(c)
@@ -240,17 +277,56 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		return
 	}
 
-	err = internal.TransferTFTs(h.substrateClient, request.Amount, user.Mnemonic, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
 	Success(c, http.StatusCreated, "User is credited successfully", CreditUserResponse{
 		User:   user.Email,
 		Amount: request.Amount,
 		Memo:   request.Memo,
 	})
+}
 
+// @Summary List pending records
+// @Description Returns all pending records in the system
+// @Tags admin
+// @ID list-pending-records
+// @Accept json
+// @Produce json
+// @Success 200 {array} PendingRecordsResponse
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /pending-records [get]
+// ListPendingRecordsHandler returns all pending records in the system
+func (h *Handler) ListPendingRecordsHandler(c *gin.Context) {
+	pendingRecords, err := h.db.ListAllPendingRecords()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list all pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var pendingRecordsResponse []PendingRecordsResponse
+	for _, record := range pendingRecords {
+		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd amount")
+			InternalServerError(c)
+			return
+		}
+
+		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
+			InternalServerError(c)
+			return
+		}
+
+		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
+			PendingRecord:        record,
+			USDAmount:            usdAmount,
+			TransferredUSDAmount: usdTransferredAmount,
+		})
+	}
+
+	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
+		"pending_records": pendingRecordsResponse,
+	})
 }

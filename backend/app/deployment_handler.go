@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal/activities"
+	"kubecloud/internal/statemanager"
 	"kubecloud/kubedeployer"
 	"net"
 	"net/http"
@@ -116,6 +117,7 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 	}
 
 	id := fmt.Sprintf("%v", userID)
+	projectName = kubedeployer.GetProjectName(id, projectName)
 	cluster, err := h.db.GetClusterByName(id, projectName)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Failed to get cluster")
@@ -307,30 +309,28 @@ func (h *Handler) processKubeconfig(kubeconfigYAML, externalIP string) (string, 
 	return updatedConfig, nil
 }
 
-func (h *Handler) getClientConfig(c *gin.Context) (activities.ClientConfig, error) {
+func (h *Handler) getClientConfig(c *gin.Context) (statemanager.ClientConfig, error) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		return activities.ClientConfig{}, fmt.Errorf("user_id not found in context")
+		return statemanager.ClientConfig{}, fmt.Errorf("user_id not found in context")
 	}
 	userIDStr := fmt.Sprintf("%v", userID)
 
 	userIDInt, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		return activities.ClientConfig{}, fmt.Errorf("failed to parse user ID: %v", err)
+		return statemanager.ClientConfig{}, fmt.Errorf("failed to parse user ID: %v", err)
 	}
 
 	user, err := h.db.GetUserByID(userIDInt)
 	if err != nil {
-		return activities.ClientConfig{}, fmt.Errorf("failed to get user: %v", err)
+		return statemanager.ClientConfig{}, fmt.Errorf("failed to get user: %v", err)
 	}
 
-	return activities.ClientConfig{
+	return statemanager.ClientConfig{
 		SSHPublicKey: h.sshPublicKey,
 		Mnemonic:     user.Mnemonic,
 		UserID:       userIDStr,
 		Network:      h.config.SystemAccount.Network,
-		SSE:          h.sseManager,
-		DB:           h.db,
 	}, nil
 }
 
@@ -348,8 +348,7 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 		return
 	}
 
-	// Create the workflow template
-	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID) // TODO: should be cleaned
+	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID)
 	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, wfName, len(cluster.Nodes))
 
 	// Get the workflow
@@ -444,6 +443,9 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
 	}
+
+	// TODO: find a better place for this
+	cluster.Nodes[0].OriginalName = cluster.Nodes[0].Name
 
 	wf.State = ewf.State{
 		"config":  config,

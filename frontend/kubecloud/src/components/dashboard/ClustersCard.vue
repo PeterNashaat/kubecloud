@@ -47,13 +47,13 @@
         <tbody>
           <tr v-for="cluster in paginatedClusters" :key="cluster.id">
             <td class="cluster-name-cell">
-              <span class="cluster-name">{{ cluster.project_name }}</span>
+              <span class="cluster-name">{{ cluster.cluster.name }}</span>
             </td>
             <td>{{ Array.isArray(cluster.cluster.nodes) ? cluster.cluster.nodes.length : (typeof cluster.cluster.nodes === 'number' ? cluster.cluster.nodes : 0) }}</td>
             <td>{{ formatDate(cluster.created_at) }}</td>
             <td>
-              <v-btn icon size="small" class="mr-1" @click="viewCluster(cluster.project_name)"><v-icon icon="mdi-eye-outline" /></v-btn>
-              <v-btn icon size="small" class="ml-1" color="error" @click="deleteCluster(cluster.project_name)"><v-icon icon="mdi-delete-outline" /></v-btn>
+              <v-btn icon size="small" class="mr-1" @click="viewCluster(cluster.cluster.name)"><v-icon icon="mdi-eye-outline" /></v-btn>
+              <v-btn icon size="small" class="ml-1" color="error" @click="deleteCluster(cluster.cluster.name)"><v-icon icon="mdi-delete-outline" /></v-btn>
             </td>
           </tr>
         </tbody>
@@ -72,8 +72,8 @@
         <v-card-text>Are you sure you want to delete this cluster? This action cannot be undone.</v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn color="primary" @click="showDeleteModal = false">Cancel</v-btn>
-          <v-btn color="error" @click="confirmDelete" :loading="deleting">Delete</v-btn>
+          <v-btn variant="outlined" color="primary" @click="showDeleteModal = false">Cancel</v-btn>
+          <v-btn variant="outlined" color="error" @click="confirmDelete" :loading="deleting">Delete</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -84,9 +84,11 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
+import { useNotificationStore } from '../../stores/notifications'
 
 const router = useRouter()
 const clusterStore = useClusterStore()
+const notificationStore = useNotificationStore()
 
 const showDeleteModal = ref(false)
 const deleting = ref(false)
@@ -157,7 +159,7 @@ async function confirmDelete() {
   if (!clusterToDelete.value) return
   deleting.value = true
   await clusterStore.deleteCluster(clusterToDelete.value)
-  await clusterStore.fetchClusters()
+  notificationStore.info('Cluster Removal Started', `Cluster is being removed from the cluster in the background. You will be notified when the operation completes.`);
   showDeleteModal.value = false
   deleting.value = false
   clusterToDelete.value = null

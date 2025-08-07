@@ -181,3 +181,38 @@ export const validateAsync = async (
 
   return syncResult
 } 
+
+
+
+
+
+export function required(msg: string) {
+  return (value: string) => {
+    if (!value) {
+      return msg;
+    }
+  };
+}
+export function min(msg: string, min: number) {
+  return (value: number) => {
+    if (value < min) {
+      return msg ;
+    }
+  };
+}
+
+export function max(msg: string, max: number) {
+  return (value: number) => {
+    if (+value > max) {
+      return msg;
+    }
+  };
+}
+
+export function isAlphanumeric(msg: string) {
+  return (value: string) => {
+    if (!/^[a-zA-Z0-9]*$/.test(value)) {
+      return msg;
+    }
+  };
+}

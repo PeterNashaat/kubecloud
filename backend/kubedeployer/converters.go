@@ -2,21 +2,27 @@ package kubedeployer
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
-	"github.com/threefoldtech/zosbase/pkg/netlight/resource"
 )
 
 const (
-	MYC_NET_SEED_LEN = 32
-	MYC_IP_SEED_LEN  = 6
-	K3S_FLIST        = "https://hub.threefold.me/hanafy.3bot/ahmedhanafy725-k3s-full.flist"
-	K3S_ENTRYPOINT   = "/sbin/zinit init"
-	K3S_DATA_DIR     = "/mnt/data"
-	K3S_IFACE        = "mycelium-br"
-	K3S_TOKEN        = "randomely_generated_token"
+	K3S_FLIST      = "https://hub.threefold.me/hanafy.3bot/ahmedhanafy725-k3s-pure.flist"
+	K3S_ENTRYPOINT = "/sbin/zinit init"
+	K3S_DATA_DIR   = "/mnt/data"
+	K3S_IFACE      = "flannel-br"
 )
+
+func generateRandomString(length int) string {
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(result)
+}
 
 func deploymentFromNode(
 	node Node,
@@ -26,7 +32,7 @@ func deploymentFromNode(
 	token string,
 	masterSSH string,
 ) (workloads.Deployment, error) {
-	netSeed, err := getRandomMyceliumNetSeed()
+	ipSeed, err := workloads.RandomMyceliumIPSeed()
 	if err != nil {
 		return workloads.Deployment{}, err
 	}
@@ -37,16 +43,17 @@ func deploymentFromNode(
 	}
 
 	vm := workloads.VM{
-		Name:         node.Name,
-		NodeID:       node.NodeID,
-		CPU:          node.CPU,
-		MemoryMB:     node.Memory,
-		RootfsSizeMB: node.RootSize,
-		EnvVars:      node.EnvVars,
-		Flist:        node.Flist,
-		Entrypoint:   node.Entrypoint,
-		NetworkName:  networkName,
-		IP:           node.IP,
+		Name:           node.Name,
+		NodeID:         node.NodeID,
+		CPU:            node.CPU,
+		MemoryMB:       node.Memory,
+		RootfsSizeMB:   node.RootSize,
+		EnvVars:        node.EnvVars,
+		Flist:          node.Flist,
+		Entrypoint:     node.Entrypoint,
+		NetworkName:    networkName,
+		IP:             node.IP,
+		MyceliumIPSeed: ipSeed,
 		Mounts: []workloads.Mount{
 			{
 				Name:       disk.Name,
@@ -56,11 +63,11 @@ func deploymentFromNode(
 	}
 
 	vm.EnvVars["K3S_NODE_NAME"] = node.Name
-	vm.EnvVars["NET_SEED"] = netSeed
 	vm.EnvVars["DUAL_STACK"] = "true"
 	vm.EnvVars["MASTER"] = "false"
 	vm.EnvVars["HA"] = "false"
 	vm.EnvVars["K3S_URL"] = ""
+	vm.EnvVars["K3S_TOKEN"] = token
 
 	if node.Type == NodeTypeMaster || node.Type == NodeTypeLeader {
 		vm.EnvVars["MASTER"] = "true"
@@ -69,13 +76,6 @@ func deploymentFromNode(
 	if node.Type != NodeTypeLeader {
 		vm.EnvVars["K3S_URL"] = fmt.Sprintf("https://%s:6443", leaderIP)
 	}
-
-	if token == "" {
-		vm.EnvVars["K3S_TOKEN"] = K3S_TOKEN
-	} else {
-		vm.EnvVars["K3S_TOKEN"] = token
-	}
-
 	if vm.EnvVars["K3S_FLANNEL_IFACE"] == "" {
 		vm.EnvVars["K3S_FLANNEL_IFACE"] = K3S_IFACE
 	}
@@ -118,14 +118,9 @@ func nodeFromDeployment(
 	node.Flist = vm.Flist
 	node.Entrypoint = vm.Entrypoint
 
-	seed := node.EnvVars["NET_SEED"]
-	inspections, err := resource.InspectMycelium([]byte(seed))
-	if err != nil {
-		return Node{}, fmt.Errorf("failed to inspect mycelium for node %s: %v", node.Name, err)
-	}
-
-	node.MyceliumIP = inspections.IP().String()
+	// computed fields
 	node.IP = vm.IP
+	node.MyceliumIP = vm.MyceliumIP
 	node.PlanetaryIP = vm.PlanetaryIP
 	node.ContractID = depl.ContractID
 
@@ -149,6 +144,7 @@ func (c *Cluster) PrepareCluster(userID string) error {
 
 	hasLeader := false
 	for idx, node := range c.Nodes {
+		c.Nodes[idx].OriginalName = node.Name // Safe, cause it checks if projectName is not empty
 		c.Nodes[idx].Name = projectName + node.Name
 		if node.Type == NodeTypeLeader {
 			hasLeader = true

@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
 import { userService } from '@/utils/userService'
-import { useNotificationStore } from '@/stores/notifications'
 
 // Interface for rented nodes (matches the grid proxy structure)
 export interface RentedNode {
@@ -100,7 +99,6 @@ export function useNodeManagement() {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const reserveNodeLoading = ref(false)
-  const notificationStore = useNotificationStore()
 
   // Fetch user's rented nodes
   async function fetchRentedNodes() {
@@ -157,11 +155,9 @@ export function useNodeManagement() {
   async function reserveNode(nodeId: number) {
     reserveNodeLoading.value = true
     try {
-      const response = await userService.reserveNode(nodeId)
+      await userService.reserveNode(nodeId)
       // Refresh the rented nodes list after successful reservation
       await fetchRentedNodes()
-      notificationStore.success('Node Reserved', 'Node has been successfully reserved.')
-      return response
     } catch (err: any) {
       console.error('Failed to reserve node:', err)
       throw err
@@ -172,21 +168,15 @@ export function useNodeManagement() {
 
   // Unreserve a node
   async function unreserveNode(contractId: string) {
-    try {
-      const response = await userService.unreserveNode(contractId)
-      // Optimistically remove the node from the list
-      rentedNodes.value = rentedNodes.value.filter(node => node.rentContractId?.toString() !== contractId)
-      return response
-    } catch (err: any) {
-      console.error('Failed to unreserve node:', err)
-      throw err
-    }
+    await userService.unreserveNode(contractId)
+    // Optimistically remove the node from the list
+    rentedNodes.value = rentedNodes.value.filter(node => node.rentContractId?.toString() !== contractId)
   }
 
   // Add node to deployment
-  async function addNodeToDeployment(deploymentName: string, nodePayload: { nodeId: number, role: string, vcpu: number, ram: number, storage: number }) {
+  async function addNodeToDeployment(deploymentName: string, clusterPayload: { name: string, nodes: any[] }) {
     try {
-      const response = await userService.addNodeToDeployment(deploymentName, nodePayload)
+      const response = await userService.addNodeToDeployment(deploymentName, clusterPayload)
       // Optionally refresh data or handle response
       return response
     } catch (err: any) {
