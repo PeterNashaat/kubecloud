@@ -117,7 +117,7 @@
                         :isAuthenticated="isAuthenticated"
                         :loading="reservingNodeId === node.nodeId"
                         :disabled="reservingNodeId === node.nodeId"
-                        @reserve="reserveNode"
+                        @action="handleNodeAction(node, $event)"
                         @signin="handleSignIn"
                         tabindex="0"
                         aria-label="Node card"
@@ -222,6 +222,12 @@ const totalPages = computed(() => Math.max(1, Math.ceil(filteredNodes.value.leng
 const paginatedNodes = computed(() =>
   filteredNodes.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 )
+
+function handleNodeAction(node: any, payload: { nodeId: number; action: string }) {
+  if (payload.action === 'reserve') {
+    reserveNode(payload.nodeId);
+  }
+}
 
 watch(filteredNodes, () => {
   if (currentPage.value > totalPages.value) {

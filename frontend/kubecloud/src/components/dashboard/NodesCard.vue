@@ -100,7 +100,8 @@
             :isAuthenticated="true"
             :loading="unreservingNode === rentedNodes[idx]?.rentContractId?.toString()"
             :disabled="false"
-            @reserve="confirmUnreserve(rentedNodes[idx])"
+            :buttonLabel="'Unreserve Node'"
+            @action="handleNodeAction(node, $event)"
           />
         </v-col>
       </v-row>
@@ -186,6 +187,13 @@ const handleUnreserve = async () => {
     console.error('Failed to unreserve node. Please try again.')
   } finally {
     unreservingNode.value = null
+  }
+}
+
+function handleNodeAction(node: any, payload: { nodeId: number; action: string }) {
+  if (payload.action === 'unreserve') {
+    const found = rentedNodes.value.find(n => n.nodeId === payload.nodeId);
+    if (found) confirmUnreserve(found);
   }
 }
 

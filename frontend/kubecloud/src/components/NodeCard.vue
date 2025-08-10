@@ -27,17 +27,17 @@
     </v-card-text>
     <v-card-actions class="pt-3 px-4 pb-4">
       <v-btn
-        color="primary"
-        variant="elevated"
+        :color="buttonColor"
+        variant="outlined"
         block
         class="font-weight-bold"
         style="border-radius:8px;"
-        @click="$emit('reserve', node.nodeId)"
-        aria-label="Reserve Node"
+        @click="handleAction"
+        :aria-label="buttonLabel"
         :loading="loading"
         :disabled="disabled || loading"
       >
-        Reserve Node
+        {{ buttonLabel }}
       </v-btn>
     </v-card-actions>
   </v-card>
@@ -47,8 +47,21 @@
 import type { NormalizedNode } from '../types/normalizedNode';
 import { defineProps, defineEmits, computed } from 'vue';
 
-const props = defineProps<{ node: NormalizedNode; loading?: boolean; disabled?: boolean }>();
-const emit = defineEmits(['reserve', 'signin']);
+
+const props = defineProps<{ node: NormalizedNode; loading?: boolean; disabled?: boolean; buttonLabel?: string }>();
+const buttonLabel = computed(() => props.buttonLabel || 'Reserve Node');
+const buttonColor = computed(() =>
+  buttonLabel.value.toLowerCase().includes('unreserve') ? 'error' : 'primary'
+);
+const emit = defineEmits(['action', 'signin']);
+
+const actionType = computed(() =>
+  buttonLabel.value.toLowerCase().includes('unreserve') ? 'unreserve' : 'reserve'
+);
+
+function handleAction() {
+  emit('action', { nodeId: props.node.nodeId, action: actionType.value });
+}
 
 const baseNodePrice = computed(() => {
   const base = Number(props.node.price_usd ?? 0);
