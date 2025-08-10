@@ -17,7 +17,7 @@ func TestGormStore_SaveAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	dbFile := tmpFile.Name()
 	require.NoError(t, tmpFile.Close())
-	
+
 	t.Cleanup(func() {
 		err := os.Remove(dbFile)
 		require.NoError(t, err)
@@ -28,19 +28,19 @@ func TestGormStore_SaveAndLoad(t *testing.T) {
 
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	
+
 	t.Cleanup(func() {
 		sqlDB.Close()
 	})
 
 	store := NewGormStore(db)
 	require.NoError(t, err)
-	
+
 	t.Cleanup(func() {
 		err := store.Close()
 		require.NoError(t, err)
 	})
-	
+
 	err = store.Setup()
 	require.NoError(t, err)
 	wfName := "test-gorm-workflow"
@@ -72,7 +72,7 @@ func TestGormStore_LoadNotFound(t *testing.T) {
 	require.NoError(t, err)
 	dbFile := tmpFile.Name()
 	require.NoError(t, tmpFile.Close())
-	
+
 	t.Cleanup(func() {
 		err := os.Remove(dbFile)
 		require.NoError(t, err)
@@ -83,7 +83,7 @@ func TestGormStore_LoadNotFound(t *testing.T) {
 
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	
+
 	t.Cleanup(func() {
 		sqlDB.Close()
 	})
@@ -92,13 +92,13 @@ func TestGormStore_LoadNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGormStore() error = %v", err)
 	}
-	
+
 	t.Cleanup(func() {
 		if err := store.Close(); err != nil {
 			t.Fatalf("failed to close store: %v", err)
 		}
 	})
-	
+
 	// Test LoadWorkflowByUUID with non-existent UUID
 	_, err = store.LoadWorkflowByUUID(context.Background(), "non-existent-id")
 	require.Error(t, err, "Expected an error when loading a non-existent workflow by UUID")
