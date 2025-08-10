@@ -70,6 +70,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { authService } from '@/utils/authService'
 import { useUserStore } from '../stores/user'
 import { validateField, VALIDATION_RULES } from '../utils/validation'
+import { api } from '../utils/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -155,7 +156,13 @@ const handleResetPassword = async () => {
       password: password.value,
       confirm_password: confirmPassword.value
     })
-    router.replace('/sign-in')
+
+    // Fetch user profile since user is already authenticated
+    const userRes = await api.get('/v1/user/', { requiresAuth: true, showNotifications: false }) as any
+    userStore.user = userRes.data.data.user
+
+    // Redirect to dashboard instead of sign-in
+    router.replace('/dashboard')
   } catch (err: any) {
     error.value = err?.message || 'Failed to reset password'
   } finally {
