@@ -67,6 +67,8 @@
               autofocus
               class="mb-4"
               @keyup.enter="handleAddKey"
+              @blur="nameTouched = true"
+              @input="nameTouched = true"
             />
             <v-textarea
               v-model="newKey.public_key"
@@ -85,7 +87,7 @@
             <v-btn variant="outlined" color="primary" :disabled="isAddDisabled" @click="handleAddKey">
               Add
             </v-btn>
-            <v-btn variant="outlined" @click="addDialog = false">Cancel</v-btn>
+            <v-btn variant="outlined" @click="handleCancelDialog">Cancel</v-btn>
           </v-card-actions>
         </v-card>
       </template>
@@ -111,7 +113,15 @@ const isDuplicateKey = computed(() => {
   return !!val && sshKeys.value.some(k => k.public_key.trim() === val)
 })
 
-const nameError = computed(() => !newKey.value.name ? 'Key name is required.' : '')
+const nameTouched = ref(false)
+const nameError = computed(() => {
+  if (!nameTouched.value) return ''
+  if (!newKey.value.name) return 'Key name is required.'
+  if (sshKeys.value.some(k => k.name.trim().toLowerCase() === newKey.value.name.trim().toLowerCase())) {
+    return 'Key name must be unique.'
+  }
+  return ''
+})
 
 const publicKeyErrors = computed(() => {
   const errors: string[] = []
@@ -136,6 +146,7 @@ async function handleAddKey() {
     sshKeys.value.push(added)
     addDialog.value = false
     newKey.value = { name: '', public_key: '' }
+    nameTouched.value = false
   } catch (e: any) {
   }
 }
@@ -149,8 +160,10 @@ async function pasteFromClipboard() {
   newKey.value.public_key = await navigator.clipboard.readText()
 }
 
+
 function openAddDialog() {
   addDialog.value = true
+  nameTouched.value = false
   nextTick(() => {
     if (nameField.value?.focus) nameField.value.focus()
   })
@@ -160,6 +173,12 @@ async function copyKey(key: string, id: number) {
   await navigator.clipboard.writeText(key)
   lastCopiedId.value = id
   setTimeout(() => lastCopiedId.value = null, 1200)
+}
+
+
+function handleCancelDialog() {
+  addDialog.value = false
+  nameTouched.value = false
 }
 
 function truncateKey(key: string) {
