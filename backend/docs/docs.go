@@ -1974,6 +1974,12 @@ const docTemplate = `{
         },
         "models.Voucher": {
             "type": "object",
+            "required": [
+                "code",
+                "created_at",
+                "expires_at",
+                "value"
+            ],
             "properties": {
                 "code": {
                     "type": "string"

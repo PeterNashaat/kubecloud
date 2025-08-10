@@ -390,6 +390,11 @@ definitions:
         type: boolean
       value:
         type: number
+    required:
+    - code
+    - created_at
+    - expires_at
+    - value
     type: object
 info:
   contact: {}

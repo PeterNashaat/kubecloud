@@ -130,7 +130,7 @@
                         :isAuthenticated="isAuthenticated"
                         :loading="reservingNodeId === node.nodeId"
                         :disabled="reservingNodeId === node.nodeId"
-                        @reserve="reserveNode"
+                        @action="handleNodeAction(node, $event)"
                         @signin="handleSignIn"
                         tabindex="0"
                         aria-label="Node card"
@@ -164,12 +164,10 @@ import { useNormalizedNodes } from '../composables/useNormalizedNodes'
 import { useNodeFilters } from '../composables/useNodeFilters'
 import NodeFilterPanel from '../components/NodeFilterPanel.vue'
 import NodeCard from '../components/NodeCard.vue'
-import { useNotificationStore } from '../stores/notifications'
 
 const router = useRouter()
 const userStore = useUserStore()
 const isAuthenticated = computed(() => userStore.isLoggedIn)
-const notificationStore = useNotificationStore()
 
 const { nodes, total, loading, fetchNodes } = useNodes()
 const normalizedNodes = useNormalizedNodes(() => nodes.value)
@@ -237,6 +235,12 @@ const totalPages = computed(() => Math.max(1, Math.ceil(filteredNodes.value.leng
 const paginatedNodes = computed(() =>
   filteredNodes.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 )
+
+function handleNodeAction(node: any, payload: { nodeId: number; action: string }) {
+  if (payload.action === 'reserve') {
+    reserveNode(payload.nodeId);
+  }
+}
 
 watch(filteredNodes, () => {
   if (currentPage.value > totalPages.value) {
