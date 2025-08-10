@@ -52,7 +52,7 @@ const emit = defineEmits(['reserve', 'signin']);
 
 const baseNodePrice = computed(() => {
   const base = Number(props.node.price_usd ?? 0);
-  const extra = props.node.gpu ? Number(props.node.extraFee ?? 0) : 0;
+  const extra = Number(props.node.extraFee ?? 0);
   const price = base + extra;
   return isNaN(price) ? null : price;
 });
