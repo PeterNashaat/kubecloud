@@ -1,3 +1,0 @@
-exec: /scripts/mycelium.sh
-after:
-  - set_seed

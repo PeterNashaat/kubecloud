@@ -1,7 +1,11 @@
 package models
 
+import "gorm.io/gorm"
+
 // DB interface for databases
 type DB interface {
+	Close() error
+	GetDB() *gorm.DB
 	RegisterUser(user *User) error
 	GetUserByEmail(email string) (User, error)
 	GetUserByID(userID int) (User, error)
@@ -37,7 +41,7 @@ type DB interface {
 	GetUnreadNotificationCount(userID string) (int64, error)
 	DeleteNotification(notificationID uint, userID string) error
 	// Cluster methods
-	CreateCluster(cluster *Cluster) error
+	CreateCluster(userID string, cluster *Cluster) error
 	ListUserClusters(userID string) ([]Cluster, error)
 	GetClusterByName(userID string, projectName string) (Cluster, error)
 	UpdateCluster(cluster *Cluster) error

@@ -3,20 +3,12 @@
     <div class="footer-content">
       <div class="footer-brand">
         <router-link to="/" class="footer-logo" aria-label="KubeCloud logo">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <ellipse cx="24" cy="28" rx="16" ry="10" fill="#181A20" stroke="#3B82F6" stroke-width="2.5"/>
-            <ellipse cx="18" cy="22" rx="7" ry="6" fill="#181A20" stroke="#60A5FA" stroke-width="2.5"/>
-            <ellipse cx="30" cy="20" rx="6" ry="5" fill="#181A20" stroke="#93C5FD" stroke-width="2.5"/>
-            <ellipse cx="24" cy="28" rx="10" ry="7" fill="#181A20" stroke="#3B82F6" stroke-width="2.5"/>
-            <ellipse cx="24" cy="28" rx="5" ry="3.5" fill="#3B82F6" fill-opacity="0.7"/>
-          </svg>
-          <span class="footer-title">KubeCloud</span>
+          <img :src="logo" alt="KubeCloud Logo" class="logo" width="110">
         </router-link>
       </div>
       <nav class="footer-links">
         <router-link to="/docs" class="footer-link">Docs</router-link>
-        <a href="https://github.com/neverhack/kubecloud" target="_blank" rel="noopener" class="footer-link">GitHub</a>
-        <router-link to="/privacy" class="footer-link">Privacy</router-link>
+        <a href="https://github.com/codescalers/kubecloud" target="_blank" rel="noopener" class="footer-link">GitHub</a>
       </nav>
     </div>
     <div class="footer-bottom">
@@ -26,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-// No logic needed
+  import logo from '@/assets/logo.png'
 </script>
 
 <style scoped>
@@ -74,7 +66,7 @@
 }
 
 .footer-title {
-  color: inherit;
+  color: white;
   font-weight: inherit;
   letter-spacing: inherit;
   margin-left: 0.5rem;
@@ -141,11 +133,11 @@
     gap: 1.5rem;
     padding: 0 1.2rem;
   }
-  
+
   .footer-links {
     gap: 0.7rem;
   }
-  
+
   .footer-title {
     font-size: 1rem;
   }
@@ -155,23 +147,23 @@
   .app-footer {
     padding: 1.5rem 0 0.7rem 0;
   }
-  
+
   .footer-content {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
     padding: 0 0.5rem;
   }
-  
+
   .footer-links {
     gap: 0.7rem;
     flex-wrap: wrap;
   }
-  
+
   .footer-title {
     font-size: 1rem;
   }
-  
+
   .footer-bottom {
     margin-top: 1.5rem;
   }

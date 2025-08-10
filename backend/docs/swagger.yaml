@@ -40,9 +40,9 @@ definitions:
     type: object
   app.ChargeBalanceResponse:
     properties:
-      new_balance:
-        type: number
-      payment_intent_id:
+      email:
+        type: string
+      workflow_id:
         type: string
     type: object
   app.CreditRequestInput:
@@ -86,6 +86,50 @@ definitions:
     - expire_after_days
     - value
     type: object
+  app.GetUserResponse:
+    properties:
+      account_address:
+        type: string
+      admin:
+        type: boolean
+      code:
+        type: integer
+      credit_card_balance:
+        description: millicent, money from credit card
+        type: integer
+      credited_balance:
+        description: millicent, manually added by admin or from vouchers
+        type: integer
+      debt:
+        description: millicent
+        type: integer
+      email:
+        type: string
+      id:
+        type: integer
+      password:
+        items:
+          type: integer
+        type: array
+      pending_balance_usd:
+        type: number
+      sponsored:
+        type: boolean
+      ssh_key:
+        type: string
+      stripe_customer_id:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+      verified:
+        type: boolean
+    required:
+    - email
+    - password
+    - username
+    type: object
   app.LoginInput:
     properties:
       email:
@@ -117,6 +161,17 @@ definitions:
         type: number
       user_id:
         type: integer
+    type: object
+  app.RedeemVoucherResponse:
+    properties:
+      amount:
+        type: number
+      email:
+        type: string
+      voucher_code:
+        type: string
+      workflow_id:
+        type: string
     type: object
   app.RefreshTokenInput:
     properties:
@@ -157,6 +212,22 @@ definitions:
       timeout:
         type: string
     type: object
+  app.RegisterUserResponse:
+    properties:
+      email:
+        type: string
+      workflow_id:
+        type: string
+    type: object
+  app.ReserveNodeResponse:
+    properties:
+      email:
+        type: string
+      node_id:
+        type: integer
+      workflow_id:
+        type: string
+    type: object
   app.SSHKeyInput:
     properties:
       name:
@@ -167,11 +238,22 @@ definitions:
     - name
     - public_key
     type: object
+  app.UnreserveNodeResponse:
+    properties:
+      contract_id:
+        type: integer
+      email:
+        type: string
+      workflow_id:
+        type: string
+    type: object
   app.UserBalanceResponse:
     properties:
       balance_usd:
         type: number
       debt_usd:
+        type: number
+      pending_balance_usd:
         type: number
     type: object
   app.VerifyCodeInput:
@@ -415,7 +497,7 @@ paths:
         "200":
           description: User is retrieved successfully
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/app.GetUserResponse'
         "404":
           description: User is not found
           schema:
@@ -465,8 +547,8 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Balance is charged successfully
+        "202":
+          description: 'workflow_id: string, email: string'
           schema:
             $ref: '#/definitions/app.ChargeBalanceResponse'
         "400":
@@ -478,7 +560,7 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Charge user balance
@@ -716,12 +798,16 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/app.APIResponse'
+            $ref: '#/definitions/app.ReserveNodeResponse'
         "400":
           description: Invalid request
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: No nodes are available for rent.
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
@@ -748,12 +834,16 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/app.APIResponse'
+            $ref: '#/definitions/app.UnreserveNodeResponse'
         "400":
           description: Invalid request
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: User is not found
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
@@ -803,11 +893,12 @@ paths:
       - application/json
       responses:
         "202":
-          description: Voucher redeemed successfully
+          description: 'workflow_id: string, voucher_code: string, amount: float64,
+            email: string'
           schema:
-            $ref: '#/definitions/app.APIResponse'
+            $ref: '#/definitions/app.RedeemVoucherResponse'
         "400":
-          description: Invalid voucher code or already redeemed
+          description: Invalid voucher code, already redeemed, or expired
           schema:
             $ref: '#/definitions/app.APIResponse'
         "404":
@@ -815,7 +906,7 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Redeem voucher
@@ -874,11 +965,11 @@ paths:
       - application/json
       responses:
         "201":
-          description: Verification code sent successfully
+          description: 'workflow_id: string, email: string'
           schema:
-            $ref: '#/definitions/app.RegisterResponse'
+            $ref: '#/definitions/app.RegisterUserResponse'
         "400":
-          description: Invalid request format or validation error
+          description: Invalid request format
           schema:
             $ref: '#/definitions/app.APIResponse'
         "409":
@@ -886,7 +977,7 @@ paths:
           schema:
             $ref: '#/definitions/app.APIResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
             $ref: '#/definitions/app.APIResponse'
       summary: Register user (with KYC sponsorship)
@@ -908,10 +999,10 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "202":
+          description: 'workflow_id: string, email: string'
           schema:
-            $ref: '#/definitions/internal.TokenPair'
+            $ref: '#/definitions/app.RegisterUserResponse'
         "400":
           description: Invalid request format or verification failed
           schema:
@@ -1184,4 +1275,38 @@ paths:
       summary: Generate vouchers
       tags:
       - admin
+  /workflow/{workflow_id}:
+    get:
+      consumes:
+      - application/json
+      description: Returns the status of a workflow by its ID.
+      operationId: get-workflow-status
+      parameters:
+      - description: Workflow ID
+        in: path
+        name: workflow_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Workflow status returned successfully
+          schema:
+            type: string
+        "400":
+          description: Invalid request or missing workflow ID
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: Workflow not found
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Get workflow status
+      tags:
+      - workflow
 swagger: "2.0"

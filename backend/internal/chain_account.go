@@ -153,8 +153,8 @@ func FromUSDMillicentToTFT(substrateClient *substrate.Substrate, amountMillicent
 	}
 
 	// Convert Millicent to dollars for the calculation
-	amountDollars := float64(amountMillicent) / 1000.0
-	tft := (amountDollars * 1e7) / (float64(price) / 1000)
+	amountUSD := FromUSDMilliCentToUSD(amountMillicent)
+	tft := (amountUSD * 1e7) / (float64(price) / 1000)
 	return uint64(tft), nil
 }
 

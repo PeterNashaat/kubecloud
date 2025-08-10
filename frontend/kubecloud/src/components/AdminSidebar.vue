@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits, onMounted } from 'vue'
+import { defineProps, defineEmits } from 'vue'
 const props = defineProps<{ selected: string }>()
 defineEmits(['update:selected'])
 
@@ -35,6 +35,7 @@ const adminNavItems = [
   { key: 'vouchers', title: 'Vouchers', icon: 'mdi-ticket-percent' },
   { key: 'system', title: 'System', icon: 'mdi-cog' },
   { key: 'invoices', title: 'Invoices', icon: 'mdi-file-document-outline' },
+  { key: 'pending-records', title: 'Pending Records', icon: 'mdi-clock-outline' },
 ]
 
 </script>

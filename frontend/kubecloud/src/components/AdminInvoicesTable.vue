@@ -56,6 +56,7 @@
 
 <script setup lang="ts">
 import { ref, defineProps } from 'vue'
+import {formatDate} from '../utils/uiUtils.ts'
 const props = defineProps<{ invoices: any[] }>()
 
 const headers = [
@@ -67,12 +68,7 @@ const headers = [
   { title: 'Actions', key: 'actions', sortable: false, width: '120px' }
 ]
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return '-';
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  return d.toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
+
 
 const showInvoiceModal = ref(false)
 const selectedInvoice = ref<any | null>(null)

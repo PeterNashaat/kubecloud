@@ -2,21 +2,25 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/models"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/mattn/go-sqlite3"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/paymentmethod"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
+	"github.com/xmonader/ewf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"gorm.io/gorm"
 
 	"github.com/vedhavyas/go-subkey"
@@ -34,7 +38,9 @@ type Handler struct {
 	firesquidClient graphql.GraphQl
 	redis           *internal.RedisClient
 	sseManager      *internal.SSEManager
+	ewfEngine       *ewf.Engine
 	gridNet         string // Network name for the grid
+	sshPublicKey    string // SSH public key loaded at startup
 	systemIdentity  substrate.Identity
 	kycClient       *internal.KYCClient
 	sponsorKeyPair  subkey.KeyPair
@@ -46,8 +52,8 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	config internal.Configuration, mailService internal.MailService,
 	gridproxy proxy.Client, substrateClient *substrate.Substrate,
 	graphqlClient graphql.GraphQl, firesquidClient graphql.GraphQl,
-	redis *internal.RedisClient, sseManager *internal.SSEManager,
-	gridNet string, systemIdentity substrate.Identity,
+	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine,
+	gridNet string, sshPublicKey string, systemIdentity substrate.Identity,
 	kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string) *Handler {
 
 	return &Handler{
@@ -61,7 +67,9 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 		firesquidClient: firesquidClient,
 		redis:           redis,
 		sseManager:      sseManager,
+		ewfEngine:       ewfEngine,
 		gridNet:         gridNet,
+		sshPublicKey:    sshPublicKey,
 		systemIdentity:  systemIdentity,
 		kycClient:       kycClient,
 		sponsorKeyPair:  sponsorKeyPair,
@@ -124,16 +132,17 @@ type RefreshTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// chargeBalanceResponse struct holds the response data after charging balance
+// ChargeBalanceResponse holds the response for charging user balance
 type ChargeBalanceResponse struct {
-	PaymentIntentID string  `json:"payment_intent_id"`
-	NewBalance      float64 `json:"new_balance"`
+	WorkflowID string `json:"workflow_id"`
+	Email      string `json:"email"`
 }
 
 // UserBalanceResponse struct holds the response data for user balance
 type UserBalanceResponse struct {
-	BalanceUSD float64 `json:"balance_usd"`
-	DebtUSD    float64 `json:"debt_usd"`
+	BalanceUSD        float64 `json:"balance_usd"`
+	DebtUSD           float64 `json:"debt_usd"`
+	PendingBalanceUSD float64 `json:"pending_balance_usd"`
 }
 
 // SSHKeyInput struct for adding SSH keys
@@ -142,22 +151,23 @@ type SSHKeyInput struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
-// KYC sponsorship helpers
-func (h *Handler) createKYCSponsorship(ctx context.Context, mnemonic string) error {
-	sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
-	if err != nil {
-		return fmt.Errorf("failed to create sponsee keypair from mnemonic: %w", err)
-	}
-	sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
-	if err != nil {
-		return fmt.Errorf("failed to derive sponsee SS58 address: %w", err)
-	}
+// RegisterUserResponse holds the response for user registration
+type RegisterUserResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	Email      string `json:"email"`
+}
 
-	if err := h.kycClient.CreateSponsorship(ctx, h.sponsorAddress, h.sponsorKeyPair, sponseeAddress, sponseeKeyPair); err != nil {
-		return fmt.Errorf("failed to create KYC sponsorship: %w", err)
-	}
+// RedeemVoucherResponse holds the response for redeeming a voucher
+type RedeemVoucherResponse struct {
+	WorkflowID  string  `json:"workflow_id"`
+	VoucherCode string  `json:"voucher_code"`
+	Amount      float64 `json:"amount"`
+	Email       string  `json:"email"`
+}
 
-	return nil
+type GetUserResponse struct {
+	models.User
+	PendingBalanceUSD float64 `json:"pending_balance_usd"`
 }
 
 // RegisterHandler registers user to the system
@@ -168,10 +178,10 @@ func (h *Handler) createKYCSponsorship(ctx context.Context, mnemonic string) err
 // @Accept json
 // @Produce json
 // @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterResponse "Verification code sent successfully"
-// @Failure 400 {object} APIResponse "Invalid request format or validation error"
+// @Success 201 {object} RegisterUserResponse "workflow_id: string, email: string"
+// @Failure 400 {object} APIResponse "Invalid request format"
 // @Failure 409 {object} APIResponse "User already registered"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/register [post]
 func (h *Handler) RegisterHandler(c *gin.Context) {
 	var request RegisterInput
@@ -198,104 +208,24 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	code := internal.GenerateRandomCode()
-	subject, body := h.mailService.SignUpMailContent(code, h.config.MailSender.Timeout, request.Name, h.config.Server.Host)
-
-	err := h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserRegistration)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send verification code")
+		log.Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
 		return
 	}
 
-	// hash password
-	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
-	if err != nil {
-		log.Error().Err(err).Msg("error hashing password")
-		InternalServerError(c)
-		return
+	wf.State = ewf.State{
+		"name":     request.Name,
+		"email":    request.Email,
+		"password": request.Password,
 	}
 
-	isAdmin := internal.Contains(h.config.Admins, request.Email)
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	user := models.User{
-		Username: request.Name,
-		Email:    request.Email,
-		Password: hashedPassword,
-		Code:     code,
-		Verified: existingUser.Verified,
-		Admin:    isAdmin,
-	}
-
-	if getErr != gorm.ErrRecordNotFound {
-		if !user.Verified {
-			user.ID = existingUser.ID
-			err = h.db.UpdateUserByID(&user)
-			if err != nil {
-				log.Error().Err(err).Send()
-				InternalServerError(c)
-				return
-			}
-		}
-	}
-
-	// create user model in db
-	if getErr != nil {
-		mnemonic, _, err := internal.SetupUserOnTFChain(h.substrateClient, h.config)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to setup user on TFChain")
-			InternalServerError(c)
-			return
-		}
-		customer, err := internal.CreateStripeCustomer(request.Name, request.Email)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-
-		user.Mnemonic = mnemonic
-		user.StripeCustomerID = customer.ID
-		// Set user.AccountAddress from mnemonic
-		sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to create keypair for SS58 address")
-			InternalServerError(c)
-			return
-		}
-		sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to get SS58 address")
-			InternalServerError(c)
-			return
-		}
-		user.AccountAddress = sponseeAddress
-
-		err = h.db.RegisterUser(&user)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-
-		if err := h.createKYCSponsorship(c.Request.Context(), mnemonic); err != nil {
-			log.Error().Err(err).Msg("failed to create KYC sponsorship")
-			InternalServerError(c)
-			return
-		}
-
-		// Set sponsored to true after successful sponsorship creation
-		user.Sponsored = true
-		if err := h.db.UpdateUserByID(&user); err != nil {
-			log.Error().Err(err).Msg("failed to update user sponsorship status")
-			InternalServerError(c)
-			return
-		}
-	}
-
-	Success(c, http.StatusCreated, "Verification code sent successfully", RegisterResponse{
-		Email:   request.Email,
-		Timeout: fmt.Sprintf("%d seconds", h.config.MailSender.Timeout),
+	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow id.", RegisterUserResponse{
+		WorkflowID: wf.UUID,
+		Email:      request.Email,
 	})
 }
 
@@ -306,11 +236,10 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body VerifyCodeInput true "Verify Code Input"
-// @Success 201 {object} internal.TokenPair
+// @Success 202 {object} RegisterUserResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format or verification failed"
 // @Failure 500 {object} APIResponse
 // @Router /user/register/verify [post]
-// VerifyRegisterCode verifies email when signing up
 func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	var request VerifyCodeInput
 
@@ -343,29 +272,25 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	user.Verified = true
-	if err := h.db.UpdateUserByID(&user); err != nil {
-		log.Error().Err(err).Send()
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
 		return
 	}
 
-	subject, body := h.mailService.WelcomeMailContent(user.Username, h.config.Server.Host)
-	err = h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
+	// Start the user-verification workflow
+	wf.State = ewf.State{
+		"email": user.Email,
+		"name":  user.Username,
 	}
 
-	// create token pairs
-	tokenPair, err := h.tokenManager.CreateTokenPair(user.ID, user.Username, user.Admin)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to generate token pair")
-		InternalServerError(c)
-		return
-	}
-	Success(c, http.StatusCreated, "token pair generated", tokenPair)
+	h.ewfEngine.RunAsync(context.Background(), wf)
+
+	Success(c, http.StatusCreated, "verification in progress", RegisterUserResponse{
+		WorkflowID: wf.UUID,
+		Email:      user.Email,
+	})
 }
 
 // @Summary Login user (KYC verification checked)
@@ -646,12 +571,11 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body ChargeBalanceInput true "Charge Balance Input"
-// @Success 201 {object} ChargeBalanceResponse "Balance is charged successfully"
+// @Success 202 {object} ChargeBalanceResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format or amount"
 // @Failure 404 {object} APIResponse "User is not found"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/balance/charge [post]
-// ChargeBalance charges the user's balance
 func (h *Handler) ChargeBalance(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -690,66 +614,26 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	intent, err := internal.CreatePaymentIntent(user.StripeCustomerID, paymentMethod.ID, h.config.Currency, request.Amount)
-	if err != nil {
-		log.Error().Err(err).Msg("error creating payment intent")
-		InternalServerError(c)
-		return
-	}
-
-	requestAmountUSDMillicent := internal.FromUSDToUSDMillicent(request.Amount)
-	requestedTFTs, err := internal.FromUSDMillicentToTFT(h.substrateClient, requestAmountUSDMillicent)
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowChargeBalance)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 
-	systemBalanceUSDMillicent, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Msg("error checking system account balance")
-		InternalServerError(c)
-		return
+	wf.State = ewf.State{
+		"user_id":            userID,
+		"stripe_customer_id": user.StripeCustomerID,
+		"payment_method_id":  paymentMethod.ID,
+		"amount":             internal.FromUSDToUSDMillicent(request.Amount),
+		"mnemonic":           user.Mnemonic,
 	}
 
-	responseMsg := "Balance is charged successfully"
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	if systemBalanceUSDMillicent < requestAmountUSDMillicent {
-		if err = h.db.CreatePendingRecord(&models.PendingRecord{
-			UserID:    userID,
-			TFTAmount: requestedTFTs,
-		}); err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-		responseMsg = "Balance is pending to be charged, will be charged soon"
-
-	} else {
-		err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
-		if err != nil {
-			log.Error().Err(err).Send()
-			// TODO: should we handle it as pending too?
-			if err = internal.CancelPaymentIntent(intent.ID); err != nil {
-				log.Error().Err(err).Msg("error canceling payment intent after transfer failure")
-			}
-			InternalServerError(c)
-			return
-		}
-	}
-
-	user.CreditCardBalance += requestAmountUSDMillicent
-
-	err = h.db.UpdateUserByID(&user)
-	if err != nil {
-		log.Error().Err(err).Msg("error updating user data")
-		InternalServerError(c)
-		return
-	}
-
-	Success(c, http.StatusCreated, responseMsg, ChargeBalanceResponse{
-		PaymentIntentID: intent.ID,
-		NewBalance:      internal.FromUSDMilliCentToUSD(user.CreditCardBalance),
+	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", ChargeBalanceResponse{
+		WorkflowID: wf.UUID,
+		Email:      user.Email,
 	})
 }
 
@@ -758,7 +642,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 // @Tags users
 // @ID get-user
 // @Produce json
-// @Success 200 {object} models.User "User is retrieved successfully"
+// @Success 200 {object} GetUserResponse "User is retrieved successfully"
 // @Failure 404 {object} APIResponse "User is not found"
 // @Failure 500 {object} APIResponse
 // @Router /user [get]
@@ -773,8 +657,32 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 		return
 	}
 
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var tftPendingAmount uint64
+	for _, record := range pendingRecords {
+		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
+	}
+
+	usdMillicentPendingAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, tftPendingAmount)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert tft to usd millicent")
+		InternalServerError(c)
+		return
+	}
+
+	userResponse := GetUserResponse{
+		User:              user,
+		PendingBalanceUSD: internal.FromUSDMilliCentToUSD(usdMillicentPendingAmount),
+	}
+
 	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
-		"user": user,
+		"user": userResponse,
 	})
 }
 
@@ -802,11 +710,32 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
+		return
+	}
+
+	pendingRecords, err := h.db.ListUserPendingRecords(userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list pending records")
+		InternalServerError(c)
+		return
+	}
+
+	var tftPendingAmount uint64
+	for _, record := range pendingRecords {
+		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
+	}
+
+	usdPendingAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, tftPendingAmount)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert tft to usd millicent")
+		InternalServerError(c)
+		return
 	}
 
 	Success(c, http.StatusOK, "Balance is fetched", UserBalanceResponse{
-		BalanceUSD: internal.FromUSDMilliCentToUSD(usdMillicentBalance),
-		DebtUSD:    internal.FromUSDMilliCentToUSD(user.Debt),
+		BalanceUSD:        internal.FromUSDMilliCentToUSD(usdMillicentBalance),
+		DebtUSD:           internal.FromUSDMilliCentToUSD(user.Debt),
+		PendingBalanceUSD: internal.FromUSDMilliCentToUSD(usdPendingAmount),
 	})
 }
 
@@ -816,12 +745,11 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 // @ID redeem-voucher
 // @Param voucher_code path string true "Voucher Code"
 // @Produce json
-// @Success 202 {object} APIResponse "Voucher redeemed successfully"
-// @Failure 400 {object} APIResponse "Invalid voucher code or already redeemed"
+// @Success 202 {object} RedeemVoucherResponse "workflow_id: string, voucher_code: string, amount: float64, email: string"
+// @Failure 400 {object} APIResponse "Invalid voucher code, already redeemed, or expired"
 // @Failure 404 {object} APIResponse "User or voucher are not found"
-// @Failure 500 {object} APIResponse
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/redeem/{voucher_code} [put]
-// RedeemVoucherHandler redeems a voucher for the user
 func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	voucherCodeParam := c.Param("voucher_code")
 	if voucherCodeParam == "" {
@@ -855,7 +783,6 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	if voucher.ExpiresAt.Before(time.Now()) {
 		Error(c, http.StatusBadRequest, "Voucher is already expired", "")
 		return
-
 	}
 
 	err = h.db.RedeemVoucher(voucher.Code)
@@ -865,52 +792,25 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	voucherValueUSDMillicent := internal.FromUSDToUSDMillicent(voucher.Value)
-
-	user.CreditedBalance += voucherValueUSDMillicent
-	err = h.db.UpdateUserByID(&user)
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
-
-	requestedTFTs, err := internal.FromUSDMillicentToTFT(h.substrateClient, voucherValueUSDMillicent)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
+	wf.State = map[string]interface{}{
+		"user_id":  user.ID,
+		"amount":   internal.FromUSDToUSDMillicent(voucher.Value),
+		"mnemonic": user.Mnemonic,
 	}
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	systemUSDMillicentBalance, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
-	responseMsg := "Voucher is redeemed successfully"
-
-	if systemUSDMillicentBalance < voucherValueUSDMillicent {
-		if err = h.db.CreatePendingRecord(&models.PendingRecord{
-			UserID:    userID,
-			TFTAmount: requestedTFTs,
-		}); err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-		responseMsg = "Balance is pending to be charged, will be charged soon"
-	} else {
-		err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
-		if err != nil {
-			log.Error().Err(err).Send()
-			InternalServerError(c)
-			return
-		}
-	}
-
-	Success(c, http.StatusOK, responseMsg, nil)
+	Success(c, http.StatusOK, "Voucher is redeemed successfully. Money transfer in progress.", RedeemVoucherResponse{
+		WorkflowID:  wf.UUID,
+		VoucherCode: voucher.Code,
+		Amount:      voucher.Value,
+		Email:       user.Email,
+	})
 }
 
 // @Summary List user SSH keys
@@ -983,6 +883,11 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	}
 
 	if err := h.db.CreateSSHKey(&sshKey); err != nil {
+		var sqliteErr sqlite3.Error
+		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+			Error(c, http.StatusBadRequest, "Duplicate SSH key", "SSH key name or public key already exists for this user.")
+			return
+		}
 		log.Error().Err(err).Msg("failed to create SSH key")
 		InternalServerError(c)
 		return
@@ -1038,6 +943,34 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 	}
 
 	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
+}
+
+// @Summary Get workflow status
+// @Description Returns the status of a workflow by its ID.
+// @Tags workflow
+// @ID get-workflow-status
+// @Accept json
+// @Produce json
+// @Param workflow_id path string true "Workflow ID"
+// @Success 200 {object} string "Workflow status returned successfully"
+// @Failure 400 {object} APIResponse "Invalid request or missing workflow ID"
+// @Failure 404 {object} APIResponse "Workflow not found"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @Router /workflow/{workflow_id} [get]
+func (h *Handler) GetWorkflowStatus(c *gin.Context) {
+
+	workflowID := c.Param("workflow_id")
+	if workflowID == "" {
+		Error(c, http.StatusBadRequest, "Invalid request", "Workflow ID is required")
+		return
+	}
+
+	workflow, err := h.ewfEngine.Store().LoadWorkflowByUUID(c, workflowID)
+	if err != nil {
+		InternalServerError(c)
+		return
+	}
+	Success(c, http.StatusOK, "Status returned successfully", workflow.Status)
 }
 
 // @Summary List user pending records

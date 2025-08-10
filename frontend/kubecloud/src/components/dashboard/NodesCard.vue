@@ -10,7 +10,18 @@
           Manage your rented nodes and their resources.
         </p>
       </div>
-      <div class="header-actions">
+      <div class="header-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+        <v-btn
+          color="primary"
+          variant="outlined"
+          :disabled="loading"
+          prepend-icon="mdi-refresh"
+          @click="fetchRentedNodes"
+          class="refresh-btn"
+          style="min-width: 110px;"
+        >
+          Refresh
+        </v-btn>
         <v-btn
           color="primary"
           variant="elevated"
@@ -242,9 +253,8 @@ const handleUnreserve = async () => {
     await unreserveNode(selectedNode.value.rentContractId.toString())
     showUnreserveDialog.value = false
     selectedNode.value = null
-    notificationStore.success('Success', 'Node unreserved successfully.')
   } catch (err) {
-    notificationStore.error('Error', 'Failed to unreserve node. Please try again.')
+    console.error('Failed to unreserve node. Please try again.')
   } finally {
     unreservingNode.value = null
   }

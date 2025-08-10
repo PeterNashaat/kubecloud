@@ -3,13 +3,12 @@ package app
 import (
 	"fmt"
 	"kubecloud/internal"
-	"kubecloud/models"
+	"kubecloud/internal/activities"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -21,6 +20,20 @@ import (
 type ListNodesResponse struct {
 	Total int               `json:"total"`
 	Nodes []proxyTypes.Node `json:"nodes"`
+}
+
+// ReserveNodeResponse holds the response for reserve node response
+type ReserveNodeResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	NodeID     uint32 `json:"node_id"`
+	Email      string `json:"email"`
+}
+
+// UnreserveNodeResponse holds the response for unreserve node response
+type UnreserveNodeResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	ContractID uint32 `json:"contract_id"`
+	Email      string `json:"email"`
 }
 
 // @Summary List nodes
@@ -80,8 +93,9 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param node_id path string true "Node ID"
-// @Success 200 {object} APIResponse
+// @Success 202 {object} ReserveNodeResponse
 // @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 404 {object} APIResponse "No nodes are available for rent."
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/{node_id} [post]
@@ -127,13 +141,6 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	}
 	node := nodes[0]
 
-	// Create identity from mnemonic
-	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
 	// validate user has enough balance for reserving node
 	usdMillicentBalance, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, user.Mnemonic)
 	if err != nil {
@@ -147,29 +154,25 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	contractID, err := h.substrateClient.CreateRentContract(identity, nodeID, nil)
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowReserveNode)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 
-	err = h.db.CreateUserNode(&models.UserNodes{
-		UserID:     userID,
-		ContractID: contractID,
+	wf.State = map[string]interface{}{
+		"user_id":  userID,
+		"mnemonic": user.Mnemonic,
+		"node_id":  nodeID,
+	}
+
+	h.ewfEngine.RunAsync(c, wf)
+
+	Success(c, http.StatusAccepted, "Node reservation in progress. You can check its status using the workflow id.", ReserveNodeResponse{
+		WorkflowID: wf.UUID,
 		NodeID:     nodeID,
-		CreatedAt:  time.Now(),
-	})
-
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
-	Success(c, http.StatusOK, "Node is rented successfully", gin.H{
-		"contract_id": contractID,
-		"node_id":     nodeID,
+		Email:      user.Email,
 	})
 
 }
@@ -203,7 +206,6 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 	}
 
 	twinID, err := h.substrateClient.GetTwinByPubKey(identity.PublicKey())
-	fmt.Println(twinID)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -238,8 +240,9 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param contract_id path string true "Contract ID"
-// @Success 200 {object} APIResponse
+// @Success 202 {object} UnreserveNodeResponse
 // @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 404 {object} APIResponse "User is not found"
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/unreserve/{contract_id} [delete]
@@ -260,13 +263,6 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 		return
 	}
 
-	identity, err := substrate.NewIdentityFromSr25519Phrase(user.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
 	contractID64, err := strconv.ParseUint(contractIDParam, 10, 32)
 	if err != nil {
 		log.Error().Msg("Invalid contract ID or type")
@@ -275,13 +271,26 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 	}
 	contractID := uint32(contractID64)
 
-	err = h.substrateClient.CancelContract(identity, uint64(contractID))
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUnreserveNode)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
-	Success(c, http.StatusAccepted, "Node unreserved successfully", nil)
+
+	wf.State = map[string]interface{}{
+		"user_id":     userID,
+		"mnemonic":    user.Mnemonic,
+		"contract_id": contractID,
+	}
+
+	h.ewfEngine.RunAsync(c, wf)
+
+	Success(c, http.StatusAccepted, "Node unreservation in progress. You can check its status using the workflow id.", UnreserveNodeResponse{
+		WorkflowID: wf.UUID,
+		ContractID: contractID,
+		Email:      user.Email,
+	})
 }
 
 func queryParamsToStruct(query url.Values, result interface{}) error {

@@ -30,8 +30,8 @@ export interface ChargeBalanceRequest {
 }
 
 export interface ChargeBalanceResponse {
-  payment_intent_id: string
-  new_balance: number
+  email: string
+  workflow_id: string
 }
 
 class StripeService {

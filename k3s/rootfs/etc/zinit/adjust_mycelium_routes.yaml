@@ -1,4 +1,0 @@
-exec: /scripts/fix_mycelium_route.sh
-oneshot: true
-after:
-  - network_setup
