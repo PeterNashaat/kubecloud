@@ -2,12 +2,13 @@ package models
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/xmonader/ewf"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"os"
-	"testing"
 )
 
 // TestSQLiteStore_SaveAndLoad tests saving and loading a workflow in SQLiteStore.
@@ -16,24 +17,30 @@ func TestGormStore_SaveAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	dbFile := tmpFile.Name()
 	require.NoError(t, tmpFile.Close())
-	defer func() {
+	
+	t.Cleanup(func() {
 		err := os.Remove(dbFile)
 		require.NoError(t, err)
-	}()
+	})
 
 	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	require.NoError(t, err)
 
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	defer sqlDB.Close()
+	
+	t.Cleanup(func() {
+		sqlDB.Close()
+	})
 
 	store := NewGormStore(db)
 	require.NoError(t, err)
-	defer func() {
+	
+	t.Cleanup(func() {
 		err := store.Close()
 		require.NoError(t, err)
-	}()
+	})
+	
 	err = store.Setup()
 	require.NoError(t, err)
 	wfName := "test-gorm-workflow"
@@ -65,27 +72,33 @@ func TestGormStore_LoadNotFound(t *testing.T) {
 	require.NoError(t, err)
 	dbFile := tmpFile.Name()
 	require.NoError(t, tmpFile.Close())
-	defer func() {
+	
+	t.Cleanup(func() {
 		err := os.Remove(dbFile)
 		require.NoError(t, err)
-	}()
+	})
 
 	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	require.NoError(t, err)
 
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	defer sqlDB.Close()
+	
+	t.Cleanup(func() {
+		sqlDB.Close()
+	})
 
 	store := NewGormStore(db)
 	if err != nil {
 		t.Fatalf("NewGormStore() error = %v", err)
 	}
-	defer func() {
+	
+	t.Cleanup(func() {
 		if err := store.Close(); err != nil {
 			t.Fatalf("failed to close store: %v", err)
 		}
-	}()
+	})
+	
 	// Test LoadWorkflowByUUID with non-existent UUID
 	_, err = store.LoadWorkflowByUUID(context.Background(), "non-existent-id")
 	require.Error(t, err, "Expected an error when loading a non-existent workflow by UUID")
