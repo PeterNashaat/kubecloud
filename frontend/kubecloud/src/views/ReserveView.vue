@@ -74,20 +74,33 @@
           <!-- Nodes Column -->
           <v-col cols="12" md="9">
             <v-card class="reservation-card">
-              <div class="nodes-header">
-                <h2 class="card-title kubecloud-gradient kubecloud-glow-blue">
-                  Available Nodes
-                </h2>
-                <div class="nodes-count">
-                  {{ filteredNodes.length }} of {{ total }} nodes
+              <div class="nodes-header" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                <div style="display: flex; align-items: center; gap: 1.2rem;">
+                  <h2 class="card-title kubecloud-gradient kubecloud-glow-blue">
+                    Available Nodes
+                  </h2>
+                  <div class="nodes-count">
+                    {{ filteredNodes.length }} of {{ total }} nodes
+                  </div>
                 </div>
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  :disabled="loading"
+                  @click="fetchNodes"
+                  prepend-icon="mdi-refresh"
+                  class="refresh-btn"
+                  style="min-width: 120px;"
+                >
+                  Refresh
+                </v-btn>
               </div>
               <p class="card-description">
                 Browse through our available nodes and select the one that best fits your requirements.
               </p>
-              
+
               <v-divider class="my-6" color="primary" />
-              
+
               <div v-if="loading" class="loading-section">
                 <v-skeleton-loader type="card, card, card, card" :loading="loading" class="w-100" />
                 <p class="loading-text">Loading available nodes...</p>
