@@ -85,9 +85,9 @@
               <p class="card-description">
                 Browse through our available nodes and select the one that best fits your requirements.
               </p>
-              
+
               <v-divider class="my-6" color="primary" />
-              
+
               <div v-if="loading" class="loading-section">
                 <v-skeleton-loader type="card, card, card, card" :loading="loading" class="w-100" />
                 <p class="loading-text">Loading available nodes...</p>
@@ -151,12 +151,10 @@ import { useNormalizedNodes } from '../composables/useNormalizedNodes'
 import { useNodeFilters } from '../composables/useNodeFilters'
 import NodeFilterPanel from '../components/NodeFilterPanel.vue'
 import NodeCard from '../components/NodeCard.vue'
-import { useNotificationStore } from '../stores/notifications'
 
 const router = useRouter()
 const userStore = useUserStore()
 const isAuthenticated = computed(() => userStore.isLoggedIn)
-const notificationStore = useNotificationStore()
 
 const { nodes, total, loading, fetchNodes } = useNodes()
 const normalizedNodes = useNormalizedNodes(() => nodes.value)

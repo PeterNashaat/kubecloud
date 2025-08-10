@@ -50,14 +50,19 @@ import { defineProps, defineEmits, computed } from 'vue';
 const props = defineProps<{ node: NormalizedNode; loading?: boolean; disabled?: boolean }>();
 const emit = defineEmits(['reserve', 'signin']);
 
-const monthlyPrice = computed(() => props.node.price_usd ?? 'N/A');
+const baseNodePrice = computed(() => {
+  const base = Number(props.node.price_usd ?? 0);
+  const extra = props.node.gpu ? Number(props.node.extraFee ?? 0) : 0;
+  const price = base + extra;
+  return isNaN(price) ? null : price;
+});
+
+const monthlyPrice = computed(() => {
+  return baseNodePrice.value == null ? 'N/A' : baseNodePrice.value.toFixed(2);
+});
 
 const hourlyPrice = computed(() => {
-  const price = props.node.price_usd;
-  if (price && !isNaN(Number(price))) {
-    return (Number(price) / 720).toFixed(2);
-  }
-  return 'N/A';
+  return baseNodePrice.value == null ? 'N/A' : (baseNodePrice.value / 720).toFixed(2);
 });
 
 const resources = [

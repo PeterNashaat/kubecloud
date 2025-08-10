@@ -88,7 +88,7 @@
     <div v-else class="nodes-section">
       <v-row class="nodes-grid">
         <v-col
-          v-for="node in rentedNodes"
+          v-for="(node, idx) in normalizedNodes"
           :key="node.id"
           cols="12"
           sm="6"
@@ -96,11 +96,11 @@
           lg="4"
         >
           <NodeCard
-            :node="normalizeNode(node)"
+            :node="node"
             :isAuthenticated="true"
-            :loading="unreservingNode === node.rentContractId?.toString()"
+            :loading="unreservingNode === rentedNodes[idx]?.rentContractId?.toString()"
             :disabled="false"
-            @reserve="confirmUnreserve(node)"
+            @reserve="confirmUnreserve(rentedNodes[idx])"
           />
         </v-col>
       </v-row>
@@ -137,32 +137,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
 import { useNotificationStore } from '../../stores/notifications'
 import NodeCard from '../NodeCard.vue'
-
-function normalizeNode(node: RentedNode) {
-  return {
-    nodeId: node.nodeId,
-    price_usd: node.price_usd ?? 'N/A',
-    cpu: Math.round(node.total_resources?.cru ?? 0),
-    ram: Math.round(node.total_resources?.mru ? node.total_resources.mru / (1024*1024*1024) : 0),
-    storage: Math.round(node.total_resources?.sru ? node.total_resources.sru / (1024*1024*1024) : 0),
-    country: node.country,
-    gpu: !!node.num_gpu,
-    locationString: node.country || '',
-    city: node.city || '',
-    status: node.status || '',
-    healthy: node.healthy ?? true,
-    id: node.id,
-    rentable: false,
-    rented: true,
-    dedicated: false,
-    certificationType: '',
-  }
-}
 
 const router = useRouter()
 const {
@@ -236,6 +215,28 @@ const statCards = [
     label: 'Monthly Cost'
   }
 ]
+
+const normalizedNodes = computed(() =>
+  rentedNodes.value.map(node => ({
+    nodeId: node.nodeId,
+    price_usd: node.price_usd ?? 'N/A',
+    cpu: Math.round(node.total_resources?.cru ?? 0),
+    ram: Math.round(node.total_resources?.mru ? node.total_resources.mru / (1024*1024*1024) : 0),
+    storage: Math.round(node.total_resources?.sru ? node.total_resources.sru / (1024*1024*1024) : 0),
+    country: node.country,
+    gpu: !!node.num_gpu,
+    id: node.id,
+    extraFee: node.extraFee || 0,
+    locationString: node.country || '',
+    city: node.city || '',
+    status: node.status || '',
+    healthy: node.healthy ?? true,
+    rentable: false,
+    rented: true,
+    dedicated: false,
+    certificationType: '',
+  }))
+);
 </script>
 <style scoped>
 .nodes-card {
