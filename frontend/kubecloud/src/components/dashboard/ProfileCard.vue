@@ -99,10 +99,8 @@ import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '../../stores/user'
 import { authService } from '../../utils/authService'
-import { useNotificationStore } from '../../stores/notifications'
 
 const { user } = storeToRefs(useUserStore())
-const notificationStore = useNotificationStore()
 const userStore = useUserStore()
 
 // Change password form data
@@ -277,10 +275,6 @@ async function changePassword() {
   margin-bottom: 0.75rem;
 }
 
-.password-field.compact {
-  margin-bottom: 0.75rem;
-}
-
 .password-field.compact :deep(.v-field) {
   background: rgba(96, 165, 250, 0.08) !important;
   border: 1px solid rgba(96, 165, 250, 0.12) !important;
@@ -312,7 +306,6 @@ async function changePassword() {
 }
 
 .action-btn.compact {
-  margin-top: 0.75rem;
   height: 40px;
   font-size: 0.9rem;
 }
