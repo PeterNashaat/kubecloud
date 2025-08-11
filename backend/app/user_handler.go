@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/activities"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mattn/go-sqlite3"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -77,46 +79,46 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 
 // RegisterInput struct for data needed when user register
 type RegisterInput struct {
-	Name            string `json:"name" binding:"required" validate:"min=3,max=64"`
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=8,max=64"`
-	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
+	Name            string `json:"name" validate:"required,min=3,max=64"`
+	Email           string `json:"email" validate:"required,email"`
+	Password        string `json:"password" validate:"required,min=8,max=64"`
+	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
 }
 
 // LoginInput struct for login handler
 type LoginInput struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=3,max=64"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=3,max=64"`
 }
 
 // RefreshTokenInput struct when user refresh token
 type RefreshTokenInput struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 // EmailInput struct for user when forgetting password
 type EmailInput struct {
-	Email string `json:"email" binding:"required,email"`
+	Email string `json:"email" validate:"required,email"`
 }
 
 // VerifyCodeInput struct takes verification code from user
 type VerifyCodeInput struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  int    `json:"code" binding:"required,numeric"`
+	Email string `json:"email" validate:"required,email"`
+	Code  int    `json:"code" validate:"required"`
 }
 
 // ChangePasswordInput struct for user to change password
 type ChangePasswordInput struct {
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=8,max=64"`
-	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
+	Email           string `json:"email" validate:"required,email"`
+	Password        string `json:"password" validate:"required,min=8,max=64"`
+	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
 }
 
 // ChargeBalanceInput struct holds required data to charge users' balance
 type ChargeBalanceInput struct {
-	CardType     string `json:"card_type" binding:"required"`
-	PaymentToken string `json:"payment_method_id" binding:"required"`
-	Amount       uint64 `json:"amount" binding:"required"`
+	CardType     string  `json:"card_type" validate:"required"`
+	PaymentToken string  `json:"payment_method_id" validate:"required"`
+	Amount       float64 `json:"amount" validate:"required,gt=0"`
 }
 
 // RegisterResponse struct holds data returned when user registers
@@ -145,8 +147,8 @@ type UserBalanceResponse struct {
 
 // SSHKeyInput struct for adding SSH keys
 type SSHKeyInput struct {
-	Name      string `json:"name" binding:"required"`
-	PublicKey string `json:"public_key" binding:"required"`
+	Name      string `json:"name" validate:"required"`
+	PublicKey string `json:"public_key" validate:"required"`
 }
 
 // RegisterUserResponse holds the response for user registration
@@ -191,9 +193,8 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	// password and confirm password should match
-	if request.Password != request.ConfirmPassword {
-		Error(c, http.StatusBadRequest, "Validation Error", "password and confirm password don't match")
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -244,6 +245,11 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -313,6 +319,11 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	// get user by email
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
@@ -374,6 +385,11 @@ func (h *Handler) RefreshTokenHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	accessToken, err := h.tokenManager.AccessTokenFromRefresh(request.RefreshToken)
 	if err != nil {
 		log.Error().Err(err).Send()
@@ -406,6 +422,11 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		log.Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -470,6 +491,11 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	// get user by email
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
@@ -530,8 +556,8 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 		return
 	}
 
-	if request.Password != request.ConfirmPassword {
-		Error(c, http.StatusBadRequest, "password mismatch", "password and confirm password don't match")
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -584,8 +610,8 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	if request.Amount <= 0 {
-		Error(c, http.StatusBadRequest, "Amount must be greater than zero", "")
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -623,7 +649,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		"user_id":            userID,
 		"stripe_customer_id": user.StripeCustomerID,
 		"payment_method_id":  paymentMethod.ID,
-		"amount":             int(request.Amount),
+		"amount":             internal.FromUSDToUSDMillicent(request.Amount),
 		"mnemonic":           user.Mnemonic,
 	}
 
@@ -667,16 +693,16 @@ func (h *Handler) GetUserHandler(c *gin.Context) {
 		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
 	}
 
-	usdPendingAmount, err := internal.FromTFTtoUSD(h.substrateClient, tftPendingAmount)
+	usdMillicentPendingAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, tftPendingAmount)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to convert tft to usd")
+		log.Error().Err(err).Msg("failed to convert tft to usd millicent")
 		InternalServerError(c)
 		return
 	}
 
 	userResponse := GetUserResponse{
 		User:              user,
-		PendingBalanceUSD: usdPendingAmount,
+		PendingBalanceUSD: internal.FromUSDMilliCentToUSD(usdMillicentPendingAmount),
 	}
 
 	Success(c, http.StatusOK, "User is retrieved successfully", gin.H{
@@ -704,7 +730,7 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		return
 	}
 
-	usdBalance, err := internal.GetUserBalanceUSD(h.substrateClient, user.Mnemonic)
+	usdMillicentBalance, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, user.Mnemonic)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -723,17 +749,17 @@ func (h *Handler) GetUserBalance(c *gin.Context) {
 		tftPendingAmount += record.TFTAmount - record.TransferredTFTAmount
 	}
 
-	usdPendingAmount, err := internal.FromTFTtoUSD(h.substrateClient, tftPendingAmount)
+	usdPendingAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, tftPendingAmount)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to convert tft to usd")
+		log.Error().Err(err).Msg("failed to convert tft to usd millicent")
 		InternalServerError(c)
 		return
 	}
 
 	Success(c, http.StatusOK, "Balance is fetched", UserBalanceResponse{
-		BalanceUSD:        usdBalance,
-		DebtUSD:           user.Debt,
-		PendingBalanceUSD: usdPendingAmount,
+		BalanceUSD:        internal.FromUSDMilliCentToUSD(usdMillicentBalance),
+		DebtUSD:           internal.FromUSDMilliCentToUSD(user.Debt),
+		PendingBalanceUSD: internal.FromUSDMilliCentToUSD(usdPendingAmount),
 	})
 }
 
@@ -798,7 +824,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	}
 	wf.State = map[string]interface{}{
 		"user_id":  user.ID,
-		"amount":   voucher.Value,
+		"amount":   internal.FromUSDToUSDMillicent(voucher.Value),
 		"mnemonic": user.Mnemonic,
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
@@ -868,6 +894,11 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 		return
 	}
 
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
 	// Validate SSH key format
 	if err := internal.ValidateSSH(request.PublicKey); err != nil {
 		Error(c, http.StatusBadRequest, "Validation Error", "invalid SSH key format")
@@ -881,6 +912,11 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	}
 
 	if err := h.db.CreateSSHKey(&sshKey); err != nil {
+		var sqliteErr sqlite3.Error
+		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+			Error(c, http.StatusBadRequest, "Duplicate SSH key", "SSH key name or public key already exists for this user.")
+			return
+		}
 		log.Error().Err(err).Msg("failed to create SSH key")
 		InternalServerError(c)
 		return
@@ -989,14 +1025,14 @@ func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
 
 	var pendingRecordsResponse []PendingRecordsResponse
 	for _, record := range pendingRecords {
-		usdAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TFTAmount)
+		usdMillicentAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, record.TFTAmount)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to convert tft to usd amount")
 			InternalServerError(c)
 			return
 		}
 
-		usdTransferredAmount, err := internal.FromTFTtoUSD(h.substrateClient, record.TransferredTFTAmount)
+		usdMillicentTransferredAmount, err := internal.FromTFTtoUSDMillicent(h.substrateClient, record.TransferredTFTAmount)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to convert tft to usd transferred amount")
 			InternalServerError(c)
@@ -1005,8 +1041,8 @@ func (h *Handler) ListUserPendingRecordsHandler(c *gin.Context) {
 
 		pendingRecordsResponse = append(pendingRecordsResponse, PendingRecordsResponse{
 			PendingRecord:        record,
-			USDAmount:            usdAmount,
-			TransferredUSDAmount: usdTransferredAmount,
+			USDAmount:            internal.FromUSDMilliCentToUSD(usdMillicentAmount),
+			TransferredUSDAmount: internal.FromUSDMilliCentToUSD(usdMillicentTransferredAmount),
 		})
 	}
 

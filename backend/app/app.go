@@ -6,7 +6,7 @@ import (
 	"kubecloud/internal"
 	"kubecloud/internal/activities"
 	"kubecloud/middlewares"
-	"kubecloud/models/sqlite"
+	"kubecloud/models"
 	"net/http"
 	"os"
 	"strings"
@@ -34,7 +34,7 @@ type App struct {
 	httpServer    *http.Server
 	config        internal.Configuration
 	handlers      Handler
-	db            *sqlite.Sqlite
+	db            models.DB
 	redis         *internal.RedisClient
 	sseManager    *internal.SSEManager
 	workerManager *internal.WorkerManager
@@ -54,7 +54,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		time.Duration(config.JwtToken.RefreshExpiryHours)*time.Hour,
 	)
 
-	db, err := sqlite.NewSqliteStorage(config.Database.File)
+	db, err := models.NewSqliteDB(config.Database.File)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create user storage")
 		return nil, fmt.Errorf("failed to create user storage: %w", err)
@@ -98,17 +98,17 @@ func NewApp(config internal.Configuration) (*App, error) {
 	gridClient, err := deployer.NewTFPluginClient(
 		config.SystemAccount.Mnemonic,
 		deployer.WithNetwork(config.SystemAccount.Network),
+		deployer.WithGraphQlURL(config.GraphqlURL),
+		deployer.WithProxyURL(config.GridProxyURL),
+		deployer.WithSubstrateURL(config.TFChainURL),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
-	// create storage for workflows
-	ewfStore, err := ewf.NewSQLiteStore(config.Database.File)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to init EWF store")
-		return nil, fmt.Errorf("failed to init workflow store: %w", err)
-	}
+	// // create storage for workflows
+	ewfStore := models.NewGormStore(db.GetDB())
+
 	// initialize workflow ewfEngine
 	ewfEngine, err := ewf.NewEngine(ewfStore)
 	if err != nil {
@@ -294,6 +294,7 @@ func (app *App) StartBackgroundWorkers() {
 
 // Run starts the server
 func (app *App) Run() error {
+	internal.InitValidator()
 	app.StartBackgroundWorkers()
 	app.handlers.ewfEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{
@@ -344,7 +345,11 @@ func (app *App) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	// app.gridClient.Close()
+	if app.handlers.substrateClient != nil {
+		app.handlers.substrateClient.Close()
+	}
+
+	app.gridClient.Close()
 
 	return nil
 }
