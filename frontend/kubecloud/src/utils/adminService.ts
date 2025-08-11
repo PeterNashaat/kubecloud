@@ -51,6 +51,18 @@ export interface DeleteUserResponse {
   message: string
 }
 
+export interface SystemEmail {
+  title: string
+  message: string
+  priority: string
+}
+
+export interface SystemEmailResponse {
+  message: string
+  email_id: number
+}
+
+
 export interface Invoice {
   id: number
   user_id: number
@@ -148,6 +160,34 @@ export class AdminService {
     })
     return response.data.data.pending_records
   }
+
+  // Send a system email to all users (requires admin auth)
+  async sendSystemEmail(data: SystemEmail): Promise<SystemEmailResponse> {
+    const response = await api.post<SystemEmailResponse>('/v1/emails/system', data, {
+      requiresAuth: true,
+      showNotifications: true,
+      loadingMessage: 'Sending email...',
+      successMessage: 'Email sent to all users',
+      errorMessage: 'Failed to send email'
+    })
+    return response.data
+  }
+
+  // Send a system email with attachments to all users (requires admin auth)
+  async sendSystemEmailWithAttachments(formData: FormData): Promise<SystemEmailResponse> {
+    const response = await api.post<SystemEmailResponse>('/v1/emails/system/attachments', formData, {
+      requiresAuth: true,
+      showNotifications: true,
+      loadingMessage: 'Sending email with attachments...',
+      successMessage: 'Email sent to all users',
+      errorMessage: 'Failed to send email',
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  }
+
 }
 
 // Export singleton instance
