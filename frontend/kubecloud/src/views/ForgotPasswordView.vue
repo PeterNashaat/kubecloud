@@ -67,10 +67,8 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '@/utils/authService'
-import { useUserStore } from '../stores/user'
 
 const router = useRouter()
-const userStore = useUserStore()
 const step = ref(1)
 const email = ref('')
 const code = ref('')
@@ -110,10 +108,15 @@ const handleVerifyCode = async () => {
   try {
     // Verify the code and get tokens
     const tokens = await authService.verifyForgotPasswordCode({ email: email.value, code: Number(code.value) })
-    authService.storeTokens(tokens.access_token, tokens.refresh_token)
-    userStore.token = tokens.access_token
-    // Redirect to reset password page
-    router.replace({ path: '/reset-password', query: { email: email.value } })
+
+    // Pass tokens directly to reset password page (don't store in user store)
+    router.replace({
+      path: '/reset-password',
+      query: {
+        email: email.value,
+        reset_token: tokens.access_token
+      }
+    })
   } catch (err: any) {
     error.value = err?.message || 'Invalid code'
   } finally {

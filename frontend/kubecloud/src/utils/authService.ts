@@ -123,7 +123,7 @@ export class AuthService {
       )
       throw new Error('Failed to register user')
     }
-    
+
   }
 
   // Verify registration code
@@ -199,6 +199,19 @@ export class AuthService {
     return response.data.data
   }
 
+  // Change password with specific token (for password reset flow)
+  async changePasswordWithToken(data: ChangePasswordRequest, token: string): Promise<ChangePasswordResponse> {
+    const response = await api.put<ApiResponse<ChangePasswordResponse>>('/v1/user/change_password', data, {
+      requiresAuth: true,
+      customToken: token,
+      showNotifications: true,
+      loadingMessage: 'Updating password...',
+      successMessage: 'Password updated successfully!',
+      errorMessage: 'Failed to update password'
+    })
+    return response.data.data
+  }
+
   // Store tokens in localStorage
   storeTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem('token', accessToken)
@@ -226,4 +239,4 @@ export class AuthService {
 }
 
 // Export singleton instance
-export const authService = AuthService.getInstance() 
+export const authService = AuthService.getInstance()

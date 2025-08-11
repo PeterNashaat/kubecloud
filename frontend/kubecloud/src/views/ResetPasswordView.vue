@@ -65,15 +65,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { authService } from '@/utils/authService'
-import { useUserStore } from '../stores/user'
+
 import { validateField, VALIDATION_RULES } from '../utils/validation'
 
 const router = useRouter()
 const route = useRoute()
-const userStore = useUserStore()
 const password = ref('')
 const confirmPassword = ref('')
 const loading = ref(false)
@@ -140,8 +139,11 @@ const isFormValid = computed(() => {
 })
 
 const getEmail = () => {
-  // Use userStore.user.email if available, otherwise get from query param
-  return userStore.user?.email || (route.query.email as string) || ''
+  return route.query.email as string || ''
+}
+
+const getResetToken = () => {
+  return route.query.reset_token as string || ''
 }
 
 const handleResetPassword = async () => {
@@ -150,16 +152,16 @@ const handleResetPassword = async () => {
   error.value = ''
   loading.value = true
   try {
-    await authService.changePassword({
+    const resetToken = getResetToken()
+    if (!resetToken) {
+      throw new Error('Reset token is missing')
+    }
+
+    await authService.changePasswordWithToken({
       email: getEmail(),
       password: password.value,
       confirm_password: confirmPassword.value
-    })
-
-    // Clear tokens after password reset for security
-    authService.clearTokens()
-    userStore.token = null
-    userStore.user = null
+    }, resetToken)
 
     // Redirect to sign-in page
     router.replace('/sign-in')
@@ -169,6 +171,17 @@ const handleResetPassword = async () => {
     loading.value = false
   }
 }
+
+// Guard against direct access without proper reset flow
+onMounted(() => {
+  const hasEmail = !!getEmail()
+  const hasResetToken = !!getResetToken()
+
+  // If user doesn't have email or reset token, redirect to forgot password
+  if (!hasEmail || !hasResetToken) {
+    router.replace('/forgot-password')
+  }
+})
 
 
 </script>
