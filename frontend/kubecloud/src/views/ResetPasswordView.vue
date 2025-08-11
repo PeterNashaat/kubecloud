@@ -142,8 +142,8 @@ const getEmail = () => {
   return route.query.email as string || ''
 }
 
-const getResetToken = () => {
-  return route.query.reset_token as string || ''
+const isPasswordResetSession = () => {
+  return authService.isPasswordResetSessionValid()
 }
 
 const handleResetPassword = async () => {
@@ -152,19 +152,21 @@ const handleResetPassword = async () => {
   error.value = ''
   loading.value = true
   try {
-    const resetToken = getResetToken()
-    if (!resetToken) {
-      throw new Error('Reset token is missing')
+    if (!isPasswordResetSession()) {
+      throw new Error('Invalid password reset session')
     }
 
-    await authService.changePasswordWithToken({
+    await authService.changePassword({
       email: getEmail(),
       password: password.value,
       confirm_password: confirmPassword.value
-    }, resetToken)
+    }, true) // Use temporary token
+
+    // Clear all auth data including password reset session
+    authService.clearAllAuthData()
 
     // Redirect to sign-in page
-    router.replace('/sign-in')
+    router.push('/sign-in')
   } catch (err: any) {
     error.value = err?.message || 'Failed to reset password'
   } finally {
@@ -175,11 +177,11 @@ const handleResetPassword = async () => {
 // Guard against direct access without proper reset flow
 onMounted(() => {
   const hasEmail = !!getEmail()
-  const hasResetToken = !!getResetToken()
+  const hasValidSession = isPasswordResetSession()
 
-  // If user doesn't have email or reset token, redirect to forgot password
-  if (!hasEmail || !hasResetToken) {
-    router.replace('/forgot-password')
+  // If user doesn't have email or valid reset session, redirect to forgot password
+  if (!hasEmail || !hasValidSession) {
+    router.push('/forgot-password')
   }
 })
 

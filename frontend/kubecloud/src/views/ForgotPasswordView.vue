@@ -109,12 +109,17 @@ const handleVerifyCode = async () => {
     // Verify the code and get tokens
     const tokens = await authService.verifyForgotPasswordCode({ email: email.value, code: Number(code.value) })
 
-    // Pass tokens directly to reset password page (don't store in user store)
-    router.replace({
+    // Store tokens temporarily for password reset only (separate from main auth)
+    authService.storeTempTokens(tokens.access_token, tokens.refresh_token)
+
+    // Mark this as a password reset session
+    localStorage.setItem('password_reset_session', 'true')
+
+    // Redirect to reset password page with email
+    router.push({
       path: '/reset-password',
       query: {
-        email: email.value,
-        reset_token: tokens.access_token
+        email: email.value
       }
     })
   } catch (err: any) {
