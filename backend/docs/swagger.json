@@ -1852,7 +1852,6 @@
                     "type": "integer"
                 },
                 "cost": {
-                    "description": "in millicent",
                     "type": "number"
                 },
                 "id": {

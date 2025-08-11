@@ -1859,7 +1859,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "cost": {
-                    "description": "in millicent",
                     "type": "number"
                 },
                 "id": {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"time"
 
@@ -140,7 +141,7 @@ func FromTFTtoUSDMillicent(substrateClient *substrate.Substrate, amount uint64) 
 		return 0, err
 	}
 
-	usdMillicentBalance := uint64((float64(amount) / 1e7) * float64(price))
+	usdMillicentBalance := uint64(math.Round((float64(amount) / 1e7) * float64(price)))
 	return usdMillicentBalance, nil
 }
 

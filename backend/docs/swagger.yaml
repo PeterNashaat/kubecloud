@@ -298,7 +298,6 @@ definitions:
       contract_id:
         type: integer
       cost:
-        description: in millicent
         type: number
       id:
         type: integer
