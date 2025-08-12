@@ -21,8 +21,8 @@ type gormWorkflowRecord struct {
 }
 
 type gormTemplateRecord struct {
-    Name string `gorm:"primaryKey;column:name"`
-    Data []byte `gorm:"column:data;not null"`
+	Name string `gorm:"primaryKey;column:name"`
+	Data []byte `gorm:"column:data;not null"`
 }
 
 type serializableTemplate struct {
