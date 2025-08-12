@@ -116,11 +116,17 @@ func nodeFromDeployment(
 	vm := depl.Vms[0]
 	var node Node
 
+	diskSizeMb := uint64(0)
+	if len(depl.Disks) > 0 {
+		diskSizeMb = depl.Disks[0].SizeGB * 1024
+	}
+
 	node.Name = vm.Name
 	node.NodeID = vm.NodeID
 	node.CPU = vm.CPU
 	node.Memory = vm.MemoryMB
 	node.RootSize = vm.RootfsSizeMB
+	node.DiskSize = diskSizeMb
 	node.EnvVars = vm.EnvVars
 	node.Flist = vm.Flist
 	node.Entrypoint = vm.Entrypoint
