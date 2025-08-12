@@ -649,7 +649,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		"user_id":            userID,
 		"stripe_customer_id": user.StripeCustomerID,
 		"payment_method_id":  paymentMethod.ID,
-		"amount":             internal.FromUSDToUSDMillicent(request.Amount),
+		"amount":             int64(internal.FromUSDToUSDMillicent(request.Amount)),
 		"mnemonic":           user.Mnemonic,
 	}
 
@@ -824,7 +824,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	}
 	wf.State = map[string]interface{}{
 		"user_id":  user.ID,
-		"amount":   internal.FromUSDToUSDMillicent(voucher.Value),
+		"amount":   int64(internal.FromUSDToUSDMillicent(voucher.Value)),
 		"mnemonic": user.Mnemonic,
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
