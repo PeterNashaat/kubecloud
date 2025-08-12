@@ -16,6 +16,9 @@
           class="auth-field"
           :error-messages="errors.email"
           required
+          @blur="validateEmail"
+          placeholder="Enter your email address"
+          :disabled="loading || resending"
         />
         <v-text-field
           v-model="form.code"
@@ -26,6 +29,10 @@
           class="auth-field"
           :error-messages="errors.code"
           required
+          @blur="validateCode"
+          placeholder="Enter 4-6 digit code"
+          maxlength="6"
+          :disabled="loading"
         />
         <v-btn
           type="submit"
@@ -52,6 +59,7 @@
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '../utils/authService'
+import { validateField, VALIDATION_RULES, validateVerificationCode } from '../utils/validation'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,48 +81,68 @@ const clearErrors = () => {
   errors.code = ''
 }
 
+const validateEmail = () => {
+  const validation = validateField({
+    value: form.email,
+    rules: VALIDATION_RULES.EMAIL,
+    fieldName: 'Email'
+  })
+  errors.email = validation.isValid ? '' : validation.errors[0]
+  return validation.isValid
+}
+
+const validateCode = () => {
+  const validation = validateVerificationCode(form.code)
+  errors.code = validation.error
+  return validation.isValid
+}
+
 const handleVerify = async () => {
   clearErrors()
-  if (!form.email) {
-    errors.email = 'Email is required'
+
+  const isEmailValid = validateEmail()
+  const isCodeValid = validateCode()
+
+  if (!isEmailValid || !isCodeValid) {
     return
   }
-  if (!form.code) {
-    errors.code = 'Verification code is required'
-    return
-  }
+
   try {
     loading.value = true
-    await authService.verifyCode({ email: form.email, code: Number(form.code) })
+    await authService.verifyCode({
+      email: form.email.trim(),
+      code: Number(form.code.trim())
+    })
     loading.value = false
     router.push('/sign-in')
   } catch (error) {
     loading.value = false
+    errors.code = 'Invalid verification code. Please try again.'
     console.error(error)
   }
 }
 
 const resendCode = async () => {
-  resending.value = true
-  if (!form.email) {
-    errors.email = 'Email is required to resend code'
+  if (!validateEmail()) {
     return
   }
+
+  resending.value = true
   try {
     await authService.register({
       name: 'User',
-      email: form.email,
+      email: form.email.trim(),
       password: 'temporary',
       confirm_password: 'temporary'
     })
+    errors.code = ''
   } catch (error) {
     console.error(error)
+    errors.email = 'Failed to resend verification code. Please try again.'
   } finally {
     resending.value = false
   }
 }
-
-
 </script>
 
 <style scoped>

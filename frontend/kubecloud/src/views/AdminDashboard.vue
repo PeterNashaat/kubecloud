@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent, type Ref } from 'vue'
-import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest, type Invoice } from '@/utils/adminService'
-import AdminUsersTable from '@/components/AdminUsersTable.vue'
-import AdminStatsCards from '@/components/AdminStatsCards.vue'
-import AdminManualCredit from '@/components/AdminManualCredit.vue'
-import AdminVouchersSection from '@/components/AdminVouchersTable.vue'
-import AdminClustersSection from '@/components/AdminClustersSection.vue'
-import AdminSystemSection from '@/components/AdminSystemCard.vue'
-import AdminInvoicesTable from '@/components/AdminInvoicesTable.vue'
-import AdminPendingRecordsCard from '@/components/dashboard/AdminPendingRecordsCard.vue'
-// Use defineAsyncComponent to avoid TypeScript issues
+import { adminService, type User, type Voucher, type GenerateVouchersRequest, type Invoice } from '../utils/adminService'
+import { validateCreditForm } from '../utils/validation'
+import AdminUsersTable from '../components/AdminUsersTable.vue'
+import AdminStatsCards from '../components/AdminStatsCards.vue'
+import AdminManualCredit from '../components/AdminManualCredit.vue'
+import AdminVouchersSection from '../components/AdminVouchersTable.vue'
+import AdminClustersSection from '../components/AdminClustersSection.vue'
+import AdminSystemSection from '../components/AdminSystemCard.vue'
+import AdminInvoicesTable from '../components/AdminInvoicesTable.vue'
+import AdminPendingRecordsCard from '../components/dashboard/AdminPendingRecordsCard.vue'
+
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
 
 const selected = ref('overview')
@@ -39,15 +40,15 @@ const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSiz
 
 function deleteUser(userId: number) {
     adminService.deleteUser(userId)
-    // Refresh users list
+
     loadUsers()
 }
 
 async function loadUsers() {
-    // Map ID to id for compatibility if backend returns ID
+
     const rawUsers = await adminService.listUsers()
     users.value = rawUsers.map(u => ({ ...u, id: u.id ?? (u as any).ID }))
-    // Update admin stats
+
     adminStats.value[0].value = users.value.length
 }
 
@@ -62,11 +63,12 @@ const voucherExpiry = ref(30)
 const voucherResult = ref('')
 const vouchers = ref<Voucher[]>([])
 
-// Manual credit form state
-const creditUserObj = ref<User | null>(null)
+
 const creditAmount = ref(0)
 const creditReason = ref('')
 const creditResult = ref('')
+const creditValidationErrors = ref({ amount: '', memo: '' })
+const isCreditSubmitting = ref(false)
 
 const creditDialog = ref(false)
 const creditUserDialogObj = ref<User | null>(null)
@@ -75,43 +77,26 @@ function handleSidebarSelect(newSelected: string) {
   selected.value = newSelected
 }
 
-// Generate vouchers using real API
+
 async function generateVouchers() {
     const data: GenerateVouchersRequest = {
       count: voucherCount.value,
       value: voucherValue.value,
       expire_after_days: voucherExpiry.value
     }
-    
+
     const response = await adminService.generateVouchers(data)
     voucherResult.value = response.message
-    // Refresh vouchers list
+
     await loadVouchers()
 }
 
-// Load vouchers using real API
+
 async function loadVouchers() {
     vouchers.value = await adminService.listVouchers()
 }
 
-// Apply manual credit using real API
-async function applyManualCredit() {
-    if (!creditUserObj.value) return
-    
-    const data: CreditUserRequest = {
-      amount: creditAmount.value,
-      memo: creditReason.value
-    }
-    
-    const response = await adminService.creditUser(creditUserObj.value.id, data)
-    creditResult.value = response.message
-    // Reset form
-    creditUserObj.value = null
-    creditAmount.value = 0
-    creditReason.value = ''
-    // Refresh users list to get updated balances
-    await loadUsers()
-}
+
 
 function openCreditDialog(user: User) {
   creditUserDialogObj.value = user
@@ -119,41 +104,65 @@ function openCreditDialog(user: User) {
   creditAmount.value = 0
   creditReason.value = ''
   creditResult.value = ''
+  creditValidationErrors.value = { amount: '', memo: '' }
+  isCreditSubmitting.value = false
 }
 
 function closeCreditDialog() {
   creditDialog.value = false
   creditUserDialogObj.value = null
+  creditValidationErrors.value = { amount: '', memo: '' }
+  isCreditSubmitting.value = false
 }
 
 async function applyManualCreditDialog() {
   if (!creditUserDialogObj.value) return
+
+  creditResult.value = ''
+  const validation = validateCreditForm(creditAmount.value, creditReason.value)
+
+  if (!validation.isValid) {
+    creditValidationErrors.value = validation.errors
+    return
+  }
+
+  try {
+    isCreditSubmitting.value = true
+    creditValidationErrors.value = { amount: '', memo: '' }
+
     const data = {
       amount: creditAmount.value,
-      memo: creditReason.value
+      memo: creditReason.value.trim()
     }
-    // Use user.id as path param
+
+
     const response = await adminService.creditUser(creditUserDialogObj.value.id, data)
     creditResult.value = response.message
+
+
     creditAmount.value = 0
     creditReason.value = ''
-    await loadUsers()
-    closeCreditDialog()
-}
 
-const tabs = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'users', label: 'Users' },
-  { key: 'clusters', label: 'Clusters' },
-  { key: 'system', label: 'System' },
-  { key: 'vouchers', label: 'Vouchers' },
-  { key: 'invoices', label: 'Invoices' },
-]
+
+    await loadUsers()
+
+
+    setTimeout(() => {
+      closeCreditDialog()
+    }, 2000)
+
+  } catch (error) {
+    console.error('Failed to credit user:', error)
+    creditResult.value = 'Failed to credit user. Please try again.'
+  } finally {
+    isCreditSubmitting.value = false
+  }
+}
 
 const invoices: Ref<Invoice[]> = ref([])
 
-onMounted(async () => {  
-  // Load initial data
+onMounted(async () => {
+
   await loadUsers()
   await loadVouchers()
   await loadInvoices()
@@ -201,10 +210,24 @@ async function loadInvoices() {
           />
           <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
           <AdminPendingRecordsCard v-else-if="selected === 'pending-records'" />
-          <v-dialog v-model="creditDialog" max-width="500" persistent>
+          <v-dialog v-model="creditDialog" max-width="600" persistent>
             <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">
               <v-card-title class="text-h6 font-weight-bold mb-2 text-center">Manual Credit</v-card-title>
-              <v-card-subtitle class="mb-4 text-center">Apply credits to user accounts</v-card-subtitle>
+              <v-card-subtitle class="mb-4 text-center">
+                Apply credits to user: {{ creditUserDialogObj?.email }}
+              </v-card-subtitle>
+
+              <!-- Show validation errors if any -->
+              <v-alert
+                v-if="creditValidationErrors.amount || creditValidationErrors.memo"
+                type="error"
+                variant="tonal"
+                class="mb-4"
+              >
+                <div v-if="creditValidationErrors.amount">{{ creditValidationErrors.amount }}</div>
+                <div v-if="creditValidationErrors.memo">{{ creditValidationErrors.memo }}</div>
+              </v-alert>
+
               <AdminManualCredit
                 v-if="creditDialog && creditUserDialogObj"
                 :creditAmount="creditAmount"
@@ -215,7 +238,14 @@ async function loadInvoices() {
                 @update:creditReason="creditReason = $event"
               />
               <v-card-actions class="justify-end mt-2">
-                <v-btn text color="grey-lighten-1" @click="closeCreditDialog">Cancel</v-btn>
+                <v-btn
+                  text
+                  color="grey-lighten-1"
+                  @click="closeCreditDialog"
+                  :disabled="isCreditSubmitting"
+                >
+                  Cancel
+                </v-btn>
               </v-card-actions>
             </v-card>
           </v-dialog>
@@ -394,13 +424,13 @@ async function loadInvoices() {
     flex-direction: column;
     gap: 1.5rem;
   }
-  
+
   .admin-sidebar {
     flex: none;
     width: 100%;
     position: static;
   }
-  
+
   .dashboard-card {
     padding: 1.5rem;
   }
@@ -411,9 +441,9 @@ async function loadInvoices() {
     padding: 0 0.5rem;
     margin-top: 2rem;
   }
-  
+
   .dashboard-card {
     padding: 1rem;
   }
 }
-</style> 
+</style>

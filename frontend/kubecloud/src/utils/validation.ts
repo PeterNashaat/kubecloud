@@ -122,8 +122,8 @@ export const validateForm = (fields: Record<string, FieldValidation>): Validatio
 export const VALIDATION_RULES = {
   REQUIRED: { required: true },
   EMAIL: { required: true, email: true },
-  PASSWORD: { 
-    required: true, 
+  PASSWORD: {
+    required: true,
     minLength: 8,
     pattern: PATTERNS.PASSWORD,
     custom: (value: string) => {
@@ -137,12 +137,141 @@ export const VALIDATION_RULES = {
   PHONE: { required: true, pattern: PATTERNS.PHONE },
   ALPHANUMERIC: { required: true, pattern: PATTERNS.ALPHANUMERIC },
   HEX_COLOR: { pattern: PATTERNS.HEX_COLOR },
-  IP_ADDRESS: { pattern: PATTERNS.IP_ADDRESS }
+  IP_ADDRESS: { pattern: PATTERNS.IP_ADDRESS },
+  CREDIT_AMOUNT: {
+    required: true,
+    custom: (value: number) => {
+      if (typeof value !== 'number' || isNaN(value)) {
+        return 'Amount must be a valid number'
+      }
+      if (value <= 0) {
+        return 'Amount must be greater than 0'
+      }
+      if (value > 10000) {
+        return 'Amount cannot exceed $10,000'
+      }
+      if (!/^\d+(\.\d{1,2})?$/.test(value.toString())) {
+        return 'Amount can have at most 2 decimal places'
+      }
+      return true
+    }
+  },
+  CREDIT_MEMO: {
+    required: true,
+    minLength: 3,
+    maxLength: 255,
+    custom: (value: string) => {
+      if (typeof value !== 'string') {
+        return 'Memo must be a string'
+      }
+      const trimmed = value.trim()
+      if (trimmed.length < 3) {
+        return 'Memo must be at least 3 characters long'
+      }
+      if (trimmed.length > 255) {
+        return 'Memo cannot exceed 255 characters'
+      }
+      if (!/^[a-zA-Z0-9\s\-_.,!?()]+$/.test(trimmed)) {
+        return 'Memo contains invalid characters. Only letters, numbers, spaces, and basic punctuation are allowed'
+      }
+      return true
+    }
+  }
 }
 
 // Utility functions
 export const sanitizeInput = (input: string): string => {
   return input.trim().replace(/[<>]/g, '')
+}
+
+// Credit operation validation functions
+export const validateCreditAmount = (amount: number): { isValid: boolean; error: string } => {
+  const validation = validateField({
+    value: amount,
+    rules: VALIDATION_RULES.CREDIT_AMOUNT,
+    fieldName: 'Amount'
+  })
+
+  return {
+    isValid: validation.isValid,
+    error: validation.errors[0] || ''
+  }
+}
+
+export const validateCreditMemo = (memo: string): { isValid: boolean; error: string } => {
+  const validation = validateField({
+    value: memo,
+    rules: VALIDATION_RULES.CREDIT_MEMO,
+    fieldName: 'Memo'
+  })
+
+  return {
+    isValid: validation.isValid,
+    error: validation.errors[0] || ''
+  }
+}
+
+export const validateCreditForm = (amount: number, memo: string): { isValid: boolean; errors: { amount: string; memo: string } } => {
+  const amountValidation = validateCreditAmount(amount)
+  const memoValidation = validateCreditMemo(memo)
+
+  return {
+    isValid: amountValidation.isValid && memoValidation.isValid,
+    errors: {
+      amount: amountValidation.error,
+      memo: memoValidation.error
+    }
+  }
+}
+
+// Additional validation utilities for auth operations
+export const validateVerificationCode = (code: string): { isValid: boolean; error: string } => {
+  if (!code.trim()) {
+    return { isValid: false, error: 'Verification code is required' }
+  }
+  if (code.length < 4 || code.length > 6) {
+    return { isValid: false, error: 'Verification code must be 4-6 digits' }
+  }
+  if (!/^\d+$/.test(code)) {
+    return { isValid: false, error: 'Verification code must contain only numbers' }
+  }
+  return { isValid: true, error: '' }
+}
+
+export const validatePasswordStrength = (password: string): { isValid: boolean; error: string; strength: 'weak' | 'medium' | 'strong' } => {
+  if (!password) {
+    return { isValid: false, error: 'Password is required', strength: 'weak' }
+  }
+
+  const validation = validateField({
+    value: password,
+    rules: VALIDATION_RULES.PASSWORD,
+    fieldName: 'Password'
+  })
+
+  if (!validation.isValid) {
+    return { isValid: false, error: validation.errors[0], strength: 'weak' }
+  }
+
+  // Determine strength
+  let strength: 'weak' | 'medium' | 'strong' = 'medium'
+  if (password.length >= 12 && /[A-Z].*[A-Z]/.test(password) && /[0-9].*[0-9]/.test(password)) {
+    strength = 'strong'
+  } else if (password.length < 10) {
+    strength = 'weak'
+  }
+
+  return { isValid: true, error: '', strength }
+}
+
+export const validateConfirmPassword = (password: string, confirmPassword: string): { isValid: boolean; error: string } => {
+  if (!confirmPassword) {
+    return { isValid: false, error: 'Please confirm your password' }
+  }
+  if (password !== confirmPassword) {
+    return { isValid: false, error: 'Passwords do not match' }
+  }
+  return { isValid: true, error: '' }
 }
 
 export const formatValidationErrors = (errors: string[]): string => {
@@ -159,7 +288,7 @@ export const validateAsync = async (
   asyncValidator?: (value: any) => Promise<boolean | string>
 ): Promise<ValidationResult> => {
   const syncResult = validateField(field)
-  
+
   if (!syncResult.isValid || !asyncValidator) {
     return syncResult
   }
@@ -180,7 +309,7 @@ export const validateAsync = async (
   }
 
   return syncResult
-} 
+}
 
 
 
