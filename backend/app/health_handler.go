@@ -17,6 +17,11 @@ import (
 
 const healthTimeout = 2 * time.Second
 
+const (
+	HealthyStatus   = "healthy"
+	UnhealthyStatus = "unhealthy"
+)
+
 type HealthStatus struct {
 	Status  string `json:"status"`
 	Message string `json:"message,omitempty"`
@@ -26,12 +31,11 @@ type HealthChecker func(ctx context.Context) HealthStatus
 
 var healthHTTPClient = &http.Client{Timeout: healthTimeout}
 
-func healthy() HealthStatus {
-	return HealthStatus{Status: "healthy"}
-}
-
-func unhealthy(message string) HealthStatus {
-	return HealthStatus{Status: "unhealthy", Message: message}
+func healthStatusFromError(err error) HealthStatus {
+	if err == nil {
+		return HealthStatus{Status: HealthyStatus}
+	}
+	return HealthStatus{Status: UnhealthyStatus, Message: err.Error()}
 }
 
 func (h *Handler) checkDatabase(ctx context.Context) HealthStatus {
@@ -41,49 +45,45 @@ func (h *Handler) checkDatabase(ctx context.Context) HealthStatus {
 
 	dbPinger, ok := h.db.(pinger)
 	if !ok {
-		return unhealthy("database does not support Ping")
+		return healthStatusFromError(fmt.Errorf("database does not support ping"))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
 	defer cancel()
 
-	if err := dbPinger.Ping(ctx); err != nil {
-		return unhealthy(err.Error())
-	}
-	return healthy()
+	err := dbPinger.Ping(ctx)
+	return healthStatusFromError(err)
 }
 
 func (h *Handler) checkRedis(ctx context.Context) HealthStatus {
 	if h.redis == nil || h.redis.Client() == nil {
-		return unhealthy("redis client not initialized")
+		return healthStatusFromError(fmt.Errorf("redis client not initialized"))
 	}
 
-	if err := h.redis.Client().Ping(ctx).Err(); err != nil {
-		return unhealthy(err.Error())
-	}
-	return healthy()
+	err := h.redis.Client().Ping(ctx).Err()
+	return healthStatusFromError(err)
 }
 
 func httpHealthCheck(ctx context.Context, url string) HealthStatus {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return unhealthy(err.Error())
+		return healthStatusFromError(err)
 	}
 
 	resp, err := healthHTTPClient.Do(req)
 	if err != nil {
-		return unhealthy(err.Error())
+		return healthStatusFromError(err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return unhealthy(fmt.Sprintf("unexpected status: %s", resp.Status))
+		return healthStatusFromError(fmt.Errorf("unexpected status: %s", resp.Status))
 	}
-	return healthy()
+	return healthStatusFromError(nil)
 }
 
 func healthURL(baseURL string) (string, error) {
-	if strings.TrimSpace(baseURL) == "" {
+	if len(strings.TrimSpace(baseURL)) == 0 {
 		return "", fmt.Errorf("URL not set")
 	}
 	return url.JoinPath(baseURL, "health")
@@ -92,7 +92,7 @@ func healthURL(baseURL string) (string, error) {
 func (h *Handler) checkGridProxy(ctx context.Context) HealthStatus {
 	url, err := healthURL(h.config.GridProxyURL)
 	if err != nil {
-		return unhealthy(fmt.Sprintf("gridproxy %s", err.Error()))
+		return healthStatusFromError(fmt.Errorf("gridproxy %s", err.Error()))
 	}
 	return httpHealthCheck(ctx, url)
 }
@@ -115,41 +115,41 @@ type tfchainHealth struct {
 func (h *Handler) checkTFChainHealth(ctx context.Context) HealthStatus {
 	url, err := tfchainHealthURL(h.config.TFChainURL)
 	if err != nil {
-		return unhealthy(err.Error())
+		return healthStatusFromError(err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return unhealthy(err.Error())
+		return healthStatusFromError(err)
 	}
 
 	resp, err := healthHTTPClient.Do(req)
 	if err != nil {
-		return unhealthy(err.Error())
+		return healthStatusFromError(err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return unhealthy(fmt.Sprintf("unexpected status: %s", resp.Status))
+		return healthStatusFromError(fmt.Errorf("unexpected status: %s", resp.Status))
 	}
 
 	var health tfchainHealth
 	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
-		return unhealthy(err.Error())
+		return healthStatusFromError(err)
 	}
 
 	if health.IsSyncing || !health.ShouldHavePeers || health.Peers == 0 {
-		return unhealthy(fmt.Sprintf("syncing: %v, shouldHavePeers: %v, peers: %d",
+		return healthStatusFromError(fmt.Errorf("syncing: %v, shouldHavePeers: %v, peers: %d",
 			health.IsSyncing, health.ShouldHavePeers, health.Peers))
 	}
 
-	return healthy()
+	return healthStatusFromError(nil)
 }
 
 func (h *Handler) checkActivationService(ctx context.Context) HealthStatus {
 	url, err := healthURL(h.config.ActivationServiceURL)
 	if err != nil {
-		return unhealthy(fmt.Sprintf("activation service %s", err.Error()))
+		return healthStatusFromError(fmt.Errorf("activation service %s", err.Error()))
 	}
 	return httpHealthCheck(ctx, url)
 }
@@ -158,10 +158,7 @@ func checkGraphQLClient(client interface {
 	Query(string, map[string]any) (map[string]any, error)
 }) HealthStatus {
 	_, err := client.Query("{ __typename }", map[string]any{})
-	if err != nil {
-		return unhealthy(err.Error())
-	}
-	return healthy()
+	return healthStatusFromError(err)
 }
 
 func (h *Handler) checkGraphQL(ctx context.Context) HealthStatus {
@@ -188,7 +185,7 @@ func (h *Handler) HealthHandler(c *gin.Context) {
 
 	statusCode := http.StatusOK
 	for _, status := range results {
-		if status.Status != "healthy" {
+		if status.Status != HealthyStatus {
 			statusCode = http.StatusServiceUnavailable
 			break
 		}
@@ -208,7 +205,7 @@ func (h *Handler) runChecks(ctx context.Context, checks map[string]HealthChecker
 			defer func() {
 				if r := recover(); r != nil {
 					mu.Lock()
-					results[name] = unhealthy(fmt.Sprintf("panic: %v\n%s", r, string(debug.Stack())))
+					results[name] = healthStatusFromError(fmt.Errorf("panic: %v\n%s", r, string(debug.Stack())))
 					mu.Unlock()
 				}
 			}()
