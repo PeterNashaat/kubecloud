@@ -26,6 +26,7 @@ export interface ApiOptions {
   errorMessage?: string
   requiresAuth?: boolean
   customToken?: string
+  contentType?: string
 }
 
 class ApiClient {
@@ -61,7 +62,8 @@ class ApiClient {
       successMessage,
       errorMessage,
       requiresAuth = false,
-      customToken
+      customToken,
+      contentType = 'application/json'
     } = options
 
     const notificationStore = useNotificationStore()
@@ -84,7 +86,7 @@ class ApiClient {
 
       // Add auth headers if required
       const requestHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
+        ...(contentType ? { 'Content-Type': contentType } : {}),
         ...(requiresAuth ? this.getAuthHeaders(customToken) : {}),
         ...headers
       }
@@ -92,7 +94,7 @@ class ApiClient {
       let response = await fetch(`${this.baseURL}${endpoint}`, {
         method,
         headers: requestHeaders,
-        body: body ? JSON.stringify(body) : undefined,
+        body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
         signal: controller.signal
       })
 
@@ -107,7 +109,7 @@ class ApiClient {
           response = await fetch(`${this.baseURL}${endpoint}`, {
             method,
             headers: requestHeaders,
-            body: body ? JSON.stringify(body) : undefined,
+            body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
             signal: controller.signal
           })
           if (!response.ok) throw new Error('Retry after refresh failed')

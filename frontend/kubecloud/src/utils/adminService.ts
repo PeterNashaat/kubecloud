@@ -58,8 +58,10 @@ export interface SystemEmail {
 }
 
 export interface SystemEmailResponse {
-  message: string
-  email_id: number
+  failed_emails: string[],
+  failed_emails_count: number,
+  successful_emails: number,
+  total_users: number
 }
 
 
@@ -162,28 +164,14 @@ export class AdminService {
   }
 
   // Send a system email to all users (requires admin auth)
-  async sendSystemEmail(data: SystemEmail): Promise<SystemEmailResponse> {
-    const response = await api.post<SystemEmailResponse>('/v1/emails/system', data, {
-      requiresAuth: true,
-      showNotifications: true,
-      loadingMessage: 'Sending email...',
-      successMessage: 'Email sent to all users',
-      errorMessage: 'Failed to send email'
-    })
-    return response.data
-  }
-
-  // Send a system email with attachments to all users (requires admin auth)
-  async sendSystemEmailWithAttachments(formData: FormData): Promise<SystemEmailResponse> {
-    const response = await api.post<SystemEmailResponse>('/v1/emails/system/attachments', formData, {
+  async sendSystemEmail(formData: FormData): Promise<SystemEmailResponse> {
+    const response = await api.post<SystemEmailResponse>('/v1/users/mail', formData, {
       requiresAuth: true,
       showNotifications: true,
       loadingMessage: 'Sending email with attachments...',
       successMessage: 'Email sent to all users',
       errorMessage: 'Failed to send email',
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      contentType: ''
     })
     return response.data
   }
