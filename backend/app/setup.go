@@ -63,7 +63,9 @@ func SetUp(t testing.TB) (*App, error) {
   "mailSender": {
     "email": "email@domain.com",
     "sendgrid_key": "sendgrid_key",
-    "timeout": 60
+    "timeout": 60,
+    "max_concurrent_sends": 20,
+    "max_attachment_size_mb": 10
   },
   "currency": "usd",
   "stripe_secret": "sk_test",
