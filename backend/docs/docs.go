@@ -153,6 +153,85 @@ const docTemplate = `{
                 }
             }
         },
+        "/system/maintenance/status": {
+            "get": {
+                "security": [
+                    {
+                        "AdminMiddleware": []
+                    }
+                ],
+                "description": "Gets maintenance mode for the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get maintenance mode",
+                "operationId": "get-maintenance-mode",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "AdminMiddleware": []
+                    }
+                ],
+                "description": "Sets maintenance mode for the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set maintenance mode",
+                "operationId": "set-maintenance-mode",
+                "parameters": [
+                    {
+                        "description": "Set Maintenance Mode Input",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app.SetMaintenanceModeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user": {
             "get": {
                 "description": "Retrieves all data of the user",
@@ -1765,6 +1844,17 @@ const docTemplate = `{
                 },
                 "public_key": {
                     "type": "string"
+                }
+            }
+        },
+        "app.SetMaintenanceModeInput": {
+            "type": "object",
+            "required": [
+                "enabled"
+            ],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
                 }
             }
         },

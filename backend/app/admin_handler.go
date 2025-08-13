@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"kubecloud/internal"
@@ -38,6 +39,10 @@ type PendingRecordsResponse struct {
 	models.PendingRecord
 	USDAmount            float64 `json:"usd_amount"`
 	TransferredUSDAmount float64 `json:"transferred_usd_amount"`
+}
+
+type SetMaintenanceModeInput struct {
+	Enabled bool `json:"enabled"`
 }
 
 // @Summary Get all users
@@ -340,5 +345,67 @@ func (h *Handler) ListPendingRecordsHandler(c *gin.Context) {
 
 	Success(c, http.StatusOK, "Pending records are retrieved successfully", map[string]any{
 		"pending_records": pendingRecordsResponse,
+	})
+}
+
+// @Summary Set maintenance mode
+// @Description Sets maintenance mode for the system
+// @Tags admin
+// @ID set-maintenance-mode
+// @Accept json
+// @Produce json
+// @Param body body SetMaintenanceModeInput true "Set Maintenance Mode Input"
+// @Success 200 {object} APIResponse
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /system/maintenance/status [post]
+// SetMaintenanceModeHandler sets maintenance mode for the system
+func (h *Handler) SetMaintenanceModeHandler(c *gin.Context) {
+	var request SetMaintenanceModeInput
+
+	// check on request format
+	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
+	ctx := context.Background()
+	if err := h.redis.SetMaintenanceMode(ctx, request.Enabled); err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Maintenance mode is set successfully", nil)
+}
+
+// @Summary Get maintenance mode
+// @Description Gets maintenance mode for the system
+// @Tags admin
+// @ID get-maintenance-mode
+// @Accept json
+// @Produce json
+// @Success 200 {object} APIResponse
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /system/maintenance/status [get]
+// GetMaintenanceModeHandler gets maintenance mode for the system
+func (h *Handler) GetMaintenanceModeHandler(c *gin.Context) {
+	ctx := context.Background()
+	enabled, err := h.redis.GetMaintenanceMode(ctx)
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Maintenance mode is retrieved successfully", map[string]interface{}{
+		"enabled": enabled,
 	})
 }

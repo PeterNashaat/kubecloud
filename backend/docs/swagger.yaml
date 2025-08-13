@@ -238,6 +238,13 @@ definitions:
     - name
     - public_key
     type: object
+  app.SetMaintenanceModeInput:
+    properties:
+      enabled:
+        type: boolean
+    required:
+    - enabled
+    type: object
   app.UnreserveNodeResponse:
     properties:
       contract_id:
@@ -489,6 +496,56 @@ paths:
       security:
       - AdminMiddleware: []
       summary: List pending records
+      tags:
+      - admin
+  /system/maintenance/status:
+    get:
+      consumes:
+      - application/json
+      description: Gets maintenance mode for the system
+      operationId: get-maintenance-mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
+      summary: Get maintenance mode
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Sets maintenance mode for the system
+      operationId: set-maintenance-mode
+      parameters:
+      - description: Set Maintenance Mode Input
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app.SetMaintenanceModeInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
+      summary: Set maintenance mode
       tags:
       - admin
   /user:

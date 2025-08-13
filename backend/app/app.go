@@ -225,6 +225,13 @@ func (app *App) registerHandlers() {
 
 		}
 
+		systemGroup := adminGroup.Group("/system")
+		systemGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
+		{
+			systemGroup.POST("/maintenance/status", app.handlers.SetMaintenanceModeHandler)
+			systemGroup.GET("/maintenance/status", app.handlers.GetMaintenanceModeHandler)
+		}
+
 		userGroup := v1.Group("/user")
 		{
 			userGroup.POST("/register", app.handlers.RegisterHandler)
