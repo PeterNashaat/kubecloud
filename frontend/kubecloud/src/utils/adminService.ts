@@ -168,10 +168,11 @@ export class AdminService {
     const response = await api.post<SystemEmailResponse>('/v1/users/mail', formData, {
       requiresAuth: true,
       showNotifications: true,
-      loadingMessage: 'Sending email with attachments...',
+      loadingMessage: 'Sending email to all users',
       successMessage: 'Email sent to all users',
       errorMessage: 'Failed to send email',
-      contentType: ''
+      contentType: '',
+      timeout: 60000,
     })
     return response.data
   }

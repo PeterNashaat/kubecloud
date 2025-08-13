@@ -7,9 +7,12 @@
       Send emails to all platform users
     </v-card-subtitle>
 
+    <v-alert type="warning" variant="tonal" class="my-4">
+      This will send an email to all registered users on the platform.
+    </v-alert>
     <v-card-text class="pa-0">
-      <v-form @submit.prevent="sendEmail">
-        <v-text-field v-model="title" label="Email Subject" placeholder="System Maintenance" variant="outlined"
+      <v-form ref="emailForm" @submit.prevent="sendEmail">
+        <v-text-field v-model="title" label="Email Subject" placeholder="Email Subject" variant="outlined"
           class="mb-4" :rules="[v => !!v || 'Subject is required']"></v-text-field>
 
 
@@ -44,8 +47,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { adminService } from '@/utils/adminService'
+import { useNotificationStore } from '@/stores/notifications'
 
 // Form state
+const emailForm = ref()
 const title = ref('')
 const message = ref('')
 const attachments = ref<File[]>([])
@@ -70,16 +75,7 @@ const attachmentRules = [
 
 
 
-const currentDateFormatted = computed(() => {
-  return new Date().toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: true
-  })
-})
+
 
 // Methods
 async function sendEmail() {
@@ -101,10 +97,13 @@ async function sendEmail() {
 
     // Call the API to send email with attachments
     const response = await adminService.sendSystemEmail(formData)
-
+    // if (response.failed_emails_count ==0) {
+      useNotificationStore().warning('Not all users received the email', `Failed to send email to ${response.failed_emails_count} users`)
+    // }
     
 
-    // Reset form
+    // Reset form using form reference to avoid validation triggers
+    emailForm.value?.reset()
     title.value = ''
     message.value = ''
     attachments.value = []
