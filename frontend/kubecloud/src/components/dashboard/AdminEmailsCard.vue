@@ -12,8 +12,8 @@
     </v-alert>
     <v-card-text class="pa-0">
       <v-form ref="emailForm" @submit.prevent="sendEmail">
-        <v-text-field v-model="title" label="Email Subject" placeholder="Email Subject" variant="outlined"
-          class="mb-4" :rules="[v => !!v || 'Subject is required']"></v-text-field>
+        <v-text-field v-model="title" label="Email Subject" placeholder="Email Subject" variant="outlined" class="mb-4"
+          :rules="[v => !!v || 'Subject is required']"></v-text-field>
 
 
 
@@ -87,22 +87,19 @@ async function sendEmail() {
     formData.append('subject', title.value)
     formData.append('body', message.value)
 
-    // Add attachments if any
     if (attachments.value && attachments.value.length > 0) {
-      attachments.value.forEach((file, index) => {
+      attachments.value.forEach((file) => {
         formData.append(`attachments`, file)
       })
     }
 
 
-    // Call the API to send email with attachments
     const response = await adminService.sendSystemEmail(formData)
-    // if (response.failed_emails_count ==0) {
+    if (response.failed_emails_count > 0) {
       useNotificationStore().warning('Not all users received the email', `Failed to send email to ${response.failed_emails_count} users`)
-    // }
-    
+    }
 
-    // Reset form using form reference to avoid validation triggers
+
     emailForm.value?.reset()
     title.value = ''
     message.value = ''
