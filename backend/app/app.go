@@ -202,6 +202,7 @@ func (app *App) registerHandlers() {
 	{
 		v1.GET("/nodes", app.handlers.ListNodesHandler)
 		v1.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
+		v1.GET("/system/maintenance/status", app.handlers.GetMaintenanceModeHandler)
 
 		adminGroup := v1.Group("")
 		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
@@ -229,7 +230,6 @@ func (app *App) registerHandlers() {
 		systemGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
 		{
 			systemGroup.POST("/maintenance/status", app.handlers.SetMaintenanceModeHandler)
-			systemGroup.GET("/maintenance/status", app.handlers.GetMaintenanceModeHandler)
 		}
 
 		userGroup := v1.Group("/user")
