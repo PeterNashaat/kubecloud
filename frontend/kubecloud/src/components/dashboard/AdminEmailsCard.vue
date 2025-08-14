@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { adminService } from '@/utils/adminService'
 import { useNotificationStore } from '@/stores/notifications'
 
@@ -55,7 +55,6 @@ const title = ref('')
 const message = ref('')
 const attachments = ref<File[]>([])
 const sending = ref(false)
-const result = ref<{ success: boolean; message: string } | null>(null)
 
 // File validation rules
 const attachmentRules = [
@@ -73,10 +72,6 @@ const attachmentRules = [
   }
 ]
 
-
-
-
-
 // Methods
 async function sendEmail() {
   if (!title.value || !message.value) return
@@ -93,28 +88,19 @@ async function sendEmail() {
       })
     }
 
-
     const response = await adminService.sendSystemEmail(formData)
     if (response.failed_emails_count > 0) {
       useNotificationStore().warning('Not all users received the email', `Failed to send email to ${response.failed_emails_count} users`)
     }
-
 
     emailForm.value?.reset()
     title.value = ''
     message.value = ''
     attachments.value = []
   } catch (error) {
-    result.value = {
-      success: false,
-      message: 'Failed to send email. Please try again.'
-    }
+    console.error(error)
   } finally {
     sending.value = false
   }
 }
-
-
-
-
 </script>
