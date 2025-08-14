@@ -90,11 +90,6 @@ const statsData = computed(() => [
     value: `$${props.totalSpent}`,
     label: 'Total Spent'
   },
-  {
-    icon: 'mdi-key',
-    value: props.sshKeys.length,
-    label: 'SSH Keys'
-  }
 ])
 
 // Quick actions data
