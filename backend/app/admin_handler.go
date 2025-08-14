@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -558,8 +557,7 @@ func (h *Handler) SetMaintenanceModeHandler(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
-	if err := h.redis.SetMaintenanceMode(ctx, request.Enabled); err != nil {
+	if err := h.redis.SetMaintenanceMode(c.Request.Context(), request.Enabled); err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
 		return
@@ -580,8 +578,7 @@ func (h *Handler) SetMaintenanceModeHandler(c *gin.Context) {
 // @Router /system/maintenance/status [get]
 // GetMaintenanceModeHandler gets maintenance mode for the system
 func (h *Handler) GetMaintenanceModeHandler(c *gin.Context) {
-	ctx := context.Background()
-	enabled, err := h.redis.GetMaintenanceMode(ctx)
+	enabled, err := h.redis.GetMaintenanceMode(c.Request.Context())
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
