@@ -45,7 +45,7 @@ type SSHConfig struct {
 
 // Server struct holds server's information
 type Server struct {
-	Host string `json:"host" validate:"required,hostname|ip"`
+	Host string `json:"host" validate:"required,hostname|ip|url"`
 	Port string `json:"port" validate:"required,numeric"`
 }
 
