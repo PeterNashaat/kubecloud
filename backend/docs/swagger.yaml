@@ -142,6 +142,11 @@ definitions:
     - email
     - password
     type: object
+  app.MaintenanceModeStatus:
+    properties:
+      enabled:
+        type: boolean
+    type: object
   app.PendingRecordsResponse:
     properties:
       created_at:
@@ -237,13 +242,6 @@ definitions:
     required:
     - name
     - public_key
-    type: object
-  app.SetMaintenanceModeInput:
-    properties:
-      enabled:
-        type: boolean
-    required:
-    - enabled
     type: object
   app.UnreserveNodeResponse:
     properties:
@@ -526,12 +524,12 @@ paths:
       description: Sets maintenance mode for the system
       operationId: set-maintenance-mode
       parameters:
-      - description: Set Maintenance Mode Input
+      - description: Maintenance Mode Status
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/app.SetMaintenanceModeInput'
+          $ref: '#/definitions/app.MaintenanceModeStatus'
       produces:
       - application/json
       responses:

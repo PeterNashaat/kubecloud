@@ -207,12 +207,12 @@ const docTemplate = `{
                 "operationId": "set-maintenance-mode",
                 "parameters": [
                     {
-                        "description": "Set Maintenance Mode Input",
+                        "description": "Maintenance Mode Status",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/app.SetMaintenanceModeInput"
+                            "$ref": "#/definitions/app.MaintenanceModeStatus"
                         }
                     }
                 ],
@@ -1703,6 +1703,14 @@ const docTemplate = `{
                 }
             }
         },
+        "app.MaintenanceModeStatus": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "app.PendingRecordsResponse": {
             "type": "object",
             "properties": {
@@ -1844,17 +1852,6 @@ const docTemplate = `{
                 },
                 "public_key": {
                     "type": "string"
-                }
-            }
-        },
-        "app.SetMaintenanceModeInput": {
-            "type": "object",
-            "required": [
-                "enabled"
-            ],
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
                 }
             }
         },

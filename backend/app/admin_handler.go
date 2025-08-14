@@ -354,7 +354,7 @@ func (h *Handler) ListPendingRecordsHandler(c *gin.Context) {
 // @ID set-maintenance-mode
 // @Accept json
 // @Produce json
-// @Param body body SetMaintenanceModeInput true "Set Maintenance Mode Input"
+// @Param body body MaintenanceModeStatus true "Maintenance Mode Status"
 // @Success 200 {object} APIResponse
 // @Failure 500 {object} APIResponse
 // @Security AdminMiddleware
