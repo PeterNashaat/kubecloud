@@ -205,7 +205,11 @@ async function showKubeconfig() {
   kubeconfigError.value = ''
   kubeconfigContent.value = ''
   try {
-    const response = await api.get(`/v1/deployments/${projectName.value}/kubeconfig`, { requiresAuth: true, showNotifications: false })
+    const response = await api.get(`/v1/deployments/${projectName.value}/kubeconfig`, { 
+      requiresAuth: true, 
+      showNotifications: false,
+      timeout: 120000 // 2 minutes timeout
+    })
     const data = response.data as { kubeconfig?: string }
     kubeconfigContent.value = data.kubeconfig || ''
   } catch (err: any) {
