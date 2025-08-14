@@ -26,6 +26,11 @@ type RedisClient struct {
 	client *redis.Client
 }
 
+// Client returns the underlying *redis.Client for health checks
+func (r *RedisClient) Client() *redis.Client {
+	return r.client
+}
+
 // NewRedisClient creates a new Redis client with task queue functionality
 func NewRedisClient(config Redis) (*RedisClient, error) {
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
