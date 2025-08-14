@@ -91,10 +91,11 @@ class ApiClient {
         ...headers
       }
 
+      const bodyData = body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined)
       let response = await fetch(`${this.baseURL}${endpoint}`, {
         method,
         headers: requestHeaders,
-        body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
+        body: bodyData,
         signal: controller.signal
       })
 
@@ -109,7 +110,7 @@ class ApiClient {
           response = await fetch(`${this.baseURL}${endpoint}`, {
             method,
             headers: requestHeaders,
-            body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
+            body: bodyData,
             signal: controller.signal
           })
           if (!response.ok) throw new Error('Retry after refresh failed')
