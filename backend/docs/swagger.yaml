@@ -531,7 +531,7 @@ paths:
       summary: Get maintenance mode
       tags:
       - admin
-    post:
+    put:
       consumes:
       - application/json
       description: Sets maintenance mode for the system

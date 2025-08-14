@@ -180,7 +180,7 @@
                     }
                 }
             },
-            "post": {
+            "put": {
                 "security": [
                     {
                         "AdminMiddleware": []

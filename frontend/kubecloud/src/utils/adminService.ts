@@ -181,7 +181,7 @@ export class AdminService {
 
   async SetMaintenanceModeStatus(status: boolean): Promise<void> {
     try {
-      const response = await api.post('/v1/system/maintenance/status', { enabled: status }, {
+      const response = await api.put('/v1/system/maintenance/status', { enabled: status }, {
         requiresAuth: true,
         showNotifications: true,
         loadingMessage: 'Setting maintenance mode...',

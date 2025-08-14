@@ -491,7 +491,7 @@ func TestMaintenanceModeIntegration(t *testing.T) {
 
 		payload := MaintenanceModeStatus{Enabled: true}
 		body, _ := json.Marshal(payload)
-		req, _ = http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader(body))
+		req, _ = http.NewRequest("PUT", "/api/v1/system/maintenance/status", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		resp = httptest.NewRecorder()
@@ -510,7 +510,7 @@ func TestMaintenanceModeIntegration(t *testing.T) {
 
 		payload = MaintenanceModeStatus{Enabled: false}
 		body, _ = json.Marshal(payload)
-		req, _ = http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader(body))
+		req, _ = http.NewRequest("PUT", "/api/v1/system/maintenance/status", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		resp = httptest.NewRecorder()
@@ -538,7 +538,7 @@ func TestSetMaintenanceModeHandler(t *testing.T) {
 
 	t.Run("Test Set maintenance mode with invalid JSON", func(t *testing.T) {
 		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
-		req, _ := http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader([]byte("{invalid json")))
+		req, _ := http.NewRequest("PUT", "/api/v1/system/maintenance/status", bytes.NewReader([]byte("{invalid json")))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
@@ -557,7 +557,7 @@ func TestSetMaintenanceModeHandler(t *testing.T) {
 			Enabled: true,
 		}
 		body, _ := json.Marshal(payload)
-		req, _ := http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader(body))
+		req, _ := http.NewRequest("PUT", "/api/v1/system/maintenance/status", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()

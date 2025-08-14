@@ -541,7 +541,7 @@ func (h *Handler) parseAttachments(fileHeaders []*multipart.FileHeader) ([]inter
 // @Success 200 {object} APIResponse
 // @Failure 500 {object} APIResponse
 // @Security AdminMiddleware
-// @Router /system/maintenance/status [post]
+// @Router /system/maintenance/status [put]
 // SetMaintenanceModeHandler sets maintenance mode for the system
 func (h *Handler) SetMaintenanceModeHandler(c *gin.Context) {
 	var request MaintenanceModeStatus
