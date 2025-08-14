@@ -453,3 +453,136 @@ func TestListPendingRecordsHandler(t *testing.T) {
 	})
 
 }
+
+func extractMaintenanceModeStatus(t *testing.T, responseBody *bytes.Buffer) MaintenanceModeStatus {
+	t.Helper()
+	var apiResponse APIResponse
+	err := json.Unmarshal(responseBody.Bytes(), &apiResponse)
+	require.NoError(t, err)
+	resultBytes, err := json.Marshal(apiResponse.Data)
+	require.NoError(t, err)
+
+	var result MaintenanceModeStatus
+	err = json.Unmarshal(resultBytes, &result)
+	require.NoError(t, err)
+
+	return result
+}
+
+func TestMaintenanceModeIntegration(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+
+	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, false, 0, time.Now())
+
+	t.Run("Test Full maintenance mode workflow", func(t *testing.T) {
+		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
+
+		req, _ := http.NewRequest("GET", "/api/v1/system/maintenance/status", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		result := extractMaintenanceModeStatus(t, resp.Body)
+
+		payload := MaintenanceModeStatus{Enabled: true}
+		body, _ := json.Marshal(payload)
+		req, _ = http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp = httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		// 3. Verify it's enabled
+		req, _ = http.NewRequest("GET", "/api/v1/system/maintenance/status", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp = httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		result = extractMaintenanceModeStatus(t, resp.Body)
+		assert.True(t, result.Enabled)
+
+		payload = MaintenanceModeStatus{Enabled: false}
+		body, _ = json.Marshal(payload)
+		req, _ = http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp = httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		req, _ = http.NewRequest("GET", "/api/v1/system/maintenance/status", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp = httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		result = extractMaintenanceModeStatus(t, resp.Body)
+		assert.False(t, result.Enabled)
+	})
+}
+
+func TestSetMaintenanceModeHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+
+	adminUser := CreateTestUser(t, app, "admin@example.com", "Admin User", []byte("securepassword"), true, true, false, 0, time.Now())
+	normalUser := CreateTestUser(t, app, "user@example.com", "Normal User", []byte("securepassword"), true, false, false, 0, time.Now())
+
+	t.Run("Test Set maintenance mode with invalid JSON", func(t *testing.T) {
+		token := GetAuthToken(t, app, adminUser.ID, adminUser.Email, adminUser.Username, true)
+		req, _ := http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader([]byte("{invalid json")))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusBadRequest, resp.Code)
+
+		var result APIResponse
+		err := json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
+		assert.Equal(t, "Invalid request format", result.Message)
+	})
+
+	t.Run("Test Set maintenance mode with non-admin user", func(t *testing.T) {
+		token := GetAuthToken(t, app, normalUser.ID, normalUser.Email, normalUser.Username, false)
+		payload := MaintenanceModeStatus{
+			Enabled: true,
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", "/api/v1/system/maintenance/status", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusForbidden, resp.Code)
+	})
+}
+
+func TestGetMaintenanceModeHandler(t *testing.T) {
+	app, err := SetUp(t)
+	require.NoError(t, err)
+	router := app.router
+
+	t.Run("Test Get maintenance mode successfully (default disabled)", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/system/maintenance/status", nil)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		var result APIResponse
+		err := json.Unmarshal(resp.Body.Bytes(), &result)
+		assert.NoError(t, err)
+		assert.Equal(t, "Maintenance mode is retrieved successfully", result.Message)
+		assert.Equal(t, http.StatusOK, result.Status)
+
+		data := extractMaintenanceModeStatus(t, resp.Body)
+		assert.False(t, data.Enabled)
+	})
+
+}

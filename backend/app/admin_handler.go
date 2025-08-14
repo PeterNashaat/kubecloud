@@ -41,7 +41,7 @@ type PendingRecordsResponse struct {
 	TransferredUSDAmount float64 `json:"transferred_usd_amount"`
 }
 
-type SetMaintenanceModeInput struct {
+type MaintenanceModeStatus struct {
 	Enabled bool `json:"enabled"`
 }
 
@@ -361,7 +361,7 @@ func (h *Handler) ListPendingRecordsHandler(c *gin.Context) {
 // @Router /system/maintenance/status [post]
 // SetMaintenanceModeHandler sets maintenance mode for the system
 func (h *Handler) SetMaintenanceModeHandler(c *gin.Context) {
-	var request SetMaintenanceModeInput
+	var request MaintenanceModeStatus
 
 	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -405,7 +405,7 @@ func (h *Handler) GetMaintenanceModeHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Maintenance mode is retrieved successfully", map[string]interface{}{
-		"enabled": enabled,
+	Success(c, http.StatusOK, "Maintenance mode is retrieved successfully", MaintenanceModeStatus{
+		Enabled: enabled,
 	})
 }
