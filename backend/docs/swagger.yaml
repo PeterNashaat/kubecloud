@@ -142,6 +142,11 @@ definitions:
     - email
     - password
     type: object
+  app.MaintenanceModeStatus:
+    properties:
+      enabled:
+        type: boolean
+    type: object
   app.PendingRecordsResponse:
     properties:
       created_at:
@@ -502,6 +507,56 @@ paths:
       security:
       - AdminMiddleware: []
       summary: List pending records
+      tags:
+      - admin
+  /system/maintenance/status:
+    get:
+      consumes:
+      - application/json
+      description: Gets maintenance mode for the system
+      operationId: get-maintenance-mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
+      summary: Get maintenance mode
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: Sets maintenance mode for the system
+      operationId: set-maintenance-mode
+      parameters:
+      - description: Maintenance Mode Status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app.MaintenanceModeStatus'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      security:
+      - AdminMiddleware: []
+      summary: Set maintenance mode
       tags:
       - admin
   /user:

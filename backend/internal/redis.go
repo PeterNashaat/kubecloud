@@ -256,6 +256,20 @@ func (r *RedisClient) HandleUnacknowledgedTasks(ctx context.Context, consumerNam
 	return nil
 }
 
+func (r *RedisClient) SetMaintenanceMode(ctx context.Context, enabled bool) error {
+	return r.client.Set(ctx, "maintenance_mode", enabled, 0).Err()
+}
+
+func (r *RedisClient) GetMaintenanceMode(ctx context.Context) (bool, error) {
+	res, err := r.client.Get(ctx, "maintenance_mode").Result()
+
+	if err != nil && err != redis.Nil {
+		return false, err
+	}
+
+	return res == "1", nil
+}
+
 func (r *RedisClient) Close() error {
 	return r.client.Close()
 }

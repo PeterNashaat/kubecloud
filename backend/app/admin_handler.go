@@ -60,6 +60,10 @@ type SendMailResponse struct {
 	FailedEmails      []string `json:"failed_emails,omitempty"`
 }
 
+type MaintenanceModeStatus struct {
+	Enabled bool `json:"enabled"`
+}
+
 // @Summary Get all users
 // @Description Returns a list of all users
 // @Tags admin
@@ -524,4 +528,64 @@ func (h *Handler) parseAttachments(fileHeaders []*multipart.FileHeader) ([]inter
 
 	wg.Wait()
 	return results, multiErr.ErrorOrNil()
+}
+
+// @Summary Set maintenance mode
+// @Description Sets maintenance mode for the system
+// @Tags admin
+// @ID set-maintenance-mode
+// @Accept json
+// @Produce json
+// @Param body body MaintenanceModeStatus true "Maintenance Mode Status"
+// @Success 200 {object} APIResponse
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /system/maintenance/status [put]
+// SetMaintenanceModeHandler sets maintenance mode for the system
+func (h *Handler) SetMaintenanceModeHandler(c *gin.Context) {
+	var request MaintenanceModeStatus
+
+	// check on request format
+	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Error().Err(err).Send()
+		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
+		return
+	}
+
+	if err := internal.ValidateStruct(request); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
+	if err := h.redis.SetMaintenanceMode(c.Request.Context(), request.Enabled); err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Maintenance mode is set successfully", nil)
+}
+
+// @Summary Get maintenance mode
+// @Description Gets maintenance mode for the system
+// @Tags admin
+// @ID get-maintenance-mode
+// @Accept json
+// @Produce json
+// @Success 200 {object} APIResponse
+// @Failure 500 {object} APIResponse
+// @Security AdminMiddleware
+// @Router /system/maintenance/status [get]
+// GetMaintenanceModeHandler gets maintenance mode for the system
+func (h *Handler) GetMaintenanceModeHandler(c *gin.Context) {
+	enabled, err := h.redis.GetMaintenanceMode(c.Request.Context())
+	if err != nil {
+		log.Error().Err(err).Send()
+		InternalServerError(c)
+		return
+	}
+
+	Success(c, http.StatusOK, "Maintenance mode is retrieved successfully", MaintenanceModeStatus{
+		Enabled: enabled,
+	})
 }
