@@ -1,3 +1,4 @@
+import router from "@/router"
 import { api } from "./api"
 import type { ApiResponse } from "./authService"
 import type { PendingRecord } from "./userService"
@@ -148,7 +149,24 @@ export class AdminService {
     })
     return response.data.data.pending_records
   }
+
+  async SetMaintenanceModeStatus(status: boolean): Promise<void> {
+    try {
+      const response = await api.post('/v1/system/maintenance/status', { enabled: status }, {
+        requiresAuth: true,
+        showNotifications: true,
+        loadingMessage: 'Setting maintenance mode...',
+        successMessage: 'Maintenance mode set successfully, redirecting to maintenance page in 3 seconds',
+        errorMessage: 'Failed to set maintenance mode'
+      })
+      setTimeout(() => {
+        router.push('/maintenance')
+      }, 3000)
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  }
 }
 
-// Export singleton instance
 export const adminService = AdminService.getInstance()
