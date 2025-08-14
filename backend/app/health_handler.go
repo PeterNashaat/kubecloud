@@ -84,7 +84,7 @@ func httpHealthCheck(ctx context.Context, url string) HealthStatus {
 
 func healthURL(baseURL string) (string, error) {
 	if len(strings.TrimSpace(baseURL)) == 0 {
-		return "", fmt.Errorf("URL not set")
+		return "", fmt.Errorf("url not set")
 	}
 	return url.JoinPath(baseURL, "health")
 }
