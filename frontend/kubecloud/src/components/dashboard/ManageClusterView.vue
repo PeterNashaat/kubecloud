@@ -11,6 +11,12 @@
         </div>
         <div v-else-if="cluster" class="manage-header mb-6">
           <div class="manage-header-content">
+            <div class="header-top mb-3">
+              <v-btn variant="text" color="primary" @click="goBack" class="back-button">
+                <v-icon icon="mdi-arrow-left" class="mr-2"></v-icon>
+                Back to Dashboard
+              </v-btn>
+            </div>
             <h1 class="manage-title">{{ cluster?.cluster?.name || '-' }}</h1>
             <p class="manage-subtitle">Manage your Kubernetes cluster configuration and resources</p>
           </div>
@@ -505,6 +511,16 @@ async function handleRemoveNode(nodeName: string) {
   color: var(--color-text-muted);
   text-align: center;
   margin: 2rem 0;
+}
+.header-top {
+  display: flex;
+  align-items: center;
+}
+.back-button {
+  padding: 0;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
 }
 @media (max-width: 900px) {
   .cluster-info-grid {

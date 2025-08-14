@@ -52,6 +52,20 @@ export interface DeleteUserResponse {
   message: string
 }
 
+export interface SystemEmail {
+  title: string
+  message: string
+  priority: string
+}
+
+export interface SystemEmailResponse {
+  failed_emails: string[],
+  failed_emails_count: number,
+  successful_emails: number,
+  total_users: number
+}
+
+
 export interface Invoice {
   id: number
   user_id: number
@@ -149,6 +163,21 @@ export class AdminService {
     })
     return response.data.data.pending_records
   }
+
+  // Send a system email to all users (requires admin auth)
+  async sendSystemEmail(formData: FormData): Promise<SystemEmailResponse> {
+    const response = await api.post<SystemEmailResponse>('/v1/users/mail', formData, {
+      requiresAuth: true,
+      showNotifications: true,
+      loadingMessage: 'Sending email to all users',
+      successMessage: 'Email sent to all users',
+      errorMessage: 'Failed to send email',
+      contentType: '',
+      timeout: 60000,
+    })
+    return response.data
+  }
+
 
   async SetMaintenanceModeStatus(status: boolean): Promise<void> {
     try {
