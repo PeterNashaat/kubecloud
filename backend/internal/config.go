@@ -45,7 +45,7 @@ type SSHConfig struct {
 
 // Server struct holds server's information
 type Server struct {
-	Host string `json:"host" validate:"required,hostname|ip"`
+	Host string `json:"host" validate:"required,hostname|ip|url"`
 	Port string `json:"port" validate:"required,numeric"`
 }
 
@@ -63,9 +63,11 @@ type JwtToken struct {
 
 // MailSender struct to hold sender's email, password
 type MailSender struct {
-	Email       string `json:"email" validate:"required,email"`
-	SendGridKey string `json:"sendgrid_key" validate:"required"`
-	Timeout     int    `json:"timeout" validate:"min=30"`
+	Email               string `json:"email" validate:"required,email"`
+	SendGridKey         string `json:"sendgrid_key" validate:"required"`
+	Timeout             int    `json:"timeout" validate:"min=30"`
+	MaxConcurrentSends  int    `json:"max_concurrent_sends" validate:"min=1"`
+	MaxAttachmentSizeMB int64  `json:"max_attachment_size_mb" validate:"min=1"`
 }
 
 // TermsANDConditions holds required data for accepting terms and conditions
