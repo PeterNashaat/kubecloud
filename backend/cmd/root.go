@@ -160,8 +160,12 @@ func addFlags() error {
 	}
 
 	// === Monitor Balance Interval In Hours ===
-	if err := bindIntFlag(rootCmd, "monitor_balance_interval_in_hours", 1, "Number of hours to monitor balance"); err != nil {
-		return fmt.Errorf("failed to bind monitor_balance_interval_in_hours flag: %w", err)
+	if err := bindIntFlag(rootCmd, "monitor_balance_interval_in_minutes", 1, "Number of minutes to monitor balance"); err != nil {
+		return fmt.Errorf("failed to bind monitor_balance_interval_in_minutes flag: %w", err)
+	}
+
+	if err := bindIntFlag(rootCmd, "notify_admins_for_pending_records_in_hours", 1, "Number of hours to notify admins about pending records"); err != nil {
+		return fmt.Errorf("failed to bind notify_admins_for_pending_records_in_hours flag: %w", err)
 	}
 
 	// === KYC Verifier ===
