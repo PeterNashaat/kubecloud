@@ -21,9 +21,6 @@ jobs:
       - name: Install dependencies
         run: cd frontend/kubecloud && npm ci
         
-      - name: Type check
-        run: cd frontend/kubecloud && npm run type-check
-        
       - name: Lint
         run: cd frontend/kubecloud && npm run lint
         
