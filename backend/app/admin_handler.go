@@ -406,7 +406,7 @@ func (h *Handler) SendMailToAllUsersHandler(c *gin.Context) {
 		return
 	}
 
-	body := h.mailService.SystemAnnouncementMailBody(input.Subject, input.Body)
+	body := h.mailService.SystemAnnouncementMailBody(input.Body)
 
 	emailConcurrencyLimiter := make(chan struct{}, h.config.MailSender.MaxConcurrentSends)
 
