@@ -483,9 +483,10 @@ func TestMaintenanceModeIntegration(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp := httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
+		require.Equal(t, http.StatusOK, resp.Code)
 
 		result := extractMaintenanceModeStatus(t, resp.Body)
+		require.False(t, result.Enabled)
 
 		payload := MaintenanceModeStatus{Enabled: true}
 		body, _ := json.Marshal(payload)
@@ -494,17 +495,17 @@ func TestMaintenanceModeIntegration(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp = httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
+		require.Equal(t, http.StatusOK, resp.Code)
 
 		// 3. Verify it's enabled
 		req, _ = http.NewRequest("GET", "/api/v1/system/maintenance/status", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp = httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
+		require.Equal(t, http.StatusOK, resp.Code)
 
 		result = extractMaintenanceModeStatus(t, resp.Body)
-		assert.True(t, result.Enabled)
+		require.True(t, result.Enabled)
 
 		payload = MaintenanceModeStatus{Enabled: false}
 		body, _ = json.Marshal(payload)
@@ -513,16 +514,16 @@ func TestMaintenanceModeIntegration(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp = httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
+		require.Equal(t, http.StatusOK, resp.Code)
 
 		req, _ = http.NewRequest("GET", "/api/v1/system/maintenance/status", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp = httptest.NewRecorder()
 		router.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
+		require.Equal(t, http.StatusOK, resp.Code)
 
 		result = extractMaintenanceModeStatus(t, resp.Body)
-		assert.False(t, result.Enabled)
+		require.False(t, result.Enabled)
 	})
 }
 
