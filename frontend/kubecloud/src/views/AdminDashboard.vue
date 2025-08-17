@@ -10,6 +10,7 @@ import AdminClustersSection from '../components/AdminClustersSection.vue'
 import AdminSystemSection from '../components/AdminSystemCard.vue'
 import AdminInvoicesTable from '../components/AdminInvoicesTable.vue'
 import AdminPendingRecordsCard from '../components/dashboard/AdminPendingRecordsCard.vue'
+import AdminEmailsCard from '@/components/dashboard/AdminEmailsCard.vue'
 
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
 
@@ -180,7 +181,7 @@ async function loadInvoices() {
         <div class="admin-sidebar">
           <AdminSidebar :selected="selected" @update:selected="handleSidebarSelect" />
         </div>
-        <div class="dashboard-main">
+        <div class="dashboard-main" style="width: 100%;">
           <AdminStatsCards v-if="selected === 'overview'" :adminStats="adminStats" />
           <AdminUsersTable
             v-else-if="selected === 'users'"
@@ -210,6 +211,7 @@ async function loadInvoices() {
           />
           <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
           <AdminPendingRecordsCard v-else-if="selected === 'pending-records'" />
+          <AdminEmailsCard v-else-if="selected === 'emails'" />
           <v-dialog v-model="creditDialog" max-width="600" persistent>
             <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">
               <v-card-title class="text-h6 font-weight-bold mb-2 text-center">Manual Credit</v-card-title>
