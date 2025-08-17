@@ -238,6 +238,16 @@ export const validateVerificationCode = (code: string): { isValid: boolean; erro
   return { isValid: true, error: '' }
 }
 
+export const validateEmail = (email: string): { isValid: boolean; error: string } => {
+  if (!email.trim()) {
+    return { isValid: false, error: 'Email is required' }
+  }
+  if (!PATTERNS.EMAIL.test(email.trim())) {
+    return { isValid: false, error: 'Please enter a valid email address' }
+  }
+  return { isValid: true, error: '' }
+}
+
 export const validatePasswordStrength = (password: string): { isValid: boolean; error: string; strength: 'weak' | 'medium' | 'strong' } => {
   if (!password) {
     return { isValid: false, error: 'Password is required', strength: 'weak' }

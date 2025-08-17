@@ -15,8 +15,8 @@
           variant="outlined"
           class="auth-field"
           :error-messages="errors.email"
+          :rules="[rules.required, rules.email]"
           required
-          @blur="validateEmail"
           placeholder="Enter your email address"
           :disabled="loading || resending"
         />
@@ -28,8 +28,8 @@
           variant="outlined"
           class="auth-field"
           :error-messages="errors.code"
+          :rules="[rules.required, rules.verificationCode]"
           required
-          @blur="validateCode"
           placeholder="Enter 4-6 digit code"
           maxlength="6"
           :disabled="loading"
@@ -41,7 +41,7 @@
           size="large"
           variant="outlined"
           :loading="loading"
-          :disabled="resending"
+          :disabled="resending || !isFormValid"
         >
           <v-icon icon="mdi-check-circle" class="mr-2"></v-icon>
           Verify
@@ -56,10 +56,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '../utils/authService'
-import { validateField, VALIDATION_RULES, validateVerificationCode } from '../utils/validation'
+import { validateEmail, validateVerificationCode } from '../utils/validation'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,43 +69,35 @@ const form = reactive({
   code: ''
 })
 
-const errors = reactive({
-  email: '',
-  code: ''
-})
+const errors = reactive({ email: '', code: '' })
 const loading = ref(false)
 const resending = ref(false)
 
-const clearErrors = () => {
-  errors.email = ''
-  errors.code = ''
+// Validation rules using existing validation utilities
+const rules = {
+  required: (value: string) => !!value?.trim() || 'This field is required',
+  email: (value: string) => validateEmail(value).isValid || validateEmail(value).error,
+  verificationCode: (value: string) => validateVerificationCode(value).isValid || validateVerificationCode(value).error
 }
 
-const validateEmail = () => {
-  const validation = validateField({
-    value: form.email,
-    rules: VALIDATION_RULES.EMAIL,
-    fieldName: 'Email'
-  })
-  errors.email = validation.isValid ? '' : validation.errors[0]
-  return validation.isValid
-}
+// Form validation using validation utilities
+const isFormValid = computed(() => 
+  validateEmail(form.email).isValid && validateVerificationCode(form.code).isValid
+)
 
-const validateCode = () => {
-  const validation = validateVerificationCode(form.code)
-  errors.code = validation.error
-  return validation.isValid
+// Utility function to set errors from validation results
+const setValidationErrors = () => {
+  const emailValidation = validateEmail(form.email)
+  const codeValidation = validateVerificationCode(form.code)
+  
+  errors.email = emailValidation.isValid ? '' : emailValidation.error
+  errors.code = codeValidation.isValid ? '' : codeValidation.error
+  
+  return emailValidation.isValid && codeValidation.isValid
 }
 
 const handleVerify = async () => {
-  clearErrors()
-
-  const isEmailValid = validateEmail()
-  const isCodeValid = validateCode()
-
-  if (!isEmailValid || !isCodeValid) {
-    return
-  }
+  if (!setValidationErrors()) return
 
   try {
     loading.value = true
@@ -113,17 +105,19 @@ const handleVerify = async () => {
       email: form.email.trim(),
       code: Number(form.code.trim())
     })
-    loading.value = false
     router.push('/sign-in')
   } catch (error) {
-    loading.value = false
     errors.code = 'Invalid verification code. Please try again.'
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 
 const resendCode = async () => {
-  if (!validateEmail()) {
+  const emailValidation = validateEmail(form.email)
+  if (!emailValidation.isValid) {
+    errors.email = emailValidation.error
     return
   }
 

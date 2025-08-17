@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { adminService, type User, type Voucher, type GenerateVouchersRequest, type Invoice } from '../utils/adminService'
-import { validateCreditForm } from '../utils/validation'
 import AdminUsersTable from '../components/AdminUsersTable.vue'
 import AdminStatsCards from '../components/AdminStatsCards.vue'
 import AdminManualCredit from '../components/AdminManualCredit.vue'
@@ -10,7 +9,7 @@ import AdminClustersSection from '../components/AdminClustersSection.vue'
 import AdminSystemSection from '../components/AdminSystemCard.vue'
 import AdminInvoicesTable from '../components/AdminInvoicesTable.vue'
 import AdminPendingRecordsCard from '../components/dashboard/AdminPendingRecordsCard.vue'
-import AdminEmailsCard from '@/components/dashboard/AdminEmailsCard.vue'
+import AdminEmailsCard from '../components/dashboard/AdminEmailsCard.vue'
 
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
 
@@ -58,18 +57,7 @@ function goToPage(page: number) {
 }
 
 // Voucher generation form state
-const voucherValue = ref(50)
-const voucherCount = ref(10)
-const voucherExpiry = ref(30)
-const voucherResult = ref('')
 const vouchers = ref<Voucher[]>([])
-
-
-const creditAmount = ref(0)
-const creditReason = ref('')
-const creditResult = ref('')
-const creditValidationErrors = ref({ amount: '', memo: '' })
-const isCreditSubmitting = ref(false)
 
 const creditDialog = ref(false)
 const creditUserDialogObj = ref<User | null>(null)
@@ -78,92 +66,49 @@ function handleSidebarSelect(newSelected: string) {
   selected.value = newSelected
 }
 
-
-async function generateVouchers() {
-    const data: GenerateVouchersRequest = {
-      count: voucherCount.value,
-      value: voucherValue.value,
-      expire_after_days: voucherExpiry.value
-    }
-
-    const response = await adminService.generateVouchers(data)
-    voucherResult.value = response.message
-
+async function generateVouchers(voucherData: GenerateVouchersRequest) {
+    const response = await adminService.generateVouchers(voucherData)
     await loadVouchers()
 }
-
 
 async function loadVouchers() {
     vouchers.value = await adminService.listVouchers()
 }
 
-
-
 function openCreditDialog(user: User) {
   creditUserDialogObj.value = user
   creditDialog.value = true
-  creditAmount.value = 0
-  creditReason.value = ''
-  creditResult.value = ''
-  creditValidationErrors.value = { amount: '', memo: '' }
-  isCreditSubmitting.value = false
 }
 
 function closeCreditDialog() {
   creditDialog.value = false
   creditUserDialogObj.value = null
-  creditValidationErrors.value = { amount: '', memo: '' }
-  isCreditSubmitting.value = false
 }
 
-async function applyManualCreditDialog() {
+async function applyManualCredit(creditData: { amount: number; reason: string }) {
   if (!creditUserDialogObj.value) return
 
-  creditResult.value = ''
-  const validation = validateCreditForm(creditAmount.value, creditReason.value)
-
-  if (!validation.isValid) {
-    creditValidationErrors.value = validation.errors
-    return
-  }
-
   try {
-    isCreditSubmitting.value = true
-    creditValidationErrors.value = { amount: '', memo: '' }
+    await adminService.creditUser(creditUserDialogObj.value.id, {
+      amount: creditData.amount,
+      memo: creditData.reason
+    })
 
-    const data = {
-      amount: creditAmount.value,
-      memo: creditReason.value.trim()
-    }
-
-
-    const response = await adminService.creditUser(creditUserDialogObj.value.id, data)
-    creditResult.value = response.message
-
-
-    creditAmount.value = 0
-    creditReason.value = ''
-
-
-    await loadUsers()
-
-
+    
+    // Close dialog after successful credit
     setTimeout(() => {
       closeCreditDialog()
-    }, 2000)
+    }, 1500)
 
   } catch (error) {
     console.error('Failed to credit user:', error)
-    creditResult.value = 'Failed to credit user. Please try again.'
-  } finally {
-    isCreditSubmitting.value = false
+    throw error // Let the component handle the error display
   }
 }
 
 const invoices: Ref<Invoice[]> = ref([])
 
 onMounted(async () => {
-
   await loadUsers()
   await loadVouchers()
   await loadInvoices()
@@ -199,15 +144,8 @@ async function loadInvoices() {
           <AdminSystemSection v-else-if="selected === 'system'" />
           <AdminVouchersSection
             v-else-if="selected === 'vouchers'"
-            :voucherValue="voucherValue"
-            :voucherCount="voucherCount"
-            :voucherExpiry="voucherExpiry"
-            :voucherResult="voucherResult"
             :vouchers="vouchers"
             @generateVouchers="generateVouchers"
-            @update:voucherValue="voucherValue = $event"
-            @update:voucherCount="voucherCount = $event"
-            @update:voucherExpiry="voucherExpiry = $event"
           />
           <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
           <AdminPendingRecordsCard v-else-if="selected === 'pending-records'" />
@@ -219,32 +157,15 @@ async function loadInvoices() {
                 Apply credits to user: {{ creditUserDialogObj?.email }}
               </v-card-subtitle>
 
-              <!-- Show validation errors if any -->
-              <v-alert
-                v-if="creditValidationErrors.amount || creditValidationErrors.memo"
-                type="error"
-                variant="tonal"
-                class="mb-4"
-              >
-                <div v-if="creditValidationErrors.amount">{{ creditValidationErrors.amount }}</div>
-                <div v-if="creditValidationErrors.memo">{{ creditValidationErrors.memo }}</div>
-              </v-alert>
-
               <AdminManualCredit
                 v-if="creditDialog && creditUserDialogObj"
-                :creditAmount="creditAmount"
-                :creditReason="creditReason"
-                :creditResult="creditResult"
-                @applyManualCredit="applyManualCreditDialog"
-                @update:creditAmount="creditAmount = $event"
-                @update:creditReason="creditReason = $event"
+                @applyManualCredit="applyManualCredit"
               />
               <v-card-actions class="justify-end mt-2">
                 <v-btn
                   text
                   color="grey-lighten-1"
                   @click="closeCreditDialog"
-                  :disabled="isCreditSubmitting"
                 >
                   Cancel
                 </v-btn>

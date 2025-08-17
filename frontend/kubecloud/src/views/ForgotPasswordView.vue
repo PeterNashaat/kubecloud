@@ -14,10 +14,10 @@
           prepend-inner-icon="mdi-email"
           variant="outlined"
           class="auth-field"
-          :error-messages="emailError || error"
+          :error-messages="error"
           :disabled="loading"
+          :rules="[rules.required, rules.email]"
           required
-          @blur="validateEmail"
         />
         <v-btn
           type="submit"
@@ -40,10 +40,10 @@
           prepend-inner-icon="mdi-numeric"
           variant="outlined"
           class="auth-field"
-          :error-messages="codeError || error"
+          :error-messages="error"
           :disabled="loading"
+          :rules="[rules.required, rules.verificationCode]"
           required
-          @blur="validateCode"
           placeholder="Enter 4-6 digit code"
           maxlength="6"
         />
@@ -71,7 +71,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../utils/authService'
-import { validateField, VALIDATION_RULES, validateVerificationCode } from '../utils/validation'
+import { validateEmail, validateVerificationCode } from '../utils/validation'
 
 const router = useRouter()
 const step = ref(1)
@@ -80,44 +80,25 @@ const code = ref('')
 const loading = ref(false)
 const error = ref('')
 
-// Form validation
-const emailError = ref('')
-const codeError = ref('')
-
-const isEmailValid = computed(() => {
-  const validation = validateField({
-    value: email.value,
-    rules: VALIDATION_RULES.EMAIL,
-    fieldName: 'Email'
-  })
-  return validation.isValid
-})
-
-const isCodeValid = computed(() => {
-  if (!code.value.trim()) return false
-  if (code.value.length < 4 || code.value.length > 6) return false
-  if (!/^\d+$/.test(code.value)) return false
-  return true
-})
-
-const validateEmail = () => {
-  const validation = validateField({
-    value: email.value,
-    rules: VALIDATION_RULES.EMAIL,
-    fieldName: 'Email'
-  })
-  emailError.value = validation.isValid ? '' : validation.errors[0]
-  return validation.isValid
+// Validation rules using existing validation utilities
+const rules = {
+  required: (value: string) => !!value?.trim() || 'This field is required',
+  email: (value: string) => {
+    const validation = validateEmail(value)
+    return validation.isValid || validation.error
+  },
+  verificationCode: (value: string) => {
+    const validation = validateVerificationCode(value)
+    return validation.isValid || validation.error
+  }
 }
 
-const validateCode = () => {
-  const validation = validateVerificationCode(code.value)
-  codeError.value = validation.error
-  return validation.isValid
-}
+// Form validation using validation utilities
+const isEmailValid = computed(() => validateEmail(email.value).isValid)
+const isCodeValid = computed(() => validateVerificationCode(code.value).isValid)
 
 const handleRequestCode = async () => {
-  if (!validateEmail()) return
+  if (!email.value.trim() || !rules.email(email.value)) return
 
   error.value = ''
   loading.value = true
@@ -132,29 +113,22 @@ const handleRequestCode = async () => {
 }
 
 const handleVerifyCode = async () => {
-  if (!validateCode()) return
+  if (!code.value.trim() || !rules.verificationCode(code.value)) return
 
   error.value = ''
   loading.value = true
   try {
-    // Verify the code and get tokens
     const tokens = await authService.verifyForgotPasswordCode({
       email: email.value.trim(),
       code: Number(code.value.trim())
     })
 
-    // Store tokens temporarily for password reset only (separate from main auth)
     authService.storeTempTokens(tokens.access_token, tokens.refresh_token)
-
-    // Mark this as a password reset session
     localStorage.setItem('password_reset_session', 'true')
 
-    // Redirect to reset password page with email
     router.push({
       path: '/reset-password',
-      query: {
-        email: email.value.trim()
-      }
+      query: { email: email.value.trim() }
     })
   } catch (err: any) {
     error.value = err?.message || 'Invalid verification code'

@@ -4,10 +4,11 @@
       <h3 class="dashboard-card-title">Manual Credit</h3>
       <p class="section-subtitle">Apply credits to user accounts</p>
     </div>
+    
     <v-form ref="formRef" @submit.prevent="handleSubmit" class="credit-form">
       <div class="form-row">
         <v-text-field
-          v-model.number="creditAmountLocal"
+          v-model.number="creditAmount"
           label="Amount ($)"
           type="number"
           prepend-inner-icon="mdi-currency-usd"
@@ -18,14 +19,12 @@
           density="comfortable"
           required
           class="form-field mb-3"
-          :error-messages="errors.amount"
+          :rules="[rules.required, rules.creditAmount]"
           :disabled="isSubmitting"
-          @blur="validateAmount"
-          @input="clearAmountError"
           placeholder="Enter amount (e.g., 25.50)"
         />
         <v-text-field
-          v-model="creditReasonLocal"
+          v-model="creditReason"
           label="Reason/Memo"
           prepend-inner-icon="mdi-note-text"
           variant="outlined"
@@ -34,14 +33,13 @@
           maxlength="255"
           required
           class="form-field mb-3"
-          :error-messages="errors.memo"
+          :rules="[rules.required, rules.creditMemo]"
           :disabled="isSubmitting"
-          @blur="validateMemo"
-          @input="clearMemoError"
           placeholder="Enter reason for credit (e.g., Account adjustment)"
           counter="255"
         />
       </div>
+      
       <v-btn
         type="submit"
         color="primary"
@@ -51,99 +49,82 @@
         :loading="isSubmitting"
       >
         <v-icon icon="mdi-cash-plus" class="mr-2"></v-icon>
-        Apply Credit
+        {{ isSubmitting ? 'Applying Credit...' : 'Apply Credit' }}
       </v-btn>
+      
+      <!-- Success Message -->
+      <v-alert
+        v-if="showSuccess"
+        type="success"
+        variant="tonal"
+        class="mt-4"
+        closable
+      >
+        <template #prepend>
+          <v-icon icon="mdi-check-circle" />
+        </template>
+        Credit applied successfully!
+      </v-alert>
     </v-form>
   </div>
 </template>
+
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import { validateCreditForm, validateCreditAmount, validateCreditMemo } from '../utils/validation'
+import { ref, computed } from 'vue'
+import { validateCreditAmount, validateCreditMemo } from '../utils/validation'
 
-const props = defineProps({
-  creditAmount: Number,
-  creditReason: String,
-})
+const emit = defineEmits(['applyManualCredit'])
 
-const emit = defineEmits(['applyManualCredit', 'update:creditAmount', 'update:creditReason'])
-
-const formRef = ref()
 const isSubmitting = ref(false)
-const creditAmountLocal = ref(props.creditAmount || 0)
-const creditReasonLocal = ref(props.creditReason || '')
+const showSuccess = ref(false)
+const creditAmount = ref(0)
+const creditReason = ref('')
 
-const errors = ref({
-  amount: '',
-  memo: ''
-})
+// Validation rules using existing validation utilities
+const rules = {
+  required: (value: any) => !!value || 'This field is required',
+  creditAmount: (value: number) => {
+    const validation = validateCreditAmount(value)
+    return validation.isValid || validation.error
+  },
+  creditMemo: (value: string) => {
+    const validation = validateCreditMemo(value)
+    return validation.isValid || validation.error
+  }
+}
 
 const isFormValid = computed(() => {
-  return creditAmountLocal.value > 0 &&
-         creditReasonLocal.value.trim().length >= 3 &&
-         !errors.value.amount &&
-         !errors.value.memo
+  const amountValidation = validateCreditAmount(creditAmount.value)
+  const memoValidation = validateCreditMemo(creditReason.value)
+  return amountValidation.isValid && memoValidation.isValid
 })
 
-const validateAmount = () => {
-  const validation = validateCreditAmount(creditAmountLocal.value)
-  errors.value.amount = validation.error
-}
-
-const validateMemo = () => {
-  const validation = validateCreditMemo(creditReasonLocal.value)
-  errors.value.memo = validation.error
-}
-
-const clearAmountError = () => {
-  errors.value.amount = ''
-}
-
-const clearMemoError = () => {
-  errors.value.memo = ''
-}
-
-const clearAllErrors = () => {
-  errors.value.amount = ''
-  errors.value.memo = ''
-}
-
 const handleSubmit = async () => {
-  clearAllErrors()
-
-  const validation = validateCreditForm(creditAmountLocal.value, creditReasonLocal.value)
-
-  if (!validation.isValid) {
-    errors.value = validation.errors
-    return
-  }
+  if (!isFormValid.value) return
 
   try {
     isSubmitting.value = true
-    emit('applyManualCredit')
+    await emit('applyManualCredit', {
+      amount: creditAmount.value,
+      reason: creditReason.value.trim()
+    })
+    
+    // Show success message
+    showSuccess.value = true
+    
+    // Reset form after successful submission
+    creditAmount.value = 0
+    creditReason.value = ''
+    
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      showSuccess.value = false
+    }, 3000)
+    
   } catch (error) {
     console.error('Credit application error:', error)
   } finally {
     isSubmitting.value = false
   }
 }
-
-watch(() => props.creditAmount, val => {
-  creditAmountLocal.value = val || 0
-  clearAmountError()
-})
-
-watch(() => props.creditReason, val => {
-  creditReasonLocal.value = val || ''
-  clearMemoError()
-})
-
-watch(creditAmountLocal, val => {
-  emit('update:creditAmount', val)
-  if (val > 0) clearAmountError()
-})
-
-watch(creditReasonLocal, val => {
-  emit('update:creditReason', val)
-  if (val.trim().length >= 3) clearMemoError()
-})
 </script>
