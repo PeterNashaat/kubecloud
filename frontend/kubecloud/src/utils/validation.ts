@@ -122,8 +122,8 @@ export const validateForm = (fields: Record<string, FieldValidation>): Validatio
 export const VALIDATION_RULES = {
   REQUIRED: { required: true },
   EMAIL: { required: true, email: true },
-  PASSWORD: { 
-    required: true, 
+  PASSWORD: {
+    required: true,
     minLength: 8,
     pattern: PATTERNS.PASSWORD,
     custom: (value: string) => {
@@ -136,9 +136,9 @@ export const VALIDATION_RULES = {
   URL: { required: true, url: true },
   PHONE: { required: true, pattern: PATTERNS.PHONE },
   ALPHANUMERIC: { required: true, pattern: PATTERNS.ALPHANUMERIC },
-  CLUSTER_NAME: { 
-    required: true, 
-    minLength: 3, 
+  CLUSTER_NAME: {
+    required: true,
+    minLength: 3,
     pattern: PATTERNS.ALPHANUMERIC
   },
   HEX_COLOR: { pattern: PATTERNS.HEX_COLOR },
@@ -154,13 +154,14 @@ export const formatValidationErrors = (errors: string[]): string => {
   return errors.join('. ')
 }
 
+
 // Async validation support
 export const validateAsync = async (
   field: FieldValidation,
   asyncValidator?: (value: any) => Promise<boolean | string>
 ): Promise<ValidationResult> => {
   const syncResult = validateField(field)
-  
+
   if (!syncResult.isValid || !asyncValidator) {
     return syncResult
   }
@@ -181,4 +182,36 @@ export const validateAsync = async (
   }
 
   return syncResult
+}
+
+
+export function required(msg: string) {
+  return (value: string) => {
+    if (!value) {
+      return msg;
+    }
+  };
+}
+export function min(msg: string, min: number) {
+  return (value: number) => {
+    if (value < min) {
+      return msg ;
+    }
+  };
+}
+
+export function max(msg: string, max: number) {
+  return (value: number) => {
+    if (+value > max) {
+      return msg;
+    }
+  };
+}
+
+export function isAlphanumeric(msg: string) {
+  return (value: string) => {
+    if (!/^[a-zA-Z0-9]*$/.test(value)) {
+      return msg;
+    }
+  };
 }
