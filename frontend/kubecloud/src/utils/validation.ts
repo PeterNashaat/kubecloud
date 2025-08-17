@@ -136,6 +136,11 @@ export const VALIDATION_RULES = {
   URL: { required: true, url: true },
   PHONE: { required: true, pattern: PATTERNS.PHONE },
   ALPHANUMERIC: { required: true, pattern: PATTERNS.ALPHANUMERIC },
+  CLUSTER_NAME: { 
+    required: true, 
+    minLength: 3, 
+    pattern: PATTERNS.ALPHANUMERIC
+  },
   HEX_COLOR: { pattern: PATTERNS.HEX_COLOR },
   IP_ADDRESS: { pattern: PATTERNS.IP_ADDRESS }
 }
@@ -147,10 +152,6 @@ export const sanitizeInput = (input: string): string => {
 
 export const formatValidationErrors = (errors: string[]): string => {
   return errors.join('. ')
-}
-
-export const createValidationRule = (rule: ValidationRule): ValidationRule => {
-  return rule
 }
 
 // Async validation support
@@ -180,39 +181,4 @@ export const validateAsync = async (
   }
 
   return syncResult
-} 
-
-
-
-
-
-export function required(msg: string) {
-  return (value: string) => {
-    if (!value) {
-      return msg;
-    }
-  };
-}
-export function min(msg: string, min: number) {
-  return (value: number) => {
-    if (value < min) {
-      return msg ;
-    }
-  };
-}
-
-export function max(msg: string, max: number) {
-  return (value: number) => {
-    if (+value > max) {
-      return msg;
-    }
-  };
-}
-
-export function isAlphanumeric(msg: string) {
-  return (value: string) => {
-    if (!/^[a-zA-Z0-9]*$/.test(value)) {
-      return msg;
-    }
-  };
 }
