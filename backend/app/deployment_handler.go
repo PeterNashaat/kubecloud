@@ -390,7 +390,6 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 		return
 	}
 
-	// TODO: validate the cluster required fields/ pingable nodes
 	var cluster kubedeployer.Cluster
 	if err := c.ShouldBindJSON(&cluster); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
@@ -399,6 +398,18 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 
 	if err := internal.ValidateStruct(cluster); err != nil {
 		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
+	if err := cluster.Validate(); err != nil {
+		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
+		return
+	}
+
+	projectName := kubedeployer.GetProjectName(config.UserID, cluster.Name)
+	_, err = h.db.GetClusterByName(config.UserID, projectName)
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "deployment already exists"})
 		return
 	}
 
@@ -522,14 +533,21 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		return
 	}
 
+	// TODO: find a better place for this
+	cluster.Nodes[0].OriginalName = cluster.Nodes[0].Name
+
+	for _, node := range cl.Nodes {
+		if node.OriginalName == cluster.Nodes[0].OriginalName {
+			c.JSON(http.StatusConflict, gin.H{"error": "Node with the same name already exists"})
+			return
+		}
+	}
+
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowAddNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
 		return
 	}
-
-	// TODO: find a better place for this
-	cluster.Nodes[0].OriginalName = cluster.Nodes[0].Name
 
 	wf.State = ewf.State{
 		"config":  config,
@@ -591,6 +609,18 @@ func (h *Handler) HandleRemoveNode(c *gin.Context) {
 	if err != nil {
 		log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployment details"})
+		return
+	}
+
+	nodeExists := false
+	for _, node := range cl.Nodes {
+		if node.OriginalName == nodeName {
+			nodeExists = true
+		}
+	}
+
+	if !nodeExists {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("node %q not found in cluster %q", nodeName, deploymentName)})
 		return
 	}
 
