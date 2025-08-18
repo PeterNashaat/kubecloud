@@ -39,7 +39,7 @@ type SSEMessage struct {
 }
 
 // NewSSEManager creates a new SSE manager
-func NewSSEManager(redis *RedisClient, db models.DB) *SSEManager {
+func NewSSEManager(db models.DB) *SSEManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	manager := &SSEManager{
 		clients: make(map[string][]chan SSEMessage),
@@ -47,8 +47,6 @@ func NewSSEManager(redis *RedisClient, db models.DB) *SSEManager {
 		cancel:  cancel,
 		db:      db,
 	}
-
-	go manager.listenForResults(redis)
 
 	return manager
 }
@@ -137,16 +135,6 @@ func (s *SSEManager) Notify(userID string, msgType string, data any, taskID ...s
 
 }
 
-// SendTaskUpdate is a convenience method for sending task updates
-func (s *SSEManager) SendTaskUpdate(userID, taskID string, status TaskStatus, message string, data any) {
-	payload := map[string]interface{}{
-		"status":  status,
-		"message": message,
-		"data":    data,
-	}
-	s.Notify(userID, "task_update", payload, taskID)
-}
-
 // HandleSSE handles SSE HTTP connections
 func (s *SSEManager) HandleSSE(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -194,19 +182,6 @@ func (s *SSEManager) HandleSSE(c *gin.Context) {
 			return false
 		}
 	})
-}
-
-// listenForResults listens for deployment results from Redis
-func (s *SSEManager) listenForResults(redis *RedisClient) {
-	callback := func(result *DeploymentResult) {
-		s.Notify(result.UserID, "deployment_update", result, result.TaskID)
-	}
-
-	if err := redis.SubscribeToResults(s.ctx, callback); err != nil {
-		if s.ctx.Err() == nil {
-			log.Error().Err(err).Msg("Failed to listen for Redis results")
-		}
-	}
 }
 
 // persistNotification saves notification to database
