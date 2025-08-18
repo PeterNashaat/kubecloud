@@ -3,6 +3,7 @@ package activities
 import (
 	"context"
 	"kubecloud/internal"
+	"kubecloud/internal/metrics"
 	"kubecloud/models"
 	"time"
 
@@ -53,6 +54,7 @@ func RegisterEWFWorkflows(
 	kycClient *internal.KYCClient,
 	sponsorAddress string,
 	sponsorKeyPair subkey.KeyPair,
+	metrics *metrics.Metrics,
 ) {
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
 	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config))
@@ -129,5 +131,5 @@ func RegisterEWFWorkflows(
 	}
 	engine.RegisterTemplate(WorkflowUnreserveNode, &unreserveNodeTemplate)
 
-	registerDeploymentActivities(engine, db, sse)
+	registerDeploymentActivities(engine, metrics, db, sse)
 }
