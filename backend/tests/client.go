@@ -267,6 +267,26 @@ func (c *Client) DeleteCluster(name string) error {
 	return nil
 }
 
+func (c *Client) DeleteAllDeployments() (string, error) {
+	resp, err := c.makeRequest("DELETE", "/deployments", nil, true)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("delete all deployments failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var deleteResp app.Response
+	if err := json.NewDecoder(resp.Body).Decode(&deleteResp); err != nil {
+		return "", fmt.Errorf("failed to decode delete all response: %w", err)
+	}
+
+	return deleteResp.WorkflowID, nil
+}
+
 func (c *Client) AddNode(deploymentName string, node kubedeployer.Node) (string, error) {
 	cluster := kubedeployer.Cluster{
 		Name:  deploymentName,
