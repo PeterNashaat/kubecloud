@@ -133,6 +133,7 @@
 
     <!-- Edit Cluster Nodes Modal -->
     <component :is="EditClusterNodesDialog"
+      :key="editClusterNodesDialog ? 'open' : 'closed'"
       v-model="editClusterNodesDialog"
       :cluster="cluster"
       :nodes="filteredNodes"
