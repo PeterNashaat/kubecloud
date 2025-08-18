@@ -488,6 +488,52 @@ func (h *Handler) HandleDeleteCluster(c *gin.Context) {
 	})
 }
 
+// @Summary Delete all deployments
+// @Description Deletes all deployments and their resources for the authenticated user
+// @Tags deployments
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} Response "Delete all deployments workflow started successfully"
+// @Failure 401 {object} APIResponse "Unauthorized"
+// @Failure 500 {object} APIResponse "Internal server error"
+// @Router /deployments [delete]
+func (h *Handler) HandleDeleteAllDeployments(c *gin.Context) {
+	config, err := h.getClientConfig(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	clusters, err := h.db.ListUserClusters(config.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve deployments"})
+		return
+	}
+
+	if len(clusters) == 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "No deployments found to delete"})
+		return
+	}
+
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowDeleteAllDeployments)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create workflow"})
+		return
+	}
+
+	wf.State = ewf.State{
+		"config": config,
+	}
+
+	h.ewfEngine.RunAsync(c, wf)
+
+	c.JSON(http.StatusOK, Response{
+		WorkflowID: wf.UUID,
+		Status:     string(wf.Status),
+		Message:    "Delete all deployments workflow started successfully",
+	})
+}
+
 // @Summary Add node to deployment
 // @Description Adds a new node to an existing deployment
 // @Tags deployments

@@ -285,6 +285,7 @@ func (app *App) registerHandlers() {
 			{
 				deploymentGroup.POST("", app.handlers.HandleDeployCluster)
 				deploymentGroup.GET("", app.handlers.HandleListDeployments)
+				deploymentGroup.DELETE("", app.handlers.HandleDeleteAllDeployments)
 				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
 				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
 				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteCluster)

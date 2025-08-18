@@ -423,6 +423,11 @@ func (s *GormDB) DeleteCluster(userID string, projectName string) error {
 	return s.db.Where("user_id = ? AND project_name = ?", userID, projectName).Delete(&Cluster{}).Error
 }
 
+// DeleteAllUserClusters deletes all clusters for a specific user
+func (s *GormDB) DeleteAllUserClusters(userID string) error {
+	return s.db.Where("user_id = ?", userID).Delete(&Cluster{}).Error
+}
+
 func (s *GormDB) CreatePendingRecord(record *PendingRecord) error {
 	record.CreatedAt = time.Now()
 	return s.db.Create(record).Error

@@ -319,6 +319,103 @@ func RemoveClusterFromDBStep(db models.DB) ewf.StepFn {
 	}
 }
 
+func GatherAllContractIDsStep(db models.DB) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return err
+		}
+
+		clusters, err := db.ListUserClusters(config.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to list user clusters: %w", err)
+		}
+
+		var allContractIDs []uint64
+		for _, cluster := range clusters {
+			clusterResult, err := cluster.GetClusterResult()
+			if err != nil {
+				log.Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
+				continue
+			}
+
+			// Gather contract IDs from all nodes
+			for _, node := range clusterResult.Nodes {
+				if node.ContractID != 0 {
+					allContractIDs = append(allContractIDs, node.ContractID)
+				}
+			}
+
+			// Gather contract IDs from network deployments
+			for _, contractID := range clusterResult.Network.NodeDeploymentID {
+				if contractID != 0 {
+					allContractIDs = append(allContractIDs, contractID)
+				}
+			}
+		}
+
+		// Remove duplicates
+		contractIDSet := make(map[uint64]bool)
+		var uniqueContractIDs []uint64
+		for _, id := range allContractIDs {
+			if !contractIDSet[id] {
+				contractIDSet[id] = true
+				uniqueContractIDs = append(uniqueContractIDs, id)
+			}
+		}
+
+		state["contract_ids"] = uniqueContractIDs
+		return nil
+	}
+}
+
+func BatchCancelContractsStep() ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		ensureClient(state)
+
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
+		kubeClient, err := statemanager.GetKubeClient(state, config)
+		if err != nil {
+			return err
+		}
+
+		contractIDs, ok := state["contract_ids"].([]uint64)
+		if !ok {
+			return fmt.Errorf("missing or invalid 'contract_ids' in state")
+		}
+
+		if len(contractIDs) == 0 {
+			log.Info().Str("user_id", config.UserID).Msg("No contracts to cancel")
+			return nil
+		}
+
+		if err := kubeClient.CancelAllContractsForUser(ctx, contractIDs); err != nil {
+			return fmt.Errorf("failed to cancel contracts: %w", err)
+		}
+
+		return nil
+	}
+}
+
+func DeleteAllUserClustersStep(db models.DB) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return err
+		}
+
+		if err := db.DeleteAllUserClusters(config.UserID); err != nil {
+			return fmt.Errorf("failed to delete all user clusters from database: %w", err)
+		}
+
+		return nil
+	}
+}
+
 func RemoveDeploymentNodeStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		ensureClient(state)
@@ -515,6 +612,9 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepRemoveNode, RemoveDeploymentNodeStep())
 	engine.Register(StepStoreDeployment, StoreDeploymentStep(db, metrics))
 	engine.Register(StepRemoveClusterFromDB, RemoveClusterFromDBStep(db))
+	engine.Register(StepGatherAllContractIDs, GatherAllContractIDsStep(db))
+	engine.Register(StepBatchCancelContracts, BatchCancelContractsStep())
+	engine.Register(StepDeleteAllUserClusters, DeleteAllUserClustersStep(db))
 
 	createDeployWorkflowTemplates(engine, metrics)
 
@@ -526,6 +626,14 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: StepRemoveClusterFromDB, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(WorkflowDeleteCluster, &deleteWFTemplate)
+
+	deleteAllDeploymentsWFTemplate := BaseWFTemplate
+	deleteAllDeploymentsWFTemplate.Steps = []ewf.Step{
+		{Name: StepGatherAllContractIDs, RetryPolicy: standardRetryPolicy},
+		{Name: StepBatchCancelContracts, RetryPolicy: standardRetryPolicy},
+		{Name: StepDeleteAllUserClusters, RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate(WorkflowDeleteAllDeployments, &deleteAllDeploymentsWFTemplate)
 
 	addNodeWFTemplate := BaseWFTemplate
 	addNodeWFTemplate.Steps = []ewf.Step{
