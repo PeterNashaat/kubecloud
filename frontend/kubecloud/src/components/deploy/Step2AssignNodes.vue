@@ -35,70 +35,16 @@
               </div>
             </div>
           </div>
-          <v-select
+          <NodeSelect
             v-model="vm.node"
             :items="getAvailableNodesForVM(index)"
-            :item-title="nodeLabel"
-            item-value="nodeId"
             label="Select Reserved Node"
             clearable
             class="node-select"
+            :get-node-resources="getNodeAvailableResources"
+            :cpu-label="'vCPU'"
             @update:modelValue="val => props.onAssignNode(index, val)"
-          >
-            <template #item="{ item, index, props: itemProps }">
-              <div>
-                <div v-bind="itemProps" class="node-option-row">
-                  <div class="node-id">Node {{ item.raw.nodeId }}</div>
-                  <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getNodeAvailableResources(item.raw).cpu }} vCPU
-                    </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getNodeAvailableResources(item.raw).ram }} GB RAM
-                    </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getNodeAvailableResources(item.raw).storage }} GB Disk
-                    </v-chip>
-                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-expansion-card</v-icon>
-                      GPU
-                    </v-chip>
-                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      {{ item.raw.country }}
-                    </v-chip>
-                  </div>
-                </div>
-                <v-divider v-if="index < availableNodes.length - 1" />
-              </div>
-            </template>
-            <template #selection="{ item }">
-              <div class="node-id">Node {{ item.raw.nodeId }}</div>
-              <div class="chip-row">
-                <v-chip color="primary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                  <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                  {{ getNodeAvailableResources(item.raw).cpu }} vCPU
-                </v-chip>
-                <v-chip color="success" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                  <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                  {{ getNodeAvailableResources(item.raw).ram }} GB RAM
-                </v-chip>
-                <v-chip color="info" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                  <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                  {{ getNodeAvailableResources(item.raw).storage }} GB Disk
-                </v-chip>
-                <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                  <v-icon size="14" class="mr-1">mdi-expansion-card</v-icon>
-                  GPU
-                </v-chip>
-                <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                  {{ item.raw.country }}
-                </v-chip>
-              </div>
-            </template>
-          </v-select>
+          />
         </div>
       </v-col>
     </v-row>
@@ -118,6 +64,7 @@
 import type { NormalizedNode } from '@/types/normalizedNode';
 import { type VM } from '../../composables/useDeployCluster';
 import { defineProps, withDefaults, defineEmits, onMounted, computed } from 'vue';
+import NodeSelect from '@/components/ui/NodeSelect.vue';
 const props = withDefaults(defineProps<{
   allVMs: VM[];
   availableNodes: NormalizedNode[];
@@ -128,11 +75,6 @@ const props = withDefaults(defineProps<{
   isStep2Valid: false
 });
 const emit = defineEmits(['nextStep', 'prevStep']);
-
-function nodeLabel(node: any) {
-  if (!node) return '';
-  return `Node ${node.nodeId}`;
-}
 
 const currentAllocations = computed(() =>
   props.allVMs.reduce((acc, vm) => {
@@ -245,20 +187,6 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
-}
-.node-option-row {
-  margin: .5rem;
-  cursor: pointer;
-}
-.node-id {
-  font-weight: 600;
-  margin-bottom: 2px;
-  margin-right: 1rem;
-}
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
 }
 .nodes-empty {
   display: flex;
