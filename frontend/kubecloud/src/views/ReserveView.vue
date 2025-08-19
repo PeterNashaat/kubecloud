@@ -1,5 +1,19 @@
 <template>
   <div class="reserve-view">
+    <!-- Back Button Section -->
+    <section class="back-button-section mx-7">
+      <div class="container-padding">
+        <v-btn
+          color="primary"
+          variant="outlined"
+          @click="goBack"
+          prepend-icon="mdi-arrow-left"
+          class="back-btn"
+        >
+          Back
+        </v-btn>
+      </div>
+    </section>
     <!-- Hero Section -->
     <section class="hero-section">
       <div class="hero-content container-padding">
@@ -13,6 +27,7 @@
         </div>
       </div>
     </section>
+
 
     <!-- Authentication Banner for Non-Authenticated Users -->
     <section v-if="!isAuthenticated" class="auth-banner section-padding">
@@ -228,6 +243,10 @@ const handleSignIn = () => {
   router.push('/sign-in')
 }
 
+const goBack = () => {
+  router.go(-1)
+}
+
 // Pagination logic
 const currentPage = ref(1)
 const pageSize = 8
@@ -257,17 +276,21 @@ watch(filteredNodes, () => {
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
+  margin-top: 5rem;
 }
 
 /* Hero Section */
 .hero-section {
-  margin: 7rem 0 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 2;
   padding: 2rem 0;
+}
+
+.back-button-section {
+  padding: 1rem 0;
 }
 
 /* Auth Banner */
