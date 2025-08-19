@@ -325,7 +325,7 @@ export class UserService {
     const response = await api.get<ApiResponse<PendingRecord[]>>('/v1/user/pending-records', {
       requiresAuth: true,
       showNotifications: true,
-      errorMessage: 'Failed to load pending records'
+      errorMessage: 'Failed to load payments'
     })
     return response.data.data
   }
@@ -334,7 +334,7 @@ export class UserService {
     const response = await api.get<{ data: { pending_records: PendingRecord[] } }>(`/v1/user/pending-records`, {
       requiresAuth: true,
       showNotifications: true,
-      errorMessage: 'Failed to load pending records'
+      errorMessage: 'Failed to load payments'
     })
     return response.data.data.pending_records
   }
