@@ -19,7 +19,6 @@
         </div>
         <DeployVMCard v-for="(master, masterIdx) in masters" :key="masterIdx" :vm="master" type="master" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('master', masterIdx)" @delete="() => removeMaster(masterIdx)" />
         <div v-if="!masters.length" class="empty-state">
-          <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
           <p>No master nodes configured</p>
         </div>
       </div>
@@ -33,7 +32,6 @@
         </div>
         <DeployVMCard v-for="(worker, workerIdx) in workers" :key="workerIdx" :vm="worker" type="worker" :availableSshKeys="availableSshKeys" @edit="() => openEditNodeModal('worker', workerIdx)" @delete="() => removeWorker(workerIdx)" />
         <div v-if="!workers.length" class="empty-state">
-          <v-icon icon="mdi-plus-circle-outline" size="32" color="var(--color-text-muted)"></v-icon>
           <p>No worker nodes configured</p>
         </div>
       </div>
