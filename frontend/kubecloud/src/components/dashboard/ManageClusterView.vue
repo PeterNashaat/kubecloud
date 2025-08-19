@@ -317,6 +317,7 @@ async function addNode(payload: any) {
     await addNodeToDeployment(payload.name, payload);
     notificationStore.info('Deployment is being updated', 'Your node is being added in the background. You will be notified when it is ready.');
   } catch (e: any) {
+    console.error(e);
   }
 }
 
