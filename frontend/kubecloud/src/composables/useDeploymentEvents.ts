@@ -25,7 +25,7 @@ export function useDeploymentEvents() {
 
   function connect() {
     if (eventSource.value) return
-    const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+    const backendBaseUrl = (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_API_BASE_URL) || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
     const token = userStore.token || ''
     const url = backendBaseUrl + '/v1/events?token=' + encodeURIComponent(token)
 
