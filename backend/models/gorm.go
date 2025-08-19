@@ -39,7 +39,30 @@ func NewGormStorage(dialector gorm.Dialector) (DB, error) {
 		return nil, err
 	}
 
-	return &GormDB{db: db}, nil
+	gormDB := &GormDB{db: db}
+	return gormDB, gormDB.UpdatePendingRecordsWithUsername()
+}
+
+// TODO: TO BE REMOVED
+func (s *GormDB) UpdatePendingRecordsWithUsername() error {
+	var pendingRecords []PendingRecord
+	if err := s.db.Find(&pendingRecords).Where("username IS NULL").Error; err != nil {
+		return fmt.Errorf("failed to find pending records: %w", err)
+	}
+
+	for _, record := range pendingRecords {
+		user, err := s.GetUserByID(record.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by ID %d: %w", record.UserID, err)
+		}
+
+		// Update the record with the username
+		if err := s.db.Model(&record).Update("username", user.Username).Error; err != nil {
+			return fmt.Errorf("failed to update pending record with username: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *GormDB) GetDB() *gorm.DB {
