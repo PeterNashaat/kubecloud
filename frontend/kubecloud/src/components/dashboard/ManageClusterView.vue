@@ -311,7 +311,6 @@ const notificationStore = useNotificationStore()
 async function addNode(payload: any) {
   if (!payload || !payload.name || !Array.isArray(payload.nodes) || payload.nodes.length === 0) {
     notificationStore.error('Add Node Error', 'Invalid node payload.');
-    throw new Error('Invalid node payload.');
   }
   try {
     await addNodeToDeployment(payload.name, payload);
