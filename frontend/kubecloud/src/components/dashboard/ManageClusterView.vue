@@ -308,9 +308,6 @@ const { rentedNodes, loading: nodesLoading, fetchRentedNodes, addNodeToDeploymen
 // Notification store
 const notificationStore = useNotificationStore()
 
-// SSH keys state
-const sshKeys = ref<any[]>([])
-
 async function addNode(payload: any) {
   if (!payload || !payload.name || !Array.isArray(payload.nodes) || payload.nodes.length === 0) {
     notificationStore.error('Add Node Error', 'Invalid node payload.');
@@ -320,9 +317,6 @@ async function addNode(payload: any) {
     await addNodeToDeployment(payload.name, payload);
     notificationStore.info('Deployment is being updated', 'Your node is being added in the background. You will be notified when it is ready.');
   } catch (e: any) {
-    const errorMessage = e?.message || 'Failed to add node';
-    notificationStore.error('Add Node Failed', errorMessage);
-    throw e;
   }
 }
 
