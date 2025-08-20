@@ -142,7 +142,7 @@
       <template #actions>
         <div v-if="editTab === 'add'" class="add-form-actions">
           <v-btn variant="outlined" color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading || !formValid" @click="confirmAddForm" class="mr-3">Add Node</v-btn>
-          <v-btn variant="outlined" @click="editTab = 'list'">Cancel</v-btn>
+          <v-btn variant="outlined" @click="dialog = false">Cancel</v-btn>
         </div>
       </template>
     </BaseDialogCard>
