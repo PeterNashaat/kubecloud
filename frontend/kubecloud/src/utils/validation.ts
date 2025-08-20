@@ -176,47 +176,53 @@ export const RULES = {
     maxLength: 20,
     pattern: PATTERNS.ALPHANUMERIC
   }),
-  
+
   cpu: (value: any) => validateNodeField(value, 'CPU', {
     required: true,
     min: 1,
-    max: 255
+    max: 255,
+    custom: (val: any) => {
+      const num = Number(val)
+      if (isNaN(num)) return 'CPU must be a valid number'
+      if (!Number.isInteger(num)) return 'CPU must be a whole number (no decimals)'
+      return true
+    }
   }),
-  
+
   ram: (value: any) => validateNodeField(value, 'RAM', {
     required: true,
     min: 2,
     max: 256
   }),
-  
+
   storage: (value: any) => validateNodeField(value, 'Storage', {
     required: true,
     min: 10,
     max: 10000
   }),
-  
+
   clusterName: (value: any) => validateNodeField(value, 'Cluster name', {
     required: true,
     minLength: 3,
     maxLength: 20,
     pattern: PATTERNS.ALPHANUMERIC
   }),
-  
+
   validateNode: (node: any): Record<string, string> => {
     const errors: Record<string, string> = {}
-    
+
     const nameError = RULES.nodeName(node.name)
     if (nameError) errors.name = nameError
-    
+
     const cpuError = RULES.cpu(node.vcpu)
     if (cpuError) errors.vcpu = cpuError
-    
+
     const ramError = RULES.ram(node.ram)
     if (ramError) errors.ram = ramError
-    
+
     const storageError = RULES.storage(node.disk)
     if (storageError) errors.disk = storageError
-    
+
     return errors
   }
 }
