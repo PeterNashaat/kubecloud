@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -97,7 +98,7 @@ func SendVerificationEmailStep(mailService internal.MailService, config internal
 		}
 
 		code := internal.GenerateRandomCode()
-		subject, body := mailService.SignUpMailContent(code, config.MailSender.Timeout, name, config.Server.Host)
+		subject, body := mailService.SignUpMailContent(code, config.MailSender.TimeoutMin, name, config.Server.Host)
 
 		if err := mailService.SendMail(config.MailSender.Email, email, subject, body); err != nil {
 			return fmt.Errorf("send mail failed: %w", err)
@@ -151,6 +152,16 @@ func SetupTFChainStep(client *substrate.Substrate, config internal.Configuration
 
 		sse.Notify(fmt.Sprintf("%d", userID), "user_registration", "Registering user is in progress")
 
+		existingUser, err := db.GetUserByID(userID)
+		if err != nil {
+			return fmt.Errorf("failed to check existing user: %w", err)
+		}
+
+		if len(strings.TrimSpace(existingUser.Mnemonic)) > 0 {
+			state["mnemonic"] = existingUser.Mnemonic
+			return nil
+		}
+
 		mnemonic, _, err := internal.SetupUserOnTFChain(client, config)
 		if err != nil {
 			return err
@@ -177,6 +188,15 @@ func CreateStripeCustomerStep(db models.DB) ewf.StepFn {
 		userID, ok := userIDVal.(int)
 		if !ok {
 			return fmt.Errorf("'user_id' in state is not an int")
+		}
+
+		existingUser, err := db.GetUserByID(userID)
+		if err != nil {
+			return fmt.Errorf("failed to check existing user: %w", err)
+		}
+
+		if len(strings.TrimSpace(existingUser.StripeCustomerID)) > 0 {
+			return nil
 		}
 
 		emailVal, ok := state["email"]
@@ -209,25 +229,12 @@ func CreateStripeCustomerStep(db models.DB) ewf.StepFn {
 			return fmt.Errorf("failed to update user stripe customer: %w", err)
 		}
 
-		state["stripe_customer_id"] = customer.ID
 		return nil
 	}
 }
 
 func CreateKYCSponsorship(kycClient *internal.KYCClient, sse *internal.SSEManager, sponsorAddress string, sponsorKeyPair subkey.KeyPair, db models.DB) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		mnemonicVal, ok := state["mnemonic"]
-		if !ok {
-			return fmt.Errorf("missing 'mnemonic' in state")
-		}
-		mnemonic, ok := mnemonicVal.(string)
-		if !ok {
-			return fmt.Errorf("'mnemonic' in state is not a string")
-		}
-
-		state["sponsored"] = false
-		state["sponsee_address"] = ""
-
 		userIDVal, ok := state["user_id"]
 		if !ok {
 			return fmt.Errorf("missing 'user_id' in state")
@@ -235,6 +242,24 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, sse *internal.SSEManage
 		userID, ok := userIDVal.(int)
 		if !ok {
 			return fmt.Errorf("'user_id' in state is not an int")
+		}
+
+		existingUser, err := db.GetUserByID(userID)
+		if err != nil {
+			return fmt.Errorf("failed to check existing user: %w", err)
+		}
+
+		if existingUser.Sponsored && len(strings.TrimSpace(existingUser.AccountAddress)) > 0 {
+			return nil
+		}
+
+		mnemonicVal, ok := state["mnemonic"]
+		if !ok {
+			return fmt.Errorf("missing 'mnemonic' in state")
+		}
+		mnemonic, ok := mnemonicVal.(string)
+		if !ok {
+			return fmt.Errorf("'mnemonic' in state is not a string")
 		}
 
 		sse.Notify(fmt.Sprintf("%d", userID), "user_registration", "Account verification is in progress")
@@ -265,8 +290,6 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, sse *internal.SSEManage
 			return fmt.Errorf("failed to update user data: %w", err)
 		}
 
-		state["sponsee_address"] = sponseeAddress
-		state["sponsored"] = true
 		return nil
 	}
 }

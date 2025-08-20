@@ -276,7 +276,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	if user.UpdatedAt.Add(time.Duration(h.config.MailSender.Timeout) * time.Second).Before(time.Now()) {
+	if user.UpdatedAt.Add(time.Duration(h.config.MailSender.TimeoutMin) * time.Minute).Before(time.Now()) {
 		Error(c, http.StatusBadRequest, "verification failed", "code has expired")
 		return
 	}
@@ -286,6 +286,12 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to start user verification workflow")
+		InternalServerError(c)
+		return
+	}
+
+	if err = h.ewfEngine.Store().SaveWorkflow(c.Request.Context(), wf); err != nil {
+		log.Error().Err(err).Msg("failed to save user verification workflow")
 		InternalServerError(c)
 		return
 	}
@@ -448,7 +454,7 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 	}
 
 	code := internal.GenerateRandomCode()
-	subject, body := h.mailService.ResetPasswordMailContent(code, h.config.MailSender.Timeout, user.Username, h.config.Server.Host)
+	subject, body := h.mailService.ResetPasswordMailContent(code, h.config.MailSender.TimeoutMin, user.Username, h.config.Server.Host)
 	err = h.mailService.SendMail(h.config.MailSender.Email, request.Email, subject, body)
 
 	if err != nil {
@@ -473,7 +479,7 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 
 	Success(c, http.StatusOK, "Verification code sent", RegisterResponse{
 		Email:   request.Email,
-		Timeout: fmt.Sprintf("%d seconds", h.config.MailSender.Timeout),
+		Timeout: fmt.Sprintf("%d minutes", h.config.MailSender.TimeoutMin),
 	})
 
 }
@@ -523,7 +529,7 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 		return
 	}
 
-	if user.UpdatedAt.Add(time.Duration(h.config.MailSender.Timeout) * time.Second).Before(time.Now()) {
+	if user.UpdatedAt.Add(time.Duration(h.config.MailSender.TimeoutMin) * time.Minute).Before(time.Now()) {
 		Error(c, http.StatusBadRequest, "code expired", "verification code has expired")
 
 		return

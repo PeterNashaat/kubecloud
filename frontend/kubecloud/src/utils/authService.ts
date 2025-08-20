@@ -129,9 +129,10 @@ export class AuthService {
   async verifyCode(data: VerifyCodeRequest): Promise<void> {
     const response = await api.post<ApiResponse<VerifyCodeResponse>>('/v1/user/register/verify', data, {
       showNotifications: true,
-      errorMessage: 'Verification failed'
+      errorMessage: 'Verification failed',
+      timeout: 60000
     })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 2000 })
+    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 5000, interval: 3000 })
     const status = await workflowChecker.status
     if (status === WorkflowStatus.StatusCompleted) {
       useNotificationStore().success(

@@ -43,7 +43,7 @@ type App struct {
 }
 
 // NewApp create new instance of the app with all configs
-func NewApp(config internal.Configuration) (*App, error) {
+func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 	router := gin.Default()
 
 	stripe.Key = config.StripeSecret
@@ -128,7 +128,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	_, appCancel := context.WithCancel(context.Background())
+	_, appCancel := context.WithCancel(ctx)
 
 	// Derive sponsor (system) account SS58 address once
 	sponsorKeyPair, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
