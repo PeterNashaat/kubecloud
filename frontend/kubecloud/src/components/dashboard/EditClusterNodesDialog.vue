@@ -47,66 +47,14 @@
               <v-text-field validate-on="eager" :rules="[validateCPU]" v-model.number="addFormCpu" label="CPU" type="number" min="1" />
               <v-text-field validate-on="eager" :rules="[validateRAM]" v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" />
               <v-text-field validate-on="eager" :rules="[validateStorage]" v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" />
-            <v-select
+            <NodeSelect
               v-model="addFormNodeId"
               :items="availableNodesWithName"
-              item-title="name"
-              item-value="nodeId"
               label="Select Node"
-            >
-              <template #item="{ item, props }">
-                <div class="d-flex pa-3" v-bind="props">
-                  <div class="mr-3">Node {{ item.raw.nodeId }}</div>
-                  <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getTotalCPU(item.raw) }} CPU
-                    </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getAvailableRAM(item.raw) }} GB RAM
-                    </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getAvailableStorage(item.raw) }} GB Disk
-                    </v-chip>
-                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
-                      GPU
-                    </v-chip>
-                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      {{ item.raw.country }}
-                    </v-chip>
-                  </div>
-                </div>
-              </template>
-              <template #selection="{ item }">
-                <div class="d-flex">
-                  <div class="mr-3">Node {{ item.raw.nodeId }}</div>
-                  <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getTotalCPU(item.raw) }} CPU
-                    </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getAvailableRAM(item.raw) }} GB RAM
-                    </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getAvailableStorage(item.raw) }} GB Disk
-                    </v-chip>
-                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
-                      GPU
-                    </v-chip>
-                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      {{ item.raw.country }}
-                    </v-chip>
-                  </div>
-                </div>
-              </template>
-            </v-select>
+              :get-node-resources="node => ({ cpu: getTotalCPU(node), ram: getAvailableRAM(node), storage: getAvailableStorage(node) })"
+              :cpu-label="'CPU'"
+              :gpu-icon="'mdi-nvidia'"
+            />
             <v-select v-model="addFormRole" :items="['master', 'worker']" label="Role" />
             <div class="ssh-key-section" style="margin-top: 1.5rem; width: 100%;">
               <label class="ssh-key-label">SSH Key</label>
@@ -134,7 +82,7 @@
                 <span>No SSH keys found. Please add one in your dashboard.</span>
               </div>
             </div>
-            
+
           </div>
         </v-form>
         </div>
@@ -157,6 +105,7 @@ import BaseDialogCard from './BaseDialogCard.vue';
 import { userService } from '../../utils/userService';
 import { isAlphanumeric, required, min, max } from "../../utils/validation"
 import { ROOTFS } from '../../composables/useDeployCluster';
+import NodeSelect from '@/components/ui/NodeSelect.vue';
 const props = defineProps<{
   modelValue: boolean,
   cluster: any,
@@ -291,10 +240,6 @@ const availableNodesWithName = computed(() =>
         addFormStorage.value <= availableStorage
       );
     })
-    .map(n => ({
-      ...n,
-      name: `Node ${n.nodeId}`
-    }) as RentedNode & { name: string })
 );
 </script>
 <style scoped>
