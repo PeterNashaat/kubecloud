@@ -94,7 +94,7 @@ async function applyManualCredit(creditData: { amount: number; reason: string })
       memo: creditData.reason
     })
 
-    
+
     // Close dialog after successful credit
     setTimeout(() => {
       closeCreditDialog()
@@ -148,7 +148,7 @@ async function loadInvoices() {
             @generateVouchers="generateVouchers"
           />
           <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
-          <AdminPendingRecordsCard v-else-if="selected === 'pending-records'" />
+          <AdminPendingRecordsCard v-else-if="selected === 'payments'" />
           <AdminEmailsCard v-else-if="selected === 'emails'" />
           <v-dialog v-model="creditDialog" max-width="600" persistent>
             <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">

@@ -332,7 +332,7 @@ func TestCreditUserHandler(t *testing.T) {
 		var result map[string]interface{}
 		err := json.Unmarshal(resp.Body.Bytes(), &result)
 		assert.NoError(t, err)
-		assert.Equal(t, "User is credited successfully", result["message"])
+		assert.Equal(t, "Transaction is created successfully, Money transfer is in progress", result["message"])
 		assert.NotNil(t, result["data"])
 		data, ok := result["data"].(map[string]interface{})
 		assert.True(t, ok)

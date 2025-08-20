@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"kubecloud/internal"
+	"kubecloud/internal/activities"
 	"kubecloud/models"
 	"mime/multipart"
 	"net/http"
@@ -273,28 +275,7 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	systemBalanceUSDMilliCent, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, h.config.SystemAccount.Mnemonic)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-	systemBalanceUSD := internal.FromUSDMilliCentToUSD(systemBalanceUSDMilliCent)
-
-	requestAmountMilliCent := internal.FromUSDToUSDMillicent(request.AmountUSD)
-	if systemBalanceUSDMilliCent < requestAmountMilliCent {
-		Error(c, http.StatusBadRequest, fmt.Sprintf("System balance is not enough, only %v$ is available", systemBalanceUSD), "")
-		return
-	}
-
-	requestedTFTs, err := internal.FromUSDMillicentToTFT(h.substrateClient, requestAmountMilliCent)
-	if err != nil {
-		log.Error().Err(err).Send()
-		InternalServerError(c)
-		return
-	}
-
-	err = internal.TransferTFTs(h.substrateClient, requestedTFTs, user.Mnemonic, h.systemIdentity)
+	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowAdminCreditBalance)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -307,13 +288,16 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.CreditUserBalance(user.ID, requestAmountMilliCent); err != nil {
-		log.Error().Err(err).Msg("Failed to credit user")
-		InternalServerError(c)
-		return
+	wf.State = map[string]interface{}{
+		"user_id":       user.ID,
+		"amount":        internal.FromUSDToUSDMillicent(request.AmountUSD),
+		"mnemonic":      user.Mnemonic,
+		"username":      user.Username,
+		"transfer_mode": models.AdminCreditMode,
 	}
+	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "User is credited successfully", CreditUserResponse{
+	Success(c, http.StatusCreated, "Transaction is created successfully, Money transfer is in progress", CreditUserResponse{
 		User:      user.Email,
 		AmountUSD: request.AmountUSD,
 		Memo:      request.Memo,

@@ -2,8 +2,8 @@
   <div class="dashboard-container">
     <v-container fluid class="pa-0">
       <div class="dashboard-header mb-6">
-        <h1 class="hero-title">Pending Records</h1>
-        <p class="section-subtitle">View your pending transfer records</p>
+        <h1 class="hero-title">Payments</h1>
+                  <p class="section-subtitle">View your payment records</p>
       </div>
       <div class="dashboard-content-wrapper">
         <div class="dashboard-layout">

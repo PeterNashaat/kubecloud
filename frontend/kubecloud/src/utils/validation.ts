@@ -136,6 +136,11 @@ export const VALIDATION_RULES = {
   URL: { required: true, url: true },
   PHONE: { required: true, pattern: PATTERNS.PHONE },
   ALPHANUMERIC: { required: true, pattern: PATTERNS.ALPHANUMERIC },
+  CLUSTER_NAME: {
+    required: true,
+    minLength: 3,
+    pattern: PATTERNS.ALPHANUMERIC
+  },
   HEX_COLOR: { pattern: PATTERNS.HEX_COLOR },
   IP_ADDRESS: { pattern: PATTERNS.IP_ADDRESS },
   CREDIT_AMOUNT: {
@@ -288,9 +293,6 @@ export const formatValidationErrors = (errors: string[]): string => {
   return errors.join('. ')
 }
 
-export const createValidationRule = (rule: ValidationRule): ValidationRule => {
-  return rule
-}
 
 // Async validation support
 export const validateAsync = async (
