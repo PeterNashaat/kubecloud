@@ -55,11 +55,11 @@ func RegisterEWFWorkflows(
 	sponsorKeyPair subkey.KeyPair,
 ) {
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
-	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config))
-	engine.Register(StepCreateStripeCustomer, CreateStripeCustomerStep())
-	engine.Register(StepCreateKYCSponsorship, CreateKYCSponsorship(kycClient, sponsorAddress, sponsorKeyPair))
-	engine.Register(StepSaveUser, SaveUserStep(db, config))
-	engine.Register(StepUpdateUserVerified, UpdateUserVerifiedStep(db))
+	engine.Register(StepCreateUser, CreateUserStep(config, db))
+	engine.Register(StepUpdateCode, UpdateCodeStep(db))
+	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config, sse, db))
+	engine.Register(StepCreateStripeCustomer, CreateStripeCustomerStep(db))
+	engine.Register(StepCreateKYCSponsorship, CreateKYCSponsorship(kycClient, sse, sponsorAddress, sponsorKeyPair, db))
 	engine.Register(StepSendWelcomeEmail, SendWelcomeEmailStep(mail, config))
 	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency))
 	engine.Register(StepCreatePendingRecord, CreatePendingRecord(substrate, db, config.SystemAccount.Mnemonic))
@@ -71,10 +71,23 @@ func RegisterEWFWorkflows(
 
 	registerWorkflowTemplate := userWorkfowTemplate
 	registerWorkflowTemplate.Steps = []ewf.Step{
+		{Name: StepCreateUser, RetryPolicy: &ewf.RetryPolicy{
+			MaxAttempts: 2,
+			BackOff:     ewf.ConstantBackoff(2 * time.Second),
+		}},
 		{Name: StepSendVerificationEmail, RetryPolicy: &ewf.RetryPolicy{
 			MaxAttempts: 3,
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
 		}},
+		{Name: StepUpdateCode, RetryPolicy: &ewf.RetryPolicy{
+			MaxAttempts: 2,
+			BackOff:     ewf.ConstantBackoff(2 * time.Second),
+		}},
+	}
+	engine.RegisterTemplate(WorkflowUserRegistration, &registerWorkflowTemplate)
+
+	userVerificationTemplate := userWorkfowTemplate
+	userVerificationTemplate.Steps = []ewf.Step{
 		{Name: StepSetupTFChain, RetryPolicy: &ewf.RetryPolicy{
 			MaxAttempts: 5,
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
@@ -87,17 +100,10 @@ func RegisterEWFWorkflows(
 			MaxAttempts: 3,
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
 		}},
-		{Name: StepSaveUser, RetryPolicy: &ewf.RetryPolicy{
-			MaxAttempts: 2,
+		{Name: StepSendWelcomeEmail, RetryPolicy: &ewf.RetryPolicy{
+			MaxAttempts: 3,
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
 		}},
-	}
-	engine.RegisterTemplate(WorkflowUserRegistration, &registerWorkflowTemplate)
-
-	userVerificationTemplate := userWorkfowTemplate
-	userVerificationTemplate.Steps = []ewf.Step{
-		{Name: StepUpdateUserVerified, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
-		{Name: StepSendWelcomeEmail, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
 	engine.RegisterTemplate(WorkflowUserVerification, &userVerificationTemplate)
 

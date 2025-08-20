@@ -200,6 +200,11 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	// check if user previously exists
 	existingUser, getErr := h.db.GetUserByEmail(request.Email)
+	if getErr != nil && getErr != gorm.ErrRecordNotFound {
+		InternalServerError(c)
+		return
+	}
+
 	if getErr != gorm.ErrRecordNotFound {
 		if existingUser.Verified {
 			Error(c, http.StatusConflict, "Conflict", "user already registered")
@@ -257,17 +262,17 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get user by email")
-		Error(c, http.StatusBadRequest, "verification failed", "email or password is incorrect")
+		Error(c, http.StatusBadRequest, "verification failed", "Make sure you have registered before")
 		return
 	}
 
 	if user.Verified {
-		Error(c, http.StatusBadRequest, "verification failed", "user already registered")
+		Error(c, http.StatusBadRequest, "verification failed", "User is already registered")
 		return
 	}
 
 	if user.Code != request.Code {
-		Error(c, http.StatusBadRequest, "verification failed", "wrong code")
+		Error(c, http.StatusBadRequest, "verification failed", "Invalid verification code")
 		return
 	}
 
@@ -275,6 +280,8 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		Error(c, http.StatusBadRequest, "verification failed", "code has expired")
 		return
 	}
+
+	h.sseManager.Notify(fmt.Sprintf("%d", user.ID), "user_registration", "User email is verified")
 
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
 	if err != nil {
@@ -285,13 +292,14 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 
 	// Start the user-verification workflow
 	wf.State = ewf.State{
-		"email": user.Email,
-		"name":  user.Username,
+		"email":   user.Email,
+		"name":    user.Username,
+		"user_id": user.ID,
 	}
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "verification in progress", RegisterUserResponse{
+	Success(c, http.StatusCreated, "Verification is in progress", RegisterUserResponse{
 		WorkflowID: wf.UUID,
 		Email:      user.Email,
 	})

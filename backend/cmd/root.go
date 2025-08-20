@@ -60,7 +60,7 @@ func addFlags() error {
 	if err := bindStringFlag(rootCmd, "mailSender.sendgrid_key", "", "SendGrid API key"); err != nil {
 		return fmt.Errorf("failed to bind mailSender.sendgrid_key flag: %w", err)
 	}
-	if err := bindIntFlag(rootCmd, "mailSender.timeout", 60, "Send timeout (seconds)"); err != nil {
+	if err := bindIntFlag(rootCmd, "mailSender.timeout", 150, "Send timeout (seconds)"); err != nil {
 		return fmt.Errorf("failed to bind mailSender.timeout flag: %w", err)
 	}
 	if err := bindIntFlag(rootCmd, "mailSender.max_concurrent_sends", 20, "Max concurrent sends"); err != nil {
