@@ -82,14 +82,14 @@
                 <span>No SSH keys found. Please add one in your dashboard.</span>
               </div>
             </div>
-            
+
           </div>
         </v-form>
         </div>
       </template>
       <template #actions>
         <div v-if="editTab === 'add'" class="add-form-actions">
-          <v-btn variant="outlined" color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading || !formValid" @click="confirmAddForm" class="mr-3">Add Node</v-btn>
+          <v-btn variant="outlined" color="primary" :loading="submitting" :disabled="!canAssignToNode || submitting || !formValid" @click="confirmAddForm" class="mr-3">Add Node</v-btn>
           <v-btn variant="outlined" @click="editTab = 'list'">Cancel</v-btn>
         </div>
       </template>
@@ -103,23 +103,18 @@ import { getAvailableCPU, getAvailableRAM, getAvailableStorage, getTotalCPU } fr
 import type { RentedNode } from '../../composables/useNodeManagement';
 import BaseDialogCard from './BaseDialogCard.vue';
 import { userService } from '../../utils/userService';
-import { useNotificationStore } from '../../stores/notifications';
-import {isAlphanumeric, required, min, max} from "../../utils/validation"
+import { isAlphanumeric, required, min, max } from "../../utils/validation"
 import { ROOTFS } from '../../composables/useDeployCluster';
 import NodeSelect from '@/components/ui/NodeSelect.vue';
-const notificationStore = useNotificationStore();
 const props = defineProps<{
   modelValue: boolean,
   cluster: any,
   nodes: any[],
   loading: boolean,
   availableNodes: RentedNode[],
-  addFormNode: RentedNode | undefined,
-  canAssignToNode: boolean,
-  addNodeLoading: boolean,
-  availableSshKeys: any[]
+  onAddNode: (payload: any) => Promise<void>
 }>();
-const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated', 'remove-node']);
+const emit = defineEmits(['update:modelValue', 'nodes-updated', 'remove-node']);
 const dialog = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val)
@@ -148,6 +143,7 @@ const sshKeys = ref<any[]>([]);
 const sshKeysLoading = ref(false);
 const sshKeysError = ref('');
 const formValid = ref(false);
+const submitting = ref(false);
 
 const validateNodeName = (value: string) :string|boolean =>  {
   const msg = required('Name is required')(value) || isAlphanumeric('Node name can only contain letters, and numbers.')(value);
@@ -202,27 +198,33 @@ watch([addFormNodeId, addFormRam, addFormStorage], () => {
     addFormNodeId.value=null;
   }
 });
-function confirmAddForm() {
+async function confirmAddForm() {
   // Find selected SSH key object
   const sshKeyObj = (sshKeys.value || []).find((k: any) => k.ID === addFormSshKey.value);
-  emit('add-node', {
+  const payload = {
     name: props.cluster.cluster.name,
-    token: '', // If you have a token, use it here
+    token: '',
     nodes: [
       {
         name: addFormName.value,
-        type: addFormRole.value, // 'master' | 'worker'
-        node_id: addFormNodeId.value, // backend expects node_id
+        type: addFormRole.value,
+        node_id: addFormNodeId.value,
         cpu: addFormCpu.value,
-        memory: addFormRam.value * 1024, // Convert GB to MB
-        root_size: ROOTFS * 1024, // MB
-        disk_size: addFormStorage.value * 1024, // Convert GB to MB
+        memory: addFormRam.value * 1024,
+        root_size: ROOTFS * 1024,
+        disk_size: addFormStorage.value * 1024,
         env_vars: sshKeyObj ? { SSH_KEY: sshKeyObj.public_key } : {},
       }
     ]
-  });
-  notificationStore.info('Deployment is being updated', 'Your node is being added in the background. You will be notified when it is ready.');
-  editTab.value = 'list';
+  };
+  try {
+    submitting.value = true;
+    await props.onAddNode(payload);
+    editTab.value = 'list';
+  } catch (e) {
+  } finally {
+    submitting.value = false;
+  }
 }
 // Filter available nodes based on form requirements and add 'name' property for v-select display
 const availableNodesWithName = computed(() =>
