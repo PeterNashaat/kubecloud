@@ -59,6 +59,11 @@ services:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
     ports:
       - "9090:9090"
     networks:
@@ -93,4 +98,4 @@ networks:
 
 volumes:
   mycelium-data: 
-
+  prometheus-data:

@@ -76,7 +76,7 @@ func main() {
 		graphPanel("HTTP Requests Total", "sum by (method, endpoint) (http_requests_total)", "graph", id+1, y+1, 0, 12, 8, false),
 		graphPanel("HTTP Requests Success", "sum by (method, endpoint, status) (http_requests_success)", "graph", id+2, y+1, 12, 12, 8, false),
 		graphPanel("HTTP Requests Failed", "sum by (method, endpoint, status) (http_requests_failed)", "graph", id+3, y+9, 0, 12, 8, true),
-		graphPanel("Request Duration 95th Percentile", "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, endpoint, status))", "graph", id+4, y+9, 12, 12, 8, false),
+		graphPanel("Request Duration", "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, method, endpoint, status))", "graph", id+4, y+9, 12, 12, 8, false),
 
 		// Cluster Metrics
 		rowPanel("Cluster Metrics", id+5, y+17),
@@ -103,9 +103,11 @@ func main() {
 	}
 
 	dashboard := map[string]interface{}{
-		"id":       nil,
-		"title":    "Kubecloud Dashboard",
-		"editable": false,
+		"id":                    nil,
+		"title":                 "Kubecloud Dashboard",
+		"editable":              true,
+		"updateIntervalSeconds": 5,
+		"refresh":               "5s",
 		"time": map[string]string{
 			"from": "now-1h",
 			"to":   "now",
