@@ -295,8 +295,10 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, sse *internal.SSEManage
 	}
 }
 
-func SendWelcomeEmailStep(mailService internal.MailService, config internal.Configuration) ewf.StepFn {
+func SendWelcomeEmailStep(mailService internal.MailService, config internal.Configuration, metrics *metrics.Metrics) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		metrics.IncrementUserRegistration()
+
 		emailVal, ok := state["email"]
 		if !ok {
 			return fmt.Errorf("missing 'email' in state")
