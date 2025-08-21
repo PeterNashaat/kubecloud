@@ -670,8 +670,8 @@ const docTemplate = `{
                 "summary": "List reserved nodes",
                 "operationId": "list-reserved-nodes",
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {

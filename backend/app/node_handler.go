@@ -225,7 +225,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 // @ID list-reserved-nodes
 // @Accept json
 // @Produce json
-// @Success 201 {array} APIResponse
+// @Success 200 {array} APIResponse
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/rented [get]
@@ -268,7 +268,7 @@ func (h *Handler) ListReservedNodeHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusCreated, "Nodes are retrieved successfully", ListNodesResponse{
+	Success(c, http.StatusOK, "Nodes are retrieved successfully", ListNodesResponse{
 		Total: count,
 		Nodes: nodes,
 	})
