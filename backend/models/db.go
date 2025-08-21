@@ -44,7 +44,6 @@ type DB interface {
 	MarkNotificationAsRead(notificationID uint, userID string) error
 	MarkNotificationAsUnread(notificationID uint, userID string) error
 	MarkAllNotificationsAsRead(userID string) error
-	GetUnreadNotificationCount(userID string) (int64, error)
 	DeleteNotification(notificationID uint, userID string) error
 	DeleteAllNotifications(userID string) error
 	// Cluster methods
