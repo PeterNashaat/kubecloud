@@ -214,7 +214,6 @@ func (app *App) registerHandlers() {
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/health", app.handlers.HealthHandler)
-		v1.GET("/nodes", app.handlers.ListNodesHandler)
 		v1.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
 		v1.GET("/system/maintenance/status", app.handlers.GetMaintenanceModeHandler)
 
@@ -260,7 +259,8 @@ func (app *App) registerHandlers() {
 			{
 				authGroup.GET("/", app.handlers.GetUserHandler)
 				authGroup.PUT("/change_password", app.handlers.ChangePasswordHandler)
-				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
+				authGroup.GET("/nodes", app.handlers.ListNodesHandler)
+				authGroup.GET("/nodes/rented", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.DELETE("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/balance/charge", app.handlers.ChargeBalance)
