@@ -352,6 +352,41 @@ func (s *GormDB) DeleteNotification(notificationID uint, userID string) error {
 	return s.db.Where("id = ? AND user_id = ?", notificationID, userID).Delete(&Notification{}).Error
 }
 
+// GetUnreadNotifications retrieves only unread notifications for a user with pagination
+func (s *GormDB) GetUnreadNotifications(userID string, limit, offset int) ([]Notification, error) {
+	var notifications []Notification
+	err := s.db.Where("user_id = ? AND status = ?", userID, NotificationStatusUnread).
+		Order("created_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&notifications).Error
+	return notifications, err
+}
+
+// DeleteAllNotifications deletes all notifications for a user
+func (s *GormDB) DeleteAllNotifications(userID string) error {
+	return s.db.Where("user_id = ?", userID).Delete(&Notification{}).Error
+}
+
+// MarkNotificationAsUnread marks a specific notification as unread
+func (s *GormDB) MarkNotificationAsUnread(notificationID uint, userID string) error {
+	result := s.db.Model(&Notification{}).
+		Where("id = ? AND user_id = ?", notificationID, userID).
+		Updates(map[string]interface{}{
+			"status":  NotificationStatusUnread,
+			"read_at": nil,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("notification not found or access denied")
+	}
+
+	return nil
+}
+
 // CreateSSHKey creates a new SSH key for a user
 func (s *GormDB) CreateSSHKey(sshKey *SSHKey) error {
 	sshKey.CreatedAt = time.Now()
