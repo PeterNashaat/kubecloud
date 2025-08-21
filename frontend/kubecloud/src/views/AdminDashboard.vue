@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent, type Ref } from 'vue'
-import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest, type Invoice } from '@/utils/adminService'
-import AdminUsersTable from '@/components/AdminUsersTable.vue'
-import AdminStatsCards from '@/components/AdminStatsCards.vue'
-import AdminManualCredit from '@/components/AdminManualCredit.vue'
-import AdminVouchersSection from '@/components/AdminVouchersTable.vue'
-import AdminClustersSection from '@/components/AdminClustersSection.vue'
-import AdminSystemSection from '@/components/AdminSystemCard.vue'
-import AdminInvoicesTable from '@/components/AdminInvoicesTable.vue'
-import AdminPendingRecordsCard from '@/components/dashboard/AdminPendingRecordsCard.vue'
-import AdminEmailsCard from '@/components/dashboard/AdminEmailsCard.vue'
+import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest, type Invoice } from '../utils/adminService'
+import AdminUsersTable from '../components/AdminUsersTable.vue'
+import AdminStatsCards from '../components/AdminStatsCards.vue'
+import AdminManualCredit from '../components/AdminManualCredit.vue'
+import AdminVouchersSection from '../components/AdminVouchersTable.vue'
+import AdminClustersSection from '../components/AdminClustersSection.vue'
+import AdminSystemSection from '../components/AdminSystemCard.vue'
+import AdminInvoicesTable from '../components/AdminInvoicesTable.vue'
+import AdminPendingRecordsCard from '../components/dashboard/AdminPendingRecordsCard.vue'
+import AdminEmailsCard from '../components/dashboard/AdminEmailsCard.vue'
 // Use defineAsyncComponent to avoid TypeScript issues
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
 
@@ -83,7 +83,7 @@ async function generateVouchers() {
       value: voucherValue.value,
       expire_after_days: voucherExpiry.value
     }
-    
+
     const response = await adminService.generateVouchers(data)
     voucherResult.value = response.message
     // Refresh vouchers list
@@ -98,12 +98,12 @@ async function loadVouchers() {
 // Apply manual credit using real API
 async function applyManualCredit() {
     if (!creditUserObj.value) return
-    
+
     const data: CreditUserRequest = {
       amount: creditAmount.value,
       memo: creditReason.value
     }
-    
+
     const response = await adminService.creditUser(creditUserObj.value.id, data)
     creditResult.value = response.message
     // Reset form
@@ -153,7 +153,7 @@ const tabs = [
 
 const invoices: Ref<Invoice[]> = ref([])
 
-onMounted(async () => {  
+onMounted(async () => {
   // Load initial data
   await loadUsers()
   await loadVouchers()
@@ -201,7 +201,7 @@ async function loadInvoices() {
             @update:voucherExpiry="voucherExpiry = $event"
           />
           <AdminInvoicesTable v-else-if="selected === 'invoices'" :invoices="invoices" />
-          <AdminPendingRecordsCard v-else-if="selected === 'pending-records'" />
+          <AdminPendingRecordsCard v-else-if="selected === 'payments'" />
           <AdminEmailsCard v-else-if="selected === 'emails'" />
           <v-dialog v-model="creditDialog" max-width="500" persistent>
             <v-card class="pa-4" style="background: rgba(16,24,39,0.98); border-radius: 18px;">
@@ -236,7 +236,7 @@ async function loadInvoices() {
 }
 
 .dashboard-content-wrapper {
-  max-width: 1400px;
+  max-width: 80%;
   margin: 0 auto;
   padding: 0 1rem;
   position: relative;
@@ -396,13 +396,13 @@ async function loadInvoices() {
     flex-direction: column;
     gap: 1.5rem;
   }
-  
+
   .admin-sidebar {
     flex: none;
     width: 100%;
     position: static;
   }
-  
+
   .dashboard-card {
     padding: 1.5rem;
   }
@@ -413,9 +413,9 @@ async function loadInvoices() {
     padding: 0 0.5rem;
     margin-top: 2rem;
   }
-  
+
   .dashboard-card {
     padding: 1rem;
   }
 }
-</style> 
+</style>

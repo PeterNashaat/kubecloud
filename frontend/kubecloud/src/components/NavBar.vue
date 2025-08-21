@@ -37,6 +37,12 @@
                   Admin Panel
                 </v-list-item-title>
               </v-list-item>
+              <v-list-item @click="goToDashboard">
+                <v-list-item-title>
+                  <v-icon icon="mdi-view-dashboard" class="mr-2"></v-icon>
+                  Dashboard
+                </v-list-item-title>
+              </v-list-item>
               <v-divider></v-divider>
               <v-list-item @click="handleLogout">
                 <v-list-item-title>
@@ -47,17 +53,30 @@
             </v-list>
           </v-menu>
         </div>
-        <!-- Show sign in button when not logged in -->
-        <router-link v-else :to="'/sign-in'" custom v-slot="{ navigate, isActive }">
-          <v-btn
-            variant="outlined"
-            color="white"
-            @click="navigate"
-            :class="{ 'active-link': isActive }"
-          >
-            Sign In
-          </v-btn>
-        </router-link>
+        <!-- Show sign in and sign up buttons when not logged in -->
+        <div v-else>
+          <router-link :to="'/sign-in'" custom v-slot="{ navigate, isActive }">
+            <v-btn
+              variant="outlined"
+              color="white"
+              @click="navigate"
+              :class="{ 'active-link': isActive }"
+            >
+              Sign In
+            </v-btn>
+          </router-link>
+          <router-link :to="'/sign-up'" custom v-slot="{ navigate, isActive }">
+            <v-btn
+              variant="outlined"
+              color="white"
+              class="ml-2"
+              @click="navigate"
+              :class="{ 'active-link': isActive }"
+            >
+              Sign Up
+            </v-btn>
+          </router-link>
+        </div>
       </div>
     </div>
   </nav>
@@ -104,6 +123,10 @@ const isAdmin = computed(() => userStore.isAdmin)
 
 const goToAdmin = () => {
   router.push('/admin')
+}
+
+const goToDashboard = () => {
+  router.push('/dashboard')
 }
 
 const handleLogout = async () => {

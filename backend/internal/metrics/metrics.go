@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 )
@@ -49,28 +48,28 @@ func NewMetrics() *Metrics {
 
 	m := &Metrics{
 		// HTTP metrics
-		totalRequests: promauto.NewCounterVec(
+		totalRequests: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "http_requests_total",
 				Help: "Total number of HTTP requests",
 			},
 			[]string{"method", "endpoint"},
 		),
-		successfulRequests: promauto.NewCounterVec(
+		successfulRequests: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "http_requests_success",
 				Help: "Number of successful HTTP requests",
 			},
 			[]string{"method", "endpoint", "status"},
 		),
-		failedRequests: promauto.NewCounterVec(
+		failedRequests: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "http_requests_failed",
 				Help: "Number of failed HTTP requests",
 			},
 			[]string{"method", "endpoint", "status"},
 		),
-		requestDuration: promauto.NewHistogramVec(
+		requestDuration: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Name:    "http_request_duration_seconds",
 				Help:    "Duration of HTTP requests in seconds",
@@ -80,19 +79,19 @@ func NewMetrics() *Metrics {
 		),
 
 		// Cluster metrics
-		clusterDeploymentSuccesses: promauto.NewCounter(
+		clusterDeploymentSuccesses: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "cluster_deployment_successes",
 				Help: "Number of successful cluster deployments",
 			},
 		),
-		clusterDeploymentFailures: promauto.NewCounter(
+		clusterDeploymentFailures: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "cluster_deployment_failures",
 				Help: "Number of failed cluster deployments",
 			},
 		),
-		activeClusterCount: promauto.NewGauge(
+		activeClusterCount: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "active_clusters",
 				Help: "Number of active clusters",
@@ -100,7 +99,7 @@ func NewMetrics() *Metrics {
 		),
 
 		// User metrics
-		userRegistrations: promauto.NewCounter(
+		userRegistrations: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "user_registrations",
 				Help: "Number of user registrations",
@@ -108,13 +107,13 @@ func NewMetrics() *Metrics {
 		),
 
 		// Payment metrics
-		stripePaymentSuccesses: promauto.NewCounter(
+		stripePaymentSuccesses: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "stripe_payment_successes",
 				Help: "Number of successful Stripe payments",
 			},
 		),
-		stripePaymentFailures: promauto.NewCounter(
+		stripePaymentFailures: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "stripe_payment_failures",
 				Help: "Number of failed Stripe payments",
@@ -122,13 +121,13 @@ func NewMetrics() *Metrics {
 		),
 
 		// GORM metrics
-		gormOpenConnections: promauto.NewGauge(
+		gormOpenConnections: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "gorm_open_connections",
 				Help: "Number of open GORM connections",
 			},
 		),
-		gormIdleConnections: promauto.NewGauge(
+		gormIdleConnections: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "gorm_idle_connections",
 				Help: "Number of idle GORM connections",
@@ -151,11 +150,11 @@ func NewMetrics() *Metrics {
 		m.stripePaymentFailures,
 		m.gormOpenConnections,
 		m.gormIdleConnections,
-	)
 
-	// Register Go runtime metrics
-	registry.MustRegister(collectors.NewGoCollector())
-	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		// Register Go runtime metrics
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
 
 	return m
 }
