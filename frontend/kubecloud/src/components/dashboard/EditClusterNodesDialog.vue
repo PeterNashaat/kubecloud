@@ -33,7 +33,7 @@
                 <td>{{ node.ip || '-' }}</td>
                 <td>{{ node.contract_id || '-' }}</td>
                 <td>
-                  <v-btn @click="removeNode(node.original_name)" :disabled='node.type == "leader"'><v-icon>mdi-delete</v-icon></v-btn>
+                  <v-btn @click="showDeleteConfirmation(node.original_name)" :disabled='node.type == "leader"'><v-icon>mdi-delete</v-icon></v-btn>
                 </td>
               </tr>
             </tbody>
@@ -47,74 +47,22 @@
               <v-text-field validate-on="eager" :rules="[validateCPU]" v-model.number="addFormCpu" label="CPU" type="number" min="1" />
               <v-text-field validate-on="eager" :rules="[validateRAM]" v-model.number="addFormRam" label="RAM (GB)" type="number" min="1" />
               <v-text-field validate-on="eager" :rules="[validateStorage]" v-model.number="addFormStorage" label="Storage (GB)" type="number" min="1" />
-            <v-select
+            <NodeSelect
               v-model="addFormNodeId"
               :items="availableNodesWithName"
-              item-title="name"
-              item-value="nodeId"
               label="Select Node"
-            >
-              <template #item="{ item, props }">
-                <div class="d-flex pa-3" v-bind="props">
-                  <div class="mr-3">Node {{ item.raw.nodeId }}</div>
-                  <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getTotalCPU(item.raw) }} CPU
-                    </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getAvailableRAM(item.raw) }} GB RAM
-                    </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getAvailableStorage(item.raw) }} GB Disk
-                    </v-chip>
-                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
-                      GPU
-                    </v-chip>
-                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      {{ item.raw.country }}
-                    </v-chip>
-                  </div>
-                </div>
-              </template>
-              <template #selection="{ item }">
-                <div class="d-flex">
-                  <div class="mr-3">Node {{ item.raw.nodeId }}</div>
-                  <div class="chip-row">
-                    <v-chip color="primary" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-cpu-64-bit</v-icon>
-                      {{ getTotalCPU(item.raw) }} CPU
-                    </v-chip>
-                    <v-chip color="success" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-memory</v-icon>
-                      {{ getAvailableRAM(item.raw) }} GB RAM
-                    </v-chip>
-                    <v-chip color="info" text-color="white" size="x-small" class="mr-2" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-harddisk</v-icon>
-                      {{ getAvailableStorage(item.raw) }} GB Disk
-                    </v-chip>
-                    <v-chip v-if="item.raw.gpu" color="deep-purple-accent-2" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      <v-icon size="14" class="mr-1">mdi-nvidia</v-icon>
-                      GPU
-                    </v-chip>
-                    <v-chip color="secondary" text-color="white" size="x-small" class="mr-1" variant="outlined">
-                      {{ item.raw.country }}
-                    </v-chip>
-                  </div>
-                </div>
-              </template>
-            </v-select>
+              :get-node-resources="node => ({ cpu: getTotalCPU(node), ram: getAvailableRAM(node), storage: getAvailableStorage(node) })"
+              :cpu-label="'CPU'"
+              :gpu-icon="'mdi-nvidia'"
+            />
             <v-select v-model="addFormRole" :items="['master', 'worker']" label="Role" />
             <div class="ssh-key-section" style="margin-top: 1.5rem; width: 100%;">
-              <label class="ssh-key-label">SSH Key</label>
+              <label class="ssh-key-label">SSH Keys</label>
               <div v-if="sshKeysLoading" class="mb-2"><v-progress-circular indeterminate size="24" color="primary" /></div>
               <v-chip-group
                 v-else
-                v-model="addFormSshKey"
-                :multiple="false"
+                v-model="addFormSshKeys"
+                :multiple="true"
                 column
                 class="mb-2"
               >
@@ -134,18 +82,39 @@
                 <span>No SSH keys found. Please add one in your dashboard.</span>
               </div>
             </div>
-            
+
           </div>
         </v-form>
         </div>
       </template>
       <template #actions>
         <div v-if="editTab === 'add'" class="add-form-actions">
-          <v-btn variant="outlined" color="primary" :loading="addNodeLoading" :disabled="!canAssignToNode || addNodeLoading || !formValid" @click="confirmAddForm" class="mr-3">Add Node</v-btn>
-          <v-btn variant="outlined" @click="editTab = 'list'">Cancel</v-btn>
+          <v-btn variant="outlined" color="primary" :loading="submitting" :disabled="!canAssignToNode || submitting || !formValid" @click="confirmAddForm" class="mr-3">Add Node</v-btn>
+          <v-btn variant="outlined" @click="dialog = false">Cancel</v-btn>
         </div>
       </template>
     </BaseDialogCard>
+  </v-dialog>
+
+  <!-- Delete Confirmation Dialog -->
+  <v-dialog v-model="deleteConfirmDialog" max-width="400">
+    <v-card>
+      <v-card-title class="text-h6">
+        Confirm Node Deletion
+      </v-card-title>
+      <v-card-text>
+        Are you sure you want to delete the node <strong>{{ nodeToDelete }}</strong>? This action cannot be undone.
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="grey" variant="text" @click="deleteConfirmDialog = false">
+          Cancel
+        </v-btn>
+        <v-btn color="error" variant="text" @click="confirmDeleteNode">
+          Delete
+        </v-btn>
+      </v-card-actions>
+    </v-card>
   </v-dialog>
 </template>
 
@@ -155,22 +124,18 @@ import { getAvailableCPU, getAvailableRAM, getAvailableStorage, getTotalCPU } fr
 import type { RentedNode } from '../../composables/useNodeManagement';
 import BaseDialogCard from './BaseDialogCard.vue';
 import { userService } from '../../utils/userService';
-import { useNotificationStore } from '../../stores/notifications';
-import {isAlphanumeric, required, min, max} from "../../utils/validation"
+import { isAlphanumeric, required, min, max } from "../../utils/validation"
 import { ROOTFS } from '../../composables/useDeployCluster';
-const notificationStore = useNotificationStore();
+import NodeSelect from '@/components/ui/NodeSelect.vue';
 const props = defineProps<{
   modelValue: boolean,
   cluster: any,
   nodes: any[],
   loading: boolean,
   availableNodes: RentedNode[],
-  addFormNode: RentedNode | undefined,
-  canAssignToNode: boolean,
-  addNodeLoading: boolean,
-  availableSshKeys: any[]
+  onAddNode: (payload: any) => Promise<void>
 }>();
-const emit = defineEmits(['update:modelValue', 'add-node', 'nodes-updated', 'remove-node']);
+const emit = defineEmits(['update:modelValue', 'nodes-updated', 'remove-node']);
 const dialog = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val)
@@ -187,6 +152,19 @@ const editNodesWithStorage = computed(() =>
 function removeNode(nodeName: string) {
   emit('remove-node', nodeName);
 }
+
+function showDeleteConfirmation(nodeName: string) {
+  nodeToDelete.value = nodeName;
+  deleteConfirmDialog.value = true;
+}
+
+function confirmDeleteNode() {
+  if (nodeToDelete.value) {
+    removeNode(nodeToDelete.value);
+    deleteConfirmDialog.value = false;
+    nodeToDelete.value = '';
+  }
+}
 // Add node form state
 const addFormNodeId = ref<number|null>(null);
 const addFormRole = ref('master');
@@ -194,11 +172,16 @@ const addFormCpu = ref(2);
 const addFormRam = ref(4);
 const addFormStorage = ref(25);
 const addFormName = ref('');
-const addFormSshKey = ref<number|null>(null);
+const addFormSshKeys = ref<number[]>([]);
 const sshKeys = ref<any[]>([]);
 const sshKeysLoading = ref(false);
 const sshKeysError = ref('');
 const formValid = ref(false);
+const submitting = ref(false);
+
+// Delete confirmation dialog state
+const deleteConfirmDialog = ref(false);
+const nodeToDelete = ref<string>('');
 
 const validateNodeName = (value: string) :string|boolean =>  {
   const msg = required('Name is required')(value) || isAlphanumeric('Node name can only contain letters, and numbers.')(value);
@@ -221,7 +204,7 @@ onMounted(async () => {
   try {
     sshKeys.value = await userService.listSshKeys();
     if (sshKeys.value.length > 0) {
-      addFormSshKey.value = sshKeys.value[0].ID;
+      addFormSshKeys.value = [sshKeys.value[0].ID];
     }
   } catch (e: any) {
     sshKeysError.value = e?.message || 'Failed to load SSH keys';
@@ -253,27 +236,36 @@ watch([addFormNodeId, addFormRam, addFormStorage], () => {
     addFormNodeId.value=null;
   }
 });
-function confirmAddForm() {
-  // Find selected SSH key object
-  const sshKeyObj = (sshKeys.value || []).find((k: any) => k.ID === addFormSshKey.value);
-  emit('add-node', {
+async function confirmAddForm() {
+  // Get all selected SSH keys and concatenate their public keys
+  const sshKeyPublicKeys = addFormSshKeys.value
+    .map(id => sshKeys.value.find((k: any) => k.ID === id)?.public_key)
+    .filter(key => key) // Remove undefined values
+    .join('\n'); // Join multiple keys with newlines
+  const payload = {
     name: props.cluster.cluster.name,
-    token: '', // If you have a token, use it here
+    token: '',
     nodes: [
       {
         name: addFormName.value,
-        type: addFormRole.value, // 'master' | 'worker'
-        node_id: addFormNodeId.value, // backend expects node_id
+        type: addFormRole.value,
+        node_id: addFormNodeId.value,
         cpu: addFormCpu.value,
-        memory: addFormRam.value * 1024, // Convert GB to MB
-        root_size: ROOTFS * 1024, // MB
-        disk_size: addFormStorage.value * 1024, // Convert GB to MB
-        env_vars: sshKeyObj ? { SSH_KEY: sshKeyObj.public_key } : {},
+        memory: addFormRam.value * 1024,
+        root_size: ROOTFS * 1024,
+        disk_size: addFormStorage.value * 1024,
+        env_vars: sshKeyPublicKeys ? { SSH_KEY: sshKeyPublicKeys } : {},
       }
     ]
-  });
-  notificationStore.info('Deployment is being updated', 'Your node is being added in the background. You will be notified when it is ready.');
-  editTab.value = 'list';
+  };
+  try {
+    submitting.value = true;
+    await props.onAddNode(payload);
+    editTab.value = 'list';
+  } catch (e) {
+  } finally {
+    submitting.value = false;
+  }
 }
 // Filter available nodes based on form requirements and add 'name' property for v-select display
 const availableNodesWithName = computed(() =>
@@ -289,10 +281,6 @@ const availableNodesWithName = computed(() =>
         addFormStorage.value <= availableStorage
       );
     })
-    .map(n => ({
-      ...n,
-      name: `Node ${n.nodeId}`
-    }) as RentedNode & { name: string })
 );
 </script>
 <style scoped>

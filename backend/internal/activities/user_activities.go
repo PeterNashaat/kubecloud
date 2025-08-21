@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/metrics"
 	"kubecloud/models"
 	"strings"
 
@@ -322,7 +323,7 @@ func SendWelcomeEmailStep(mailService internal.MailService, config internal.Conf
 	}
 }
 
-func CreatePaymentIntentStep(currency string) ewf.StepFn {
+func CreatePaymentIntentStep(currency string, metrics *metrics.Metrics) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		customerIDVal, ok := state["stripe_customer_id"]
 		if !ok {
@@ -344,22 +345,18 @@ func CreatePaymentIntentStep(currency string) ewf.StepFn {
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		var amount uint64
-		switch v := amountVal.(type) {
-		case int:
-			amount = uint64(v)
-		case uint64:
-			amount = v
-		case float64:
-			amount = uint64(v)
-		default:
-			return fmt.Errorf("'amount' in state is not a number")
+		amount, ok := amountVal.(uint64)
+		if !ok {
+			return fmt.Errorf("'amount' in state is not a uint64")
 		}
 
 		intent, err := internal.CreatePaymentIntent(customerID, paymentMethodID, currency, amount)
 		if err != nil {
+			metrics.IncrementStripePaymentFailure()
 			return fmt.Errorf("error creating payment intent: %w", err)
 		}
+
+		metrics.IncrementStripePaymentSuccess()
 		state["payment_intent_id"] = intent.ID
 		return nil
 	}
@@ -371,16 +368,10 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		var amount uint64
-		switch v := amountVal.(type) {
-		case int:
-			amount = uint64(v)
-		case uint64:
-			amount = v
-		case float64:
-			amount = uint64(v)
-		default:
-			return fmt.Errorf("'amount' in state is not a number")
+
+		amount, ok := amountVal.(uint64)
+		if !ok {
+			return fmt.Errorf("'amount' in state is not a uint64")
 		}
 
 		userIDVal, ok := state["user_id"]
@@ -392,6 +383,24 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 			return fmt.Errorf("'user_id' in state is not an int")
 		}
 
+		usernameVal, ok := state["username"]
+		if !ok {
+			return fmt.Errorf("missing 'username' in state")
+		}
+		username, ok := usernameVal.(string)
+		if !ok {
+			return fmt.Errorf("'username' in state is not a string")
+		}
+
+		transferModeVal, ok := state["transfer_mode"]
+		if !ok {
+			return fmt.Errorf("missing 'transfer_mode' in state")
+		}
+		transferMode, ok := transferModeVal.(string)
+		if !ok {
+			return fmt.Errorf("'transfer_mode' in state is not a string")
+		}
+
 		requestedTFTs, err := internal.FromUSDMillicentToTFT(substrateClient, amount)
 		if err != nil {
 			log.Error().Err(err).Msg("error converting usd")
@@ -399,8 +408,10 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 		}
 
 		if err = db.CreatePendingRecord(&models.PendingRecord{
-			UserID:    userID,
-			TFTAmount: requestedTFTs,
+			UserID:       userID,
+			Username:     username,
+			TFTAmount:    requestedTFTs,
+			TransferMode: transferMode,
 		}); err != nil {
 			log.Error().Err(err).Send()
 			return err
@@ -425,16 +436,9 @@ func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		var amount uint64
-		switch v := amountVal.(type) {
-		case float64:
-			amount = uint64(v)
-		case uint64:
-			amount = v
-		case int:
-			amount = uint64(v)
-		default:
-			return fmt.Errorf("'amount' in state is not a float64 or int")
+		amount, ok := amountVal.(uint64)
+		if !ok {
+			return fmt.Errorf("'amount' in state is not a uint64")
 		}
 
 		user, err := db.GetUserByID(userID)
@@ -468,16 +472,9 @@ func UpdateCreditedBalanceStep(db models.DB) ewf.StepFn {
 		if !ok {
 			return fmt.Errorf("missing 'amount' in state")
 		}
-		var amount uint64
-		switch v := amountVal.(type) {
-		case float64:
-			amount = uint64(v)
-		case uint64:
-			amount = v
-		case int:
-			amount = uint64(v)
-		default:
-			return fmt.Errorf("'amount' in state is not a float64 or int")
+		amount, ok := amountVal.(uint64)
+		if !ok {
+			return fmt.Errorf("'amount' in state is not a uint64")
 		}
 
 		user, err := db.GetUserByID(userID)

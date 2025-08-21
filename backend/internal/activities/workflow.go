@@ -3,6 +3,7 @@ package activities
 import (
 	"context"
 	"kubecloud/internal"
+	"kubecloud/internal/metrics"
 	"kubecloud/models"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/xmonader/ewf"
 )
 
-var userWorkfowTemplate = ewf.WorkflowTemplate{
+var userWorkflowTemplate = ewf.WorkflowTemplate{
 	BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
 		func(ctx context.Context, w *ewf.Workflow) {
 			log.Info().Str("workflow_name", w.Name).Msg("Starting workflow")
@@ -53,6 +54,7 @@ func RegisterEWFWorkflows(
 	kycClient *internal.KYCClient,
 	sponsorAddress string,
 	sponsorKeyPair subkey.KeyPair,
+	metrics *metrics.Metrics,
 ) {
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
 	engine.Register(StepCreateUser, CreateUserStep(config, db))
@@ -61,7 +63,7 @@ func RegisterEWFWorkflows(
 	engine.Register(StepCreateStripeCustomer, CreateStripeCustomerStep(db))
 	engine.Register(StepCreateKYCSponsorship, CreateKYCSponsorship(kycClient, sse, sponsorAddress, sponsorKeyPair, db))
 	engine.Register(StepSendWelcomeEmail, SendWelcomeEmailStep(mail, config))
-	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency))
+	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency, metrics))
 	engine.Register(StepCreatePendingRecord, CreatePendingRecord(substrate, db, config.SystemAccount.Mnemonic))
 	engine.Register(StepUpdateCreditCardBalance, UpdateCreditCardBalanceStep(db))
 	engine.Register(StepCreateIdentity, CreateIdentityStep())
@@ -69,7 +71,7 @@ func RegisterEWFWorkflows(
 	engine.Register(StepUnreserveNode, UnreserveNodeStep(db, substrate))
 	engine.Register(StepUpdateCreditedBalance, UpdateCreditedBalanceStep(db))
 
-	registerWorkflowTemplate := userWorkfowTemplate
+	registerWorkflowTemplate := userWorkflowTemplate
 	registerWorkflowTemplate.Steps = []ewf.Step{
 		{Name: StepCreateUser, RetryPolicy: &ewf.RetryPolicy{
 			MaxAttempts: 2,
@@ -86,7 +88,7 @@ func RegisterEWFWorkflows(
 	}
 	engine.RegisterTemplate(WorkflowUserRegistration, &registerWorkflowTemplate)
 
-	userVerificationTemplate := userWorkfowTemplate
+	userVerificationTemplate := userWorkflowTemplate
 	userVerificationTemplate.Steps = []ewf.Step{
 		{Name: StepSetupTFChain, RetryPolicy: &ewf.RetryPolicy{
 			MaxAttempts: 5,
@@ -107,7 +109,7 @@ func RegisterEWFWorkflows(
 	}
 	engine.RegisterTemplate(WorkflowUserVerification, &userVerificationTemplate)
 
-	chargeBalanceTemplate := userWorkfowTemplate
+	chargeBalanceTemplate := userWorkflowTemplate
 	chargeBalanceTemplate.Steps = []ewf.Step{
 		{Name: StepCreatePaymentIntent, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepUpdateCreditCardBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
@@ -115,25 +117,32 @@ func RegisterEWFWorkflows(
 	}
 	engine.RegisterTemplate(WorkflowChargeBalance, &chargeBalanceTemplate)
 
-	redeemVoucherTemplate := userWorkfowTemplate
+	adminCreditBalanceTemplate := userWorkflowTemplate
+	adminCreditBalanceTemplate.Steps = []ewf.Step{
+		{Name: StepUpdateCreditedBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
+		{Name: StepCreatePendingRecord, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
+	}
+	engine.RegisterTemplate(WorkflowAdminCreditBalance, &adminCreditBalanceTemplate)
+
+	redeemVoucherTemplate := userWorkflowTemplate
 	redeemVoucherTemplate.Steps = []ewf.Step{
 		{Name: StepUpdateCreditedBalance, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepCreatePendingRecord, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
 	engine.RegisterTemplate(WorkflowRedeemVoucher, &redeemVoucherTemplate)
 
-	reserveNodeTemplate := userWorkfowTemplate
+	reserveNodeTemplate := userWorkflowTemplate
 	reserveNodeTemplate.Steps = []ewf.Step{
 		{Name: StepCreateIdentity, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: StepReserveNode, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
 	engine.RegisterTemplate(WorkflowReserveNode, &reserveNodeTemplate)
 
-	unreserveNodeTemplate := userWorkfowTemplate
+	unreserveNodeTemplate := userWorkflowTemplate
 	unreserveNodeTemplate.Steps = []ewf.Step{
 		{Name: StepUnreserveNode, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
 	engine.RegisterTemplate(WorkflowUnreserveNode, &unreserveNodeTemplate)
 
-	registerDeploymentActivities(engine, db, sse)
+	registerDeploymentActivities(engine, metrics, db, sse)
 }
