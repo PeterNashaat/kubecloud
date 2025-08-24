@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/activities"
+	"kubecloud/internal/metrics"
 	"kubecloud/middlewares"
 	"kubecloud/models"
 	"net/http"
@@ -39,11 +40,12 @@ type App struct {
 	sseManager    *internal.SSEManager
 	workerManager *internal.WorkerManager
 	gridClient    deployer.TFPluginClient
+	metrics       *metrics.Metrics
 	appCancel     context.CancelFunc
 }
 
 // NewApp create new instance of the app with all configs
-func NewApp(config internal.Configuration) (*App, error) {
+func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 	router := gin.Default()
 
 	stripe.Key = config.StripeSecret
@@ -106,7 +108,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create TF grid client: %w", err)
 	}
 
-	// // create storage for workflows
+	// create storage for workflows
 	ewfStore := models.NewGormStore(db.GetDB())
 
 	// initialize workflow ewfEngine
@@ -128,7 +130,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	_, appCancel := context.WithCancel(context.Background())
+	_, appCancel := context.WithCancel(ctx)
 
 	// Derive sponsor (system) account SS58 address once
 	sponsorKeyPair, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
@@ -161,10 +163,12 @@ func NewApp(config internal.Configuration) (*App, error) {
 		nil, // Use default http.Client
 	)
 
+	metrics := metrics.NewMetrics()
+
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
 		sseManager, ewfEngine, config.SystemAccount.Network, sshPublicKey,
-		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress)
+		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress, metrics)
 
 	app := &App{
 		router:        router,
@@ -176,6 +180,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		workerManager: workerManager,
 		appCancel:     appCancel,
 		gridClient:    gridClient,
+		metrics:       metrics,
 	}
 
 	activities.RegisterEWFWorkflows(
@@ -188,6 +193,7 @@ func NewApp(config internal.Configuration) (*App, error) {
 		app.handlers.kycClient,
 		sponsorAddress,
 		sponsorKeyPair,
+		app.metrics,
 	)
 
 	app.registerHandlers()
@@ -197,11 +203,17 @@ func NewApp(config internal.Configuration) (*App, error) {
 
 // registerHandlers registers all routes
 func (app *App) registerHandlers() {
+	app.metrics.RegisterMetricsEndpoint(app.router)
+
 	app.router.Use(middlewares.CorsMiddleware())
+	app.router.Use(app.metrics.Middleware())
+
+	app.metrics.StartGORMMetricsCollector(app.db.GetDB(), metrics.MetricsCollectorInterval)
+	app.metrics.StartGoRuntimeMetricsCollector(metrics.MetricsCollectorInterval)
+
 	v1 := app.router.Group("/api/v1")
 	{
 		v1.GET("/health", app.handlers.HealthHandler)
-		v1.GET("/nodes", app.handlers.ListNodesHandler)
 		v1.GET("/workflow/:workflow_id", app.handlers.GetWorkflowStatus)
 		v1.GET("/system/maintenance/status", app.handlers.GetMaintenanceModeHandler)
 
@@ -247,7 +259,8 @@ func (app *App) registerHandlers() {
 			{
 				authGroup.GET("/", app.handlers.GetUserHandler)
 				authGroup.PUT("/change_password", app.handlers.ChangePasswordHandler)
-				authGroup.GET("/nodes", app.handlers.ListReservedNodeHandler)
+				authGroup.GET("/nodes", app.handlers.ListNodesHandler)
+				authGroup.GET("/nodes/rented", app.handlers.ListReservedNodeHandler)
 				authGroup.POST("/nodes/:node_id", app.handlers.ReserveNodeHandler)
 				authGroup.DELETE("/nodes/unreserve/:contract_id", app.handlers.UnreserveNodeHandler)
 				authGroup.POST("/balance/charge", app.handlers.ChargeBalance)

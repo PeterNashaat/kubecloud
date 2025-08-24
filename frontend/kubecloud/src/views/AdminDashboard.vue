@@ -66,6 +66,7 @@ function handleSidebarSelect(newSelected: string) {
   selected.value = newSelected
 }
 
+// Generate vouchers using real API
 async function generateVouchers(voucherData: GenerateVouchersRequest) {
     const response = await adminService.generateVouchers(voucherData)
     await loadVouchers()
@@ -75,16 +76,7 @@ async function loadVouchers() {
     vouchers.value = await adminService.listVouchers()
 }
 
-function openCreditDialog(user: User) {
-  creditUserDialogObj.value = user
-  creditDialog.value = true
-}
-
-function closeCreditDialog() {
-  creditDialog.value = false
-  creditUserDialogObj.value = null
-}
-
+// Apply manual credit using real API
 async function applyManualCredit(creditData: { amount: number; reason: string }) {
   if (!creditUserDialogObj.value) return
 
@@ -93,7 +85,6 @@ async function applyManualCredit(creditData: { amount: number; reason: string })
       amount: creditData.amount,
       memo: creditData.reason
     })
-
 
     // Close dialog after successful credit
     setTimeout(() => {
@@ -106,9 +97,20 @@ async function applyManualCredit(creditData: { amount: number; reason: string })
   }
 }
 
+function openCreditDialog(user: User) {
+  creditUserDialogObj.value = user
+  creditDialog.value = true
+}
+
+function closeCreditDialog() {
+  creditDialog.value = false
+  creditUserDialogObj.value = null
+}
+
 const invoices: Ref<Invoice[]> = ref([])
 
 onMounted(async () => {
+  // Load initial data
   await loadUsers()
   await loadVouchers()
   await loadInvoices()
@@ -187,7 +189,7 @@ async function loadInvoices() {
 }
 
 .dashboard-content-wrapper {
-  max-width: 1400px;
+  max-width: 80%;
   margin: 0 auto;
   padding: 0 1rem;
   position: relative;
