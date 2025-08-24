@@ -54,7 +54,7 @@ type UnreserveNodeResponse struct {
 // @Router /user/nodes [get]
 func (h *Handler) ListNodesHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
-	rentedNodes, rentedNodesCount, err := h.getRentedNodesForUser(c.Request.Context(), userID)
+	rentedNodes, rentedNodesCount, err := h.getRentedNodesForUser(c.Request.Context(), userID, true)
 	if err != nil {
 		log.Error().Err(err).Send()
 		InternalServerError(c)
@@ -253,7 +253,7 @@ func (h *Handler) ListRentableNodesHandler(c *gin.Context) {
 // ListReservedNodeHandler list reserved nodes for user on tfchain
 func (h *Handler) ListRentedNodesHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
-	nodes, count, err := h.getRentedNodesForUser(c.Request.Context(), userID)
+	nodes, count, err := h.getRentedNodesForUser(c.Request.Context(), userID, false)
 	if err != nil {
 		InternalServerError(c)
 		return
@@ -427,7 +427,7 @@ func (h *Handler) getTwinIDFromUserID(userID int) (uint64, error) {
 	return uint64(twinID), nil
 }
 
-func (h *Handler) getRentedNodesForUser(ctx context.Context, userID int) ([]proxyTypes.Node, int, error) {
+func (h *Handler) getRentedNodesForUser(ctx context.Context, userID int, healthy bool) ([]proxyTypes.Node, int, error) {
 	twinID, err := h.getTwinIDFromUserID(userID)
 	if err != nil {
 		return nil, 0, err
@@ -435,6 +435,10 @@ func (h *Handler) getRentedNodesForUser(ctx context.Context, userID int) ([]prox
 
 	filter := proxyTypes.NodeFilter{
 		RentedBy: &twinID,
+	}
+
+	if healthy {
+		filter.Healthy = &healthy
 	}
 
 	limit := proxyTypes.DefaultLimit()
