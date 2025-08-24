@@ -98,16 +98,22 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 	// Combine all nodes without duplicates
 	var allNodes []proxyTypes.Node
 	duplicatesCount := 0
-	allNodes = append(allNodes, rentedNodes...)
+	seen := make(map[int]bool)
+
+	for _, node := range rentedNodes {
+		if !seen[node.NodeID] {
+			seen[node.NodeID] = true
+			allNodes = append(allNodes, node)
+		}
+	}
 
 	for _, node := range availableNodes {
-		for _, n := range allNodes {
-			if n.ID == node.ID {
-				duplicatesCount++
-				continue
-			}
+		if !seen[node.NodeID] {
+			seen[node.NodeID] = true
+			allNodes = append(allNodes, node)
+		} else {
+			duplicatesCount++
 		}
-		allNodes = append(allNodes, node)
 	}
 
 	Success(c, http.StatusOK, "Nodes retrieved successfully", ListNodesResponse{
