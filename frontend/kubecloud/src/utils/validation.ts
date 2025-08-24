@@ -202,72 +202,66 @@ export const NODE_VALIDATION = {
 }
 
 // Credit operation validation functions
-export const validateCreditAmount = (amount: number): { isValid: boolean; error: string } => {
+export const validateCreditAmount = (amount: number): string | undefined => {
   const validation = validateField({
     value: amount,
     rules: VALIDATION_RULES.CREDIT_AMOUNT,
     fieldName: 'Amount'
   })
 
-  return {
-    isValid: validation.isValid,
-    error: validation.errors[0] || ''
-  }
+  return validation.isValid ? undefined : validation.errors[0]
 }
 
-export const validateCreditMemo = (memo: string): { isValid: boolean; error: string } => {
+export const validateCreditMemo = (memo: string): string | undefined => {
   const validation = validateField({
     value: memo,
     rules: VALIDATION_RULES.CREDIT_MEMO,
     fieldName: 'Memo'
   })
 
-  return {
-    isValid: validation.isValid,
-    error: validation.errors[0] || ''
-  }
+  return validation.isValid ? undefined : validation.errors[0]
 }
 
 export const validateCreditForm = (amount: number, memo: string): { isValid: boolean; errors: { amount: string; memo: string } } => {
-  const amountValidation = validateCreditAmount(amount)
-  const memoValidation = validateCreditMemo(memo)
+  const amountError = validateCreditAmount(amount)
+  const memoError = validateCreditMemo(memo)
 
   return {
-    isValid: amountValidation.isValid && memoValidation.isValid,
+    isValid: !amountError && !memoError,
     errors: {
-      amount: amountValidation.error,
-      memo: memoValidation.error
+      amount: amountError || '',
+      memo: memoError || ''
     }
   }
 }
 
 // Additional validation utilities for auth operations
-export const validateVerificationCode = (code: string): { isValid: boolean; error: string } => {
+export const validateVerificationCode = (code: string): string | undefined => {
   if (!code.trim()) {
-    return { isValid: false, error: 'Verification code is required' }
+    return 'Verification code is required'
   }
   if (code.length < 4 || code.length > 6) {
-    return { isValid: false, error: 'Verification code must be 4-6 digits' }
+    return 'Verification code must be 4-6 digits'
   }
   if (!/^\d+$/.test(code)) {
-    return { isValid: false, error: 'Verification code must contain only numbers' }
+    return 'Verification code must contain only numbers'
   }
-  return { isValid: true, error: '' }
+  return undefined
 }
 
-export const validateEmail = (email: string): { isValid: boolean; error: string } => {
+export const validateEmail = (email: string): string | undefined => {
   if (!email.trim()) {
-    return { isValid: false, error: 'Email is required' }
+    return 'Email is required'
   }
   if (!PATTERNS.EMAIL.test(email.trim())) {
-    return { isValid: false, error: 'Please enter a valid email address' }
+    return 'Please enter a valid email address'
   }
-  return { isValid: true, error: '' }
+  return undefined
 }
 
-export const validatePasswordStrength = (password: string): { isValid: boolean; error: string; strength: 'weak' | 'medium' | 'strong' } => {
+export const validatePasswordStrength = (password: string): { error: string | undefined; strength: 'weak' | 'medium' | 'strong' } => {
   if (!password) {
-    return { isValid: false, error: 'Password is required', strength: 'weak' }
+    return { error: 'Password is required', strength: 'weak' }
   }
 
   const validation = validateField({
@@ -277,7 +271,7 @@ export const validatePasswordStrength = (password: string): { isValid: boolean; 
   })
 
   if (!validation.isValid) {
-    return { isValid: false, error: validation.errors[0], strength: 'weak' }
+    return { error: validation.errors[0], strength: 'weak' }
   }
 
   // Determine strength
@@ -288,17 +282,17 @@ export const validatePasswordStrength = (password: string): { isValid: boolean; 
     strength = 'weak'
   }
 
-  return { isValid: true, error: '', strength }
+  return { error: undefined, strength }
 }
 
-export const validateConfirmPassword = (password: string, confirmPassword: string): { isValid: boolean; error: string } => {
+export const validateConfirmPassword = (password: string, confirmPassword: string): string | undefined => {
   if (!confirmPassword) {
-    return { isValid: false, error: 'Please confirm your password' }
+    return 'Please confirm your password'
   }
   if (password !== confirmPassword) {
-    return { isValid: false, error: 'Passwords do not match' }
+    return 'Passwords do not match'
   }
-  return { isValid: true, error: '' }
+  return undefined
 }
 
 // Unified validation function for node fields
@@ -307,86 +301,84 @@ export const validateNodeField = (value: any, fieldName: string, rules: Validati
   return result.isValid ? undefined : result.errors[0]
 }
 
-// Vuetify-compatible validation rules
+const toVuetifyRule = (validator: (value: any) => string | undefined) => 
+  (value: any): string | boolean => validator(value) || true
+
+const createNameRule = (fieldName: string, minLength: number = 3, maxLength: number = 20) => 
+  (value: any): string | boolean => {
+    const result = validateNodeField(value, fieldName, {
+      required: true,
+      minLength,
+      maxLength,
+      pattern: PATTERNS.ALPHANUMERIC
+    })
+    return result || true
+  }
+
+const createNumberRule = (fieldName: string, min: number, max: number) => 
+  (value: any): string | boolean => {
+    const result = validateNodeField(value, fieldName, {
+      required: true,
+      min,
+      max
+    })
+    return result || true
+  }
+
+const createCustomRule = (fieldName: string, customValidator: (val: any) => boolean | string) => 
+  (value: any): string | boolean => {
+    const result = validateNodeField(value, fieldName, {
+      required: true,
+      custom: customValidator
+    })
+    return result || true
+  }
+
 export const RULES = {
-  nodeName: (value: any) => validateNodeField(value, 'Name', {
-    required: true,
-    minLength: 3,
-    maxLength: 20,
-    pattern: PATTERNS.ALPHANUMERIC
+  nodeName: createNameRule('Name'),
+  clusterName: createNameRule('Cluster name'),  
+  ram: createNumberRule('RAM', 2, 256),
+  storage: createNumberRule('Storage', 10, 10000),  
+  cpu: createCustomRule('CPU', (val: any) => {
+    const num = Number(val)
+    if (isNaN(num)) return 'CPU must be a valid number'
+    if (!Number.isInteger(num)) return 'CPU must be a whole number (no decimals)'
+    return true
   }),
-
-  cpu: (value: any) => validateNodeField(value, 'CPU', {
-    required: true,
-    min: 1,
-    max: 255,
-    custom: (val: any) => {
-      const num = Number(val)
-      if (isNaN(num)) return 'CPU must be a valid number'
-      if (!Number.isInteger(num)) return 'CPU must be a whole number (no decimals)'
-      return true
-    }
-  }),
-
-  ram: (value: any) => validateNodeField(value, 'RAM', {
-    required: true,
-    min: 2,
-    max: 256
-  }),
-
-  storage: (value: any) => validateNodeField(value, 'Storage', {
-    required: true,
-    min: 10,
-    max: 10000
-  }),
-
-  clusterName: (value: any) => validateNodeField(value, 'Cluster name', {
-    required: true,
-    minLength: 3,
-    maxLength: 20,
-    pattern: PATTERNS.ALPHANUMERIC
-  }),
+  email: toVuetifyRule(validateEmail),
+  verificationCode: toVuetifyRule(validateVerificationCode),  
+  creditAmount: toVuetifyRule(validateCreditAmount),
+  creditMemo: toVuetifyRule(validateCreditMemo),
+  
+  // Add missing validation rules for auth views
+  name: createNameRule('Name', 3, 64),
+  password: (value: any): string | boolean => {
+    const result = validateField({
+      value,
+      rules: VALIDATION_RULES.PASSWORD,
+      fieldName: 'Password'
+    })
+    return result.isValid ? true : result.errors[0]
+  },
+  confirmPassword: (value: any, password: string): string | boolean => {
+    if (!value) return 'Please confirm your password'
+    if (value !== password) return 'Passwords do not match'
+    return true
+  },
 
   validateNode: (node: any): Record<string, string> => {
-    const errors: Record<string, string> = {}
-
-    const nameError = RULES.nodeName(node.name)
-    if (nameError) errors.name = nameError
-
-    const cpuError = RULES.cpu(node.vcpu)
-    if (cpuError) errors.vcpu = cpuError
-
-    const ramError = RULES.ram(node.ram)
-    if (ramError) errors.ram = ramError
-
-    const storageError = RULES.storage(node.disk)
-    if (storageError) errors.disk = storageError
-
-    return errors
-  }
-}
-
-// Vuetify-compatible validation rules
-export const VUETIFY_RULES = {
-  nodeName: (value: any): string | boolean => {
-    const result = RULES.nodeName(value);
-    return result || true;
-  },
-  cpu: (value: any): string | boolean => {
-    const result = RULES.cpu(value);
-    return result || true;
-  },
-  ram: (value: any): string | boolean => {
-    const result = RULES.ram(value);
-    return result || true;
-  },
-  storage: (value: any): string | boolean => {
-    const result = RULES.storage(value);
-    return result || true;
-  },
-  clusterName: (value: any): string | boolean => {
-    const result = RULES.clusterName(value);
-    return result || true;
+    const validations = [
+      ['name', RULES.nodeName(node.name)],
+      ['vcpu', RULES.cpu(node.vcpu)],
+      ['ram', RULES.ram(node.ram)],
+      ['disk', RULES.storage(node.disk)]
+    ]
+    
+    return Object.fromEntries(
+      validations
+        .filter(([, error]) => error !== true)
+        .map(([field, error]) => [field, error as string])
+    )
   }
 }
 

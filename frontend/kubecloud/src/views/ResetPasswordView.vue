@@ -152,9 +152,7 @@ const handleResetPassword = async () => {
   error.value = ''
   loading.value = true
   try {
-    if (!isPasswordResetSession()) {
-      throw new Error('Invalid password reset session')
-    }
+    if (!isPasswordResetSession()) return
 
     await authService.changePassword({
       email: getEmail(),

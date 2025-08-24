@@ -67,6 +67,7 @@
           block
           size="large"
           variant="outlined"
+          :disabled="loading || !isFormValid"
         >
           <v-icon icon="mdi-account-plus" class="mr-2"></v-icon>
           {{ 'Create Account' }}
@@ -87,15 +88,13 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNotificationStore } from '../stores/notifications'
 import { useUserStore } from '../stores/user'
-import { validateForm, VALIDATION_RULES } from '../utils/validation'
+import { RULES } from '../utils/validation'
 import LoadingComponent from '../components/LoadingComponent.vue'
 
 const router = useRouter()
-const notificationStore = useNotificationStore()
 const userStore = useUserStore()
 const loading = ref(false)
 const form = reactive({
@@ -115,69 +114,53 @@ const errors = reactive({
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-const clearErrors = () => {
+const isFormValid = computed(() => {
+  return RULES.name(form.name) === true && 
+         RULES.email(form.email) === true && 
+         RULES.password(form.password) === true && 
+         RULES.confirmPassword(form.confirmPassword, form.password) === true
+})
+
+// Real-time validation watchers
+watch(() => form.name, (newValue) => {
+  const nameError = RULES.name(newValue)
+  errors.name = nameError === true ? '' : nameError as string
+})
+
+watch(() => form.email, (newValue) => {
+  const emailError = RULES.email(newValue)
+  errors.email = emailError === true ? '' : emailError as string
+})
+
+watch(() => form.password, (newValue) => {
+  const passwordError = RULES.password(newValue)
+  errors.password = passwordError === true ? '' : passwordError as string
+})
+
+watch(() => form.confirmPassword, (newValue) => {
+  const confirmPasswordError = RULES.confirmPassword(newValue, form.password)
+  errors.confirmPassword = confirmPasswordError === true ? '' : confirmPasswordError as string
+})
+
+const validateFormData = () => {
   errors.name = ''
   errors.email = ''
   errors.password = ''
   errors.confirmPassword = ''
-}
 
-const validateFormData = () => {
-  clearErrors()
+  const nameError = RULES.name(form.name)
+  if (nameError !== true) errors.name = nameError as string
 
-  if (form.name.length < 3) {
-    errors.name = 'Name must be at least 3 characters'
-    return false
-  }
-  if (form.name.length > 64) {
-    errors.name = 'Name must be no more than 64 characters'
-    return false
-  }
+  const emailError = RULES.email(form.email)
+  if (emailError !== true) errors.email = emailError as string
 
-  const validationFields = {
-    name: {
-      value: form.name,
-      rules: { required: true, minLength: 3 }
-    },
-    email: {
-      value: form.email,
-      rules: VALIDATION_RULES.EMAIL
-    },
-    password: {
-      value: form.password,
-      rules: VALIDATION_RULES.PASSWORD
-    },
-    confirmPassword: {
-      value: form.confirmPassword,
-      rules: {
-        required: true,
-        custom: (value: string) => {
-          if (value !== form.password) {
-            return 'Passwords do not match'
-          }
-          return true
-        }
-      }
-    }
-  }
+  const passwordError = RULES.password(form.password)
+  if (passwordError !== true) errors.password = passwordError as string
 
-  const result = validateForm(validationFields)
+  const confirmPasswordError = RULES.confirmPassword(form.confirmPassword, form.password)
+  if (confirmPasswordError !== true) errors.confirmPassword = confirmPasswordError as string
 
-  if (!result.isValid) {
-    result.errors.forEach(error => {
-      if (error.includes('name')) {
-        errors.name = error
-      } else if (error.includes('email')) {
-        errors.email = error
-      } else if (error.includes('password') && !error.includes('confirm')) {
-        errors.password = error
-      } else if (error.includes('confirmPassword') || error.includes('do not match')) {
-        errors.confirmPassword = error
-      }
-    })
-    return false
-  }
-  return true
+  return Object.values(errors).every(error => !error)
 }
 
 const handleSignUp = async () => {

@@ -68,33 +68,12 @@ function handleSidebarSelect(newSelected: string) {
 
 // Generate vouchers using real API
 async function generateVouchers(voucherData: GenerateVouchersRequest) {
-    const response = await adminService.generateVouchers(voucherData)
-    await loadVouchers()
+  await adminService.generateVouchers(voucherData)
+  await loadVouchers()
 }
 
 async function loadVouchers() {
     vouchers.value = await adminService.listVouchers()
-}
-
-// Apply manual credit using real API
-async function applyManualCredit(creditData: { amount: number; reason: string }) {
-  if (!creditUserDialogObj.value) return
-
-  try {
-    await adminService.creditUser(creditUserDialogObj.value.id, {
-      amount: creditData.amount,
-      memo: creditData.reason
-    })
-
-    // Close dialog after successful credit
-    setTimeout(() => {
-      closeCreditDialog()
-    }, 1500)
-
-  } catch (error) {
-    console.error('Failed to credit user:', error)
-    throw error // Let the component handle the error display
-  }
 }
 
 function openCreditDialog(user: User) {
@@ -105,6 +84,10 @@ function openCreditDialog(user: User) {
 function closeCreditDialog() {
   creditDialog.value = false
   creditUserDialogObj.value = null
+}
+
+function handleCreditApplied() {
+  loadUsers()
 }
 
 const invoices: Ref<Invoice[]> = ref([])
@@ -161,7 +144,10 @@ async function loadInvoices() {
 
               <AdminManualCredit
                 v-if="creditDialog && creditUserDialogObj"
-                @applyManualCredit="applyManualCredit"
+                :userId="creditUserDialogObj.id"
+                :userEmail="creditUserDialogObj.email"
+                @creditApplied="handleCreditApplied"
+                @close="closeCreditDialog"
               />
               <v-card-actions class="justify-end mt-2">
                 <v-btn

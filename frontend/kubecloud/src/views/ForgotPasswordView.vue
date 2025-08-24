@@ -16,7 +16,7 @@
           class="auth-field"
           :error-messages="error"
           :disabled="loading"
-          :rules="[rules.required, rules.email]"
+          :rules="[RULES.email]"
           required
         />
         <v-btn
@@ -42,7 +42,7 @@
           class="auth-field"
           :error-messages="error"
           :disabled="loading"
-          :rules="[rules.required, rules.verificationCode]"
+          :rules="[RULES.verificationCode]"
           required
           placeholder="Enter 4-6 digit code"
           maxlength="6"
@@ -71,7 +71,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../utils/authService'
-import { validateEmail, validateVerificationCode } from '../utils/validation'
+import { RULES } from '../utils/validation'
 
 const router = useRouter()
 const step = ref(1)
@@ -80,25 +80,11 @@ const code = ref('')
 const loading = ref(false)
 const error = ref('')
 
-// Validation rules using existing validation utilities
-const rules = {
-  required: (value: string) => !!value?.trim() || 'This field is required',
-  email: (value: string) => {
-    const validation = validateEmail(value)
-    return validation.isValid || validation.error
-  },
-  verificationCode: (value: string) => {
-    const validation = validateVerificationCode(value)
-    return validation.isValid || validation.error
-  }
-}
-
-// Form validation using validation utilities
-const isEmailValid = computed(() => validateEmail(email.value).isValid)
-const isCodeValid = computed(() => validateVerificationCode(code.value).isValid)
+const isEmailValid = computed(() => RULES.email(email.value) === true)
+const isCodeValid = computed(() => RULES.verificationCode(code.value) === true)
 
 const handleRequestCode = async () => {
-  if (!email.value.trim() || !rules.email(email.value)) return
+  if (!email.value.trim() || RULES.email(email.value) !== true) return
 
   error.value = ''
   loading.value = true
@@ -113,7 +99,7 @@ const handleRequestCode = async () => {
 }
 
 const handleVerifyCode = async () => {
-  if (!code.value.trim() || !rules.verificationCode(code.value)) return
+  if (!code.value.trim() || RULES.verificationCode(code.value) !== true) return
 
   error.value = ''
   loading.value = true

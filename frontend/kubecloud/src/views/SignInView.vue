@@ -49,7 +49,7 @@
           size="large"
           variant="outlined"
           :loading="loading"
-          :disabled="loading"
+          :disabled="loading || !isFormValid"
         >
           <v-icon icon="mdi-login" class="mr-2"></v-icon>
           {{ loading ? 'Signing In...' : 'Sign In' }}
@@ -71,10 +71,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick } from 'vue'
+import { ref, reactive, nextTick, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { validateForm, VALIDATION_RULES } from '../utils/validation'
+import { RULES } from '../utils/validation'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -92,39 +92,33 @@ const errors = reactive({
 const showPassword = ref(false)
 const loading = ref(false)
 
-const clearErrors = () => {
-  errors.email = ''
-  errors.password = ''
-}
+const isFormValid = computed(() => {
+  return RULES.email(form.email) === true && RULES.password(form.password) === true
+})
+
+// Real-time validation watchers
+watch(() => form.email, (newValue) => {
+  const emailError = RULES.email(newValue)
+  errors.email = emailError === true ? '' : emailError as string
+})
+
+watch(() => form.password, (newValue) => {
+  const passwordError = RULES.password(newValue)
+  errors.password = passwordError === true ? '' : passwordError as string
+})
 
 const validateFormData = () => {
-  clearErrors()
+  // Clear previous errors
+  errors.email = ''
+  errors.password = ''
 
-  const validationFields = {
-    email: {
-      value: form.email,
-      rules: VALIDATION_RULES.EMAIL
-    },
-    password: {
-      value: form.password,
-      rules: { required: true, minLength: 1 }
-    }
-  }
+  const emailError = RULES.email(form.email)
+  if (emailError !== true) errors.email = emailError as string
 
-  const result = validateForm(validationFields)
+  const passwordError = RULES.password(form.password)
+  if (passwordError !== true) errors.password = passwordError as string
 
-  if (!result.isValid) {
-    result.errors.forEach(error => {
-      if (error.includes('email')) {
-        errors.email = error
-      } else if (error.includes('password')) {
-        errors.password = error
-      }
-    })
-    return false
-  }
-
-  return true
+  return Object.values(errors).every(error => !error)
 }
 
 const handleSignIn = async () => {

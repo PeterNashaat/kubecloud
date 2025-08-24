@@ -53,7 +53,7 @@
 import { defineProps, defineEmits, watch, ref, computed } from 'vue';
 import type { PropType } from 'vue';
 import type { VM, SshKey } from '../composables/useDeployCluster';
-import { VUETIFY_RULES } from '../utils/validation';
+import { RULES } from '../utils/validation';
 const props = defineProps({
   node: { type: Object as PropType<VM>, required: true },
   visible: { type: Boolean, required: true },
@@ -81,16 +81,16 @@ const errors = computed(() => {
   const node = localNode.value;
   const errs: Record<string, string> = {};
   
-  const nameResult = VUETIFY_RULES.nodeName(node.name);
+  const nameResult = RULES.nodeName(node.name);
   if (nameResult !== true) errs.name = nameResult as string;
   
-  const cpuResult = VUETIFY_RULES.cpu(node.vcpu);
+  const cpuResult = RULES.cpu(node.vcpu);
   if (cpuResult !== true) errs.vcpu = cpuResult as string;
   
-  const ramResult = VUETIFY_RULES.ram(node.ram);
+  const ramResult = RULES.ram(node.ram);
   if (ramResult !== true) errs.ram = ramResult as string;
   
-  const storageResult = VUETIFY_RULES.storage(node.disk);
+  const storageResult = RULES.storage(node.disk);
   if (storageResult !== true) errs.disk = storageResult as string;
   
   return errs;
