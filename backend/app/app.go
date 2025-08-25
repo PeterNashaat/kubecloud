@@ -31,17 +31,16 @@ import (
 
 // App holds all configurations for the app
 type App struct {
-	router        *gin.Engine
-	httpServer    *http.Server
-	config        internal.Configuration
-	handlers      Handler
-	db            models.DB
-	redis         *internal.RedisClient
-	sseManager    *internal.SSEManager
-	workerManager *internal.WorkerManager
-	gridClient    deployer.TFPluginClient
-	metrics       *metrics.Metrics
-	appCancel     context.CancelFunc
+	router     *gin.Engine
+	httpServer *http.Server
+	config     internal.Configuration
+	handlers   Handler
+	db         models.DB
+	redis      *internal.RedisClient
+	sseManager *internal.SSEManager
+	gridClient deployer.TFPluginClient
+	appCancel  context.CancelFunc
+	metrics    *metrics.Metrics
 }
 
 // NewApp create new instance of the app with all configs
@@ -94,7 +93,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create Redis client: %w", err)
 	}
 
-	sseManager := internal.NewSSEManager(redisClient, db)
+	sseManager := internal.NewSSEManager(db)
 
 	// start gridclient
 	gridClient, err := deployer.NewTFPluginClient(
@@ -144,8 +143,6 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create sponsor address from keypair: %w", err)
 	}
 
-	workerManager := internal.NewWorkerManager(redisClient, sseManager, config.DeployerWorkersNum, sshPublicKey, db, config.SystemAccount.Network)
-
 	// Validate KYC configuration
 	if strings.TrimSpace(config.KYCVerifierAPIURL) == "" {
 		appCancel()
@@ -171,16 +168,15 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress, metrics)
 
 	app := &App{
-		router:        router,
-		config:        config,
-		handlers:      *handler,
-		redis:         redisClient,
-		db:            db,
-		sseManager:    sseManager,
-		workerManager: workerManager,
-		appCancel:     appCancel,
-		gridClient:    gridClient,
-		metrics:       metrics,
+		router:     router,
+		config:     config,
+		handlers:   *handler,
+		redis:      redisClient,
+		db:         db,
+		sseManager: sseManager,
+		appCancel:  appCancel,
+		gridClient: gridClient,
+		metrics:    metrics,
 	}
 
 	activities.RegisterEWFWorkflows(
@@ -344,10 +340,6 @@ func (app *App) Shutdown(ctx context.Context) error {
 		if err := app.httpServer.Shutdown(ctx); err != nil {
 			log.Error().Err(err).Msg("Failed to shutdown HTTP server")
 		}
-	}
-
-	if app.workerManager != nil {
-		app.workerManager.Stop()
 	}
 
 	if app.sseManager != nil {
