@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/activities"
@@ -17,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/xmonader/ewf"
 	"golang.org/x/crypto/ssh"
+	"gorm.io/gorm"
 )
 
 // Response represents the response structure for deployment requests
@@ -144,8 +146,13 @@ func (h *Handler) HandleGetDeployment(c *gin.Context) {
 	projectName = kubedeployer.GetProjectName(id, projectName)
 	cluster, err := h.db.GetClusterByName(id, projectName)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Failed to get cluster")
-		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Deployment not found")
+			c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		} else {
+			log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Database error when looking up deployment")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lookup deployment"})
+		}
 		return
 	}
 
@@ -196,8 +203,13 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 	projectName = kubedeployer.GetProjectName(id, projectName)
 	cluster, err := h.db.GetClusterByName(id, projectName)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Failed to get cluster")
-		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Deployment not found")
+			c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		} else {
+			log.Error().Err(err).Str("user_id", id).Str("project_name", projectName).Msg("Database error when looking up deployment for kubeconfig")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lookup deployment"})
+		}
 		return
 	}
 
@@ -411,6 +423,10 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 	if err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "deployment already exists"})
 		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Error().Err(err).Str("user_id", config.UserID).Str("project_name", projectName).Msg("Database error when checking for existing deployment")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check existing deployments"})
+		return
 	}
 
 	wfName := fmt.Sprintf("deploy_%d_nodes_%s", len(cluster.Nodes), config.UserID)
@@ -464,7 +480,12 @@ func (h *Handler) HandleDeleteCluster(c *gin.Context) {
 	projectName := kubedeployer.GetProjectName(config.UserID, deploymentName)
 	_, err = h.db.GetClusterByName(config.UserID, projectName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		} else {
+			log.Error().Err(err).Str("user_id", config.UserID).Str("project_name", projectName).Msg("Database error when looking up deployment for deletion")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lookup deployment"})
+		}
 		return
 	}
 
@@ -527,7 +548,7 @@ func (h *Handler) HandleDeleteAllDeployments(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusAccepted, Response{
 		WorkflowID: wf.UUID,
 		Status:     string(wf.Status),
 		Message:    "Delete all deployments workflow started successfully",
@@ -568,7 +589,12 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 	projectName := kubedeployer.GetProjectName(config.UserID, cluster.Name)
 	existingCluster, err := h.db.GetClusterByName(config.UserID, projectName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		} else {
+			log.Error().Err(err).Str("user_id", config.UserID).Str("project_name", projectName).Msg("Database error when looking up deployment for adding node")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lookup deployment"})
+		}
 		return
 	}
 
@@ -646,8 +672,13 @@ func (h *Handler) HandleRemoveNode(c *gin.Context) {
 	projectName := kubedeployer.GetProjectName(config.UserID, deploymentName)
 	cluster, err := h.db.GetClusterByName(config.UserID, projectName)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", config.UserID).Str("deployment_name", deploymentName).Msg("Failed to find deployment")
-		c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Error().Err(err).Str("user_id", config.UserID).Str("deployment_name", deploymentName).Msg("Deployment not found")
+			c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+		} else {
+			log.Error().Err(err).Str("user_id", config.UserID).Str("deployment_name", deploymentName).Msg("Database error when looking up deployment for node removal")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lookup deployment"})
+		}
 		return
 	}
 
