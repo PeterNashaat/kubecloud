@@ -261,26 +261,11 @@ export class UserService {
 
   // Redeem a voucher
   async redeemVoucher(voucherCode: string) {
-    const res = await api.put<ApiResponse<RedeemVoucherResponse>>(`/v1/user/redeem/${voucherCode}`, {}, {
+    await api.put<ApiResponse<RedeemVoucherResponse>>(`/v1/user/redeem/${voucherCode}`, {}, {
       requiresAuth: true,
       showNotifications: true,
       errorMessage: 'Failed to redeem voucher'
     })
-    const workflowChecker = createWorkflowStatusChecker(res.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
-    const status = await workflowChecker.status
-    if(status === WorkflowStatus.StatusCompleted){
-      useNotificationStore().success(
-        'Voucher Redemption Success',
-        'Voucher has been successfully redeemed.',
-      )
-    }
-    if (status === WorkflowStatus.StatusFailed) {
-      useNotificationStore().error(
-        'Voucher Redemption Failed',
-        'Failed to redeem voucher',
-      )
-      throw new Error('Failed to redeem voucher')
-    }
   }
 
   // Fetch the user's current balance

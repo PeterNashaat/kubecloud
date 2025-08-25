@@ -46,18 +46,18 @@ export function useDeploymentEvents() {
           return
         }
 
+        const message = data.message || data.data?.message
+        if (message) {
+          console.log(data);
+          // Check if workflow failed based on message content
+          if (type === 'success') {
+            notificationStore.success('Workflow', message)
+          } else {
+            notificationStore.error('Workflow', message)
+          }
+        }
         // Handle workflow updates
         if (type === 'workflow_update') {
-          const message = data.message || data.data?.message
-          if (message) {
-            // Check if workflow failed based on message content
-            if (message.toLowerCase().includes('failed')) {
-              notificationStore.error('Workflow', message)
-            } else if (message.toLowerCase().includes('completed')) {
-              notificationStore.success('Workflow', message)
-            }
-          }
-
           // Always refresh data when workflow completes (success or failure)
           refreshClusterData()
         }
