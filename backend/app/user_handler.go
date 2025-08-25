@@ -250,11 +250,11 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 // @ID verify-register-code
 // @Accept json
 // @Produce json
-// @Param body body VerifyCodeInput true "Verify Code Input"
-// @Success 201 {object} VerifyRegisterUserResponse "workflow_id: string, email: string, short_live_access_token: string"
-// @Failure 400 {object} APIResponse "Invalid request format or verification failed"
-// @Failure 409 {object} APIResponse
-// @Failure 500 {object} APIResponse
+// @Param request body VerifyCodeInput true "Verification details"
+// @Success 201 {object} VerifyRegisterUserResponse
+// @Failure 400 {object} APIResponse "Invalid request"
+// @Failure 409 {object} APIResponse "User is already registered"
+// @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/register/verify [post]
 func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	var request VerifyCodeInput

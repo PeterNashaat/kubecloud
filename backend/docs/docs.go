@@ -15,6 +15,433 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/deployments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of all deployments (clusters) for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "List deployments",
+                "responses": {
+                    "200": {
+                        "description": "Deployments retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.DeploymentListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates and deploys a new Kubernetes cluster",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Deploy cluster",
+                "parameters": [
+                    {
+                        "description": "Cluster configuration",
+                        "name": "cluster",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app.ClusterInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Deployment workflow started successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes all deployments and their resources for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Delete all deployments",
+                "responses": {
+                    "200": {
+                        "description": "Delete all deployments workflow started successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/deployments/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves details of a specific deployment by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Get deployment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Deployment name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deployment details retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.DeploymentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Deployment not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a specific deployment and all its resources",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Delete deployment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Deployment name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deployment deletion workflow started successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Deployment not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/deployments/{name}/kubeconfig": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves the kubeconfig file for a specific deployment",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Get kubeconfig",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Deployment name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Kubeconfig retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.KubeconfigResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Deployment not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/deployments/{name}/nodes": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a new node to an existing deployment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Add node to deployment",
+                "parameters": [
+                    {
+                        "description": "Cluster configuration with new node",
+                        "name": "cluster",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app.ClusterInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Node addition workflow started successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Deployment not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/deployments/{name}/nodes/{node_name}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a specific node from an existing deployment",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "deployments"
+                ],
+                "summary": "Remove node from deployment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Deployment name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Node name to remove",
+                        "name": "node_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Node removal workflow started successfully",
+                        "schema": {
+                            "$ref": "#/definitions/app.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Deployment not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/invoices": {
             "get": {
                 "security": [
@@ -1008,8 +1435,8 @@ const docTemplate = `{
                 "operationId": "verify-register-code",
                 "parameters": [
                     {
-                        "description": "Verify Code Input",
-                        "name": "body",
+                        "description": "Verification details",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -1018,20 +1445,26 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "workflow_id: string, email: string",
+                    "201": {
+                        "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/app.RegisterUserResponse"
+                            "$ref": "#/definitions/app.VerifyRegisterUserResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request format or verification failed",
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User is already registered",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -1226,7 +1659,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.User"
+                                "$ref": "#/definitions/app.UserResponse"
                             }
                         }
                     },
@@ -1641,6 +2074,27 @@ const docTemplate = `{
                 }
             }
         },
+        "app.ClusterInput": {
+            "type": "object",
+            "required": [
+                "name",
+                "nodes"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app.NodeInput"
+                    }
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "app.CreditRequestInput": {
             "type": "object",
             "required": [
@@ -1668,6 +2122,38 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.DeploymentListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "deployments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app.DeploymentResponse"
+                    }
+                }
+            }
+        },
+        "app.DeploymentResponse": {
+            "type": "object",
+            "properties": {
+                "cluster": {},
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "project_name": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -1766,6 +2252,14 @@ const docTemplate = `{
                 }
             }
         },
+        "app.KubeconfigResponse": {
+            "type": "object",
+            "properties": {
+                "kubeconfig": {
+                    "type": "string"
+                }
+            }
+        },
         "app.LoginInput": {
             "type": "object",
             "required": [
@@ -1788,6 +2282,68 @@ const docTemplate = `{
             "properties": {
                 "enabled": {
                     "type": "boolean"
+                }
+            }
+        },
+        "app.NodeInput": {
+            "type": "object",
+            "required": [
+                "cpu",
+                "memory",
+                "name",
+                "node_id",
+                "root_size",
+                "type"
+            ],
+            "properties": {
+                "cpu": {
+                    "type": "integer"
+                },
+                "disk_size": {
+                    "description": "Storage in MB",
+                    "type": "integer"
+                },
+                "entrypoint": {
+                    "type": "string"
+                },
+                "env_vars": {
+                    "description": "SSH_KEY, etc.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "flist": {
+                    "type": "string"
+                },
+                "gpu_ids": {
+                    "description": "List of GPU IDs",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "memory": {
+                    "description": "Memory in MB",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "node_id": {
+                    "type": "integer"
+                },
+                "root_size": {
+                    "description": "Storage in MB",
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "worker",
+                        "master",
+                        "leader"
+                    ]
                 }
             }
         },
@@ -1907,9 +2463,6 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
-                "short_live_access_token": {
-                    "type": "string"
-                },
                 "workflow_id": {
                     "type": "string"
                 }
@@ -1925,6 +2478,20 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "workflow_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.Response": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "task_id": {
                     "type": "string"
                 }
             }
@@ -1992,6 +2559,71 @@ const docTemplate = `{
                 }
             }
         },
+        "app.UserResponse": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "account_address": {
+                    "type": "string"
+                },
+                "admin": {
+                    "type": "boolean"
+                },
+                "balance": {
+                    "description": "USD balance",
+                    "type": "number"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "credit_card_balance": {
+                    "description": "millicent, money from credit card",
+                    "type": "integer"
+                },
+                "credited_balance": {
+                    "description": "millicent, manually added by admin or from vouchers",
+                    "type": "integer"
+                },
+                "debt": {
+                    "description": "millicent",
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "password": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sponsored": {
+                    "type": "boolean"
+                },
+                "ssh_key": {
+                    "type": "string"
+                },
+                "stripe_customer_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "verified": {
+                    "type": "boolean"
+                }
+            }
+        },
         "app.VerifyCodeInput": {
             "type": "object",
             "required": [
@@ -2003,6 +2635,23 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "app.VerifyRegisterUserResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "workflow_id": {
                     "type": "string"
                 }
             }
@@ -2103,67 +2752,6 @@ const docTemplate = `{
                 "userID": {
                     "description": "User owner",
                     "type": "integer"
-                }
-            }
-        },
-        "models.User": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "username"
-            ],
-            "properties": {
-                "account_address": {
-                    "type": "string"
-                },
-                "admin": {
-                    "type": "boolean"
-                },
-                "code": {
-                    "type": "integer"
-                },
-                "credit_card_balance": {
-                    "description": "millicent, money from credit card",
-                    "type": "integer"
-                },
-                "credited_balance": {
-                    "description": "millicent, manually added by admin or from vouchers",
-                    "type": "integer"
-                },
-                "debt": {
-                    "description": "millicent",
-                    "type": "integer"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "password": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "sponsored": {
-                    "type": "boolean"
-                },
-                "ssh_key": {
-                    "type": "string"
-                },
-                "stripe_customer_id": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                },
-                "verified": {
-                    "type": "boolean"
                 }
             }
         },

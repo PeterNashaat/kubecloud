@@ -50,6 +50,7 @@ type DB interface {
 	GetClusterByName(userID string, projectName string) (Cluster, error)
 	UpdateCluster(cluster *Cluster) error
 	DeleteCluster(userID string, projectName string) error
+	DeleteAllUserClusters(userID string) error
 	// pending records methods
 	CreatePendingRecord(record *PendingRecord) error
 	ListAllPendingRecords() ([]PendingRecord, error)
