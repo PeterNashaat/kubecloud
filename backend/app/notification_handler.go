@@ -127,7 +127,7 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 
 	notificationIDStr := c.Param("notification_id")
 	notificationID, err := strconv.ParseUint(notificationIDStr, 10, 32)
-	if err != nil {
+	if err != nil || notificationID == 0 {
 		Error(c, http.StatusBadRequest, "Invalid notification ID", "Notification ID must be a positive integer")
 		return
 	}
@@ -172,7 +172,7 @@ func (h *Handler) DeleteNotificationHandler(c *gin.Context) {
 
 	notificationIDStr := c.Param("notification_id")
 	notificationID, err := strconv.ParseUint(notificationIDStr, 10, 32)
-	if err != nil {
+	if err != nil || notificationID == 0 {
 		Error(c, http.StatusBadRequest, "Invalid notification ID", "Notification ID must be a positive integer")
 		return
 	}
@@ -255,7 +255,7 @@ func (h *Handler) MarkNotificationUnreadHandler(c *gin.Context) {
 
 	notificationIDStr := c.Param("notification_id")
 	notificationID, err := strconv.ParseUint(notificationIDStr, 10, 32)
-	if err != nil {
+	if err != nil || notificationID == 0 {
 		Error(c, http.StatusBadRequest, "Invalid notification ID", "Notification ID must be a positive integer")
 		return
 	}
