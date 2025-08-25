@@ -40,6 +40,7 @@ type App struct {
 	sseManager *internal.SSEManager
 	gridClient deployer.TFPluginClient
 	appCancel  context.CancelFunc
+	metrics    *metrics.Metrics
 }
 
 // NewApp create new instance of the app with all configs
@@ -175,6 +176,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		sseManager: sseManager,
 		appCancel:  appCancel,
 		gridClient: gridClient,
+		metrics:    metrics,
 	}
 
 	activities.RegisterEWFWorkflows(
