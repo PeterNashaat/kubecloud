@@ -20,6 +20,7 @@
           { title: 'ID', key: 'id', width: '80px' },
           { title: 'Name', key: 'username' },
           { title: 'Email', key: 'email' },
+          { title: 'Balance', key: 'balance' },
           { title: 'Actions', key: 'actions', sortable: false, width: '160px' }
         ]"
         :items="users"
