@@ -1,12 +1,14 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"kubecloud/models"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const (
@@ -132,7 +134,11 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 
 	err = h.db.MarkNotificationAsRead(uint(notificationID), userID)
 	if err != nil {
-		Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
+			return
+		}
+		Error(c, http.StatusInternalServerError, "Database error", "Failed to mark notification as read")
 		return
 	}
 
@@ -173,7 +179,11 @@ func (h *Handler) DeleteNotificationHandler(c *gin.Context) {
 
 	err = h.db.DeleteNotification(uint(notificationID), userID)
 	if err != nil {
-		Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
+			return
+		}
+		Error(c, http.StatusInternalServerError, "Database error", "Failed to delete notification")
 		return
 	}
 
@@ -252,7 +262,11 @@ func (h *Handler) MarkNotificationUnreadHandler(c *gin.Context) {
 
 	err = h.db.MarkNotificationAsUnread(uint(notificationID), userID)
 	if err != nil {
-		Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
+			return
+		}
+		Error(c, http.StatusInternalServerError, "Database error", "Failed to mark notification as unread")
 		return
 	}
 

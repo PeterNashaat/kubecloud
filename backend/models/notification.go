@@ -1,8 +1,9 @@
 package models
 
 import (
-	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // NotificationType represents the type of notification
@@ -70,7 +71,7 @@ func (s *GormDB) MarkNotificationAsRead(notificationID uint, userID string) erro
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("notification not found or access denied")
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil
@@ -89,7 +90,17 @@ func (s *GormDB) MarkAllNotificationsAsRead(userID string) error {
 
 // DeleteNotification deletes a notification for a user
 func (s *GormDB) DeleteNotification(notificationID uint, userID string) error {
-	return s.db.Where("id = ? AND user_id = ?", notificationID, userID).Delete(&Notification{}).Error
+	result := s.db.Where("id = ? AND user_id = ?", notificationID, userID).Delete(&Notification{})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
 }
 
 // GetUnreadNotifications retrieves only unread notifications for a user with pagination
@@ -121,7 +132,7 @@ func (s *GormDB) MarkNotificationAsUnread(notificationID uint, userID string) er
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("notification not found or access denied")
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil
