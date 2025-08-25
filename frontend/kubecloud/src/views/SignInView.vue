@@ -6,7 +6,7 @@
         <h1 class="auth-title">Welcome Back!</h1>
         <p class="auth-subtitle">Sign in to your KubeCloud account</p>
       </div>
-      <v-form @submit.prevent="handleSignIn" class="auth-form">
+      <v-form @submit.prevent="handleSignIn" class="auth-form" ref="formRef" v-model="isFormValid">
         <v-text-field
           v-model="form.email"
           label="Email Address"
@@ -14,8 +14,8 @@
           prepend-inner-icon="mdi-email"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.email"
           :disabled="loading"
+          :rules="[RULES.email]"
           required
         />
         <v-text-field
@@ -25,9 +25,9 @@
           prepend-inner-icon="mdi-lock"
           :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
           @click:append-inner="showPassword = !showPassword"
+          :rules="[RULES.password]"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.password"
           :disabled="loading"
           required
         />
@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick, computed, watch } from 'vue'
+import { ref, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { RULES } from '../utils/validation'
@@ -84,46 +84,12 @@ const form = reactive({
   password: '',
 })
 
-const errors = reactive({
-  email: '',
-  password: ''
-})
 
 const showPassword = ref(false)
 const loading = ref(false)
-
-const isFormValid = computed(() => {
-  return RULES.email(form.email) === true && RULES.password(form.password) === true
-})
-
-// Real-time validation watchers
-watch(() => form.email, (newValue) => {
-  const emailError = RULES.email(newValue)
-  errors.email = emailError === true ? '' : emailError as string
-})
-
-watch(() => form.password, (newValue) => {
-  const passwordError = RULES.password(newValue)
-  errors.password = passwordError === true ? '' : passwordError as string
-})
-
-const validateFormData = () => {
-  // Clear previous errors
-  errors.email = ''
-  errors.password = ''
-
-  const emailError = RULES.email(form.email)
-  if (emailError !== true) errors.email = emailError as string
-
-  const passwordError = RULES.password(form.password)
-  if (passwordError !== true) errors.password = passwordError as string
-
-  return Object.values(errors).every(error => !error)
-}
+const isFormValid = ref(false)
 
 const handleSignIn = async () => {
-  if (!validateFormData()) return
-
   loading.value = true
   try {
     await userStore.login(form.email, form.password)

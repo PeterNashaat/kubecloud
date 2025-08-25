@@ -6,14 +6,14 @@
         <h1 class="auth-title">Create Account</h1>
         <p class="auth-subtitle">Join KubeCloud and start your journey</p>
       </div>
-      <v-form @submit.prevent="handleSignUp" class="auth-form">
+      <v-form @submit.prevent="handleSignUp" class="auth-form" v-model="isFormValid">
         <v-text-field
           v-model="form.name"
           label="Name"
           prepend-inner-icon="mdi-account"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.name"
+          :rules="[RULES.name]"
           required
         />
         <v-text-field
@@ -23,7 +23,7 @@
           prepend-inner-icon="mdi-email"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.email"
+          :rules="[RULES.email]"
           required
         />
         <v-text-field
@@ -35,7 +35,7 @@
           @click:append-inner="showPassword = !showPassword"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.password"
+          :rules="[RULES.password]"
           required
         />
         <div class="password-requirements">
@@ -58,7 +58,7 @@
           @click:append-inner="showConfirmPassword = !showConfirmPassword"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.confirmPassword"
+          :rules="[RULES.confirmPassword(form.confirmPassword, form.password)]"
           required
         />
         <v-btn
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { RULES } from '../utils/validation'
@@ -97,6 +97,7 @@ import LoadingComponent from '../components/LoadingComponent.vue'
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
+const isFormValid = ref(false)
 const form = reactive({
   name: '',
   email: '',
@@ -104,70 +105,11 @@ const form = reactive({
   confirmPassword: '',
 })
 
-const errors = reactive({
-  name: '',
-  email: '',
-  password: '',
-  confirmPassword: ''
-})
-
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-const isFormValid = computed(() => {
-  return RULES.name(form.name) === true && 
-         RULES.email(form.email) === true && 
-         RULES.password(form.password) === true && 
-         RULES.confirmPassword(form.confirmPassword, form.password) === true
-})
-
-// Real-time validation watchers
-watch(() => form.name, (newValue) => {
-  const nameError = RULES.name(newValue)
-  errors.name = nameError === true ? '' : nameError as string
-})
-
-watch(() => form.email, (newValue) => {
-  const emailError = RULES.email(newValue)
-  errors.email = emailError === true ? '' : emailError as string
-})
-
-watch(() => form.password, (newValue) => {
-  const passwordError = RULES.password(newValue)
-  errors.password = passwordError === true ? '' : passwordError as string
-})
-
-watch(() => form.confirmPassword, (newValue) => {
-  const confirmPasswordError = RULES.confirmPassword(newValue, form.password)
-  errors.confirmPassword = confirmPasswordError === true ? '' : confirmPasswordError as string
-})
-
-const validateFormData = () => {
-  errors.name = ''
-  errors.email = ''
-  errors.password = ''
-  errors.confirmPassword = ''
-
-  const nameError = RULES.name(form.name)
-  if (nameError !== true) errors.name = nameError as string
-
-  const emailError = RULES.email(form.email)
-  if (emailError !== true) errors.email = emailError as string
-
-  const passwordError = RULES.password(form.password)
-  if (passwordError !== true) errors.password = passwordError as string
-
-  const confirmPasswordError = RULES.confirmPassword(form.confirmPassword, form.password)
-  if (confirmPasswordError !== true) errors.confirmPassword = confirmPasswordError as string
-
-  return Object.values(errors).every(error => !error)
-}
 
 const handleSignUp = async () => {
-  if (!validateFormData()) {
-    // Don't show generic notification - inline errors are already shown
-    return
-  }
   loading.value = true
   try {
     await userStore.register({

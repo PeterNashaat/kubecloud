@@ -6,7 +6,7 @@
         <h1 class="auth-title">Verify Your Email</h1>
         <p class="auth-subtitle">Enter the verification code sent to your email</p>
       </div>
-      <v-form @submit.prevent="handleVerify" class="auth-form">
+      <v-form @submit.prevent="handleVerify" class="auth-form" v-model="isFormValid">
         <v-text-field
           v-model="form.email"
           label="Email Address"
@@ -14,7 +14,6 @@
           prepend-inner-icon="mdi-email"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.email"
           :rules="[RULES.email]"
           required
           placeholder="Enter your email address"
@@ -27,7 +26,6 @@
           prepend-inner-icon="mdi-shield-key"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.code"
           :rules="[RULES.verificationCode]"
           required
           placeholder="Enter 4-6 digit code"
@@ -56,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '../utils/authService'
 import { RULES } from '../utils/validation'
@@ -69,28 +67,11 @@ const form = reactive({
   code: ''
 })
 
-const errors = reactive({ email: '', code: '' })
 const loading = ref(false)
 const resending = ref(false)
-
-const isFormValid = computed(() => 
-  RULES.email(form.email) === true && RULES.verificationCode(form.code) === true
-)
-
-// Utility function to set errors from validation results
-const setValidationErrors = () => {
-  const emailError = RULES.email(form.email)
-  const codeError = RULES.verificationCode(form.code)
-  
-  errors.email = emailError === true ? '' : (emailError as string)
-  errors.code = codeError === true ? '' : (codeError as string)
-  
-  return emailError === true && codeError === true
-}
+const isFormValid = ref(false)
 
 const handleVerify = async () => {
-  if (!setValidationErrors()) return
-
   try {
     loading.value = true
     await authService.verifyCode({
@@ -99,7 +80,6 @@ const handleVerify = async () => {
     })
     router.push('/sign-in')
   } catch (error) {
-    errors.code = 'Invalid verification code. Please try again.'
     console.error(error)
   } finally {
     loading.value = false
@@ -107,11 +87,6 @@ const handleVerify = async () => {
 }
 
 const resendCode = async () => {
-  const emailError = RULES.email(form.email)
-  if (emailError !== true) {
-    errors.email = emailError as string
-    return
-  }
 
   resending.value = true
   try {
@@ -121,10 +96,8 @@ const resendCode = async () => {
       password: 'temporary',
       confirm_password: 'temporary'
     })
-    errors.code = ''
   } catch (error) {
     console.error(error)
-    errors.email = 'Failed to resend verification code. Please try again.'
   } finally {
     resending.value = false
   }

@@ -5,7 +5,7 @@
       <p class="section-subtitle">Apply credits to user accounts</p>
     </div>
     
-    <v-form ref="formRef" @submit.prevent="handleSubmit" class="credit-form">
+    <v-form ref="formRef" @submit.prevent="handleSubmit" class="credit-form" v-model="isFormValid">
       <div class="form-row">
         <v-text-field
           v-model.number="creditAmount"
@@ -45,7 +45,7 @@
         color="primary"
         variant="elevated"
         class="btn-primary"
-        :disabled="!isFormValid || isSubmitting"
+        :disabled="isSubmitting || !isFormValid"
         :loading="isSubmitting"
       >
         <v-icon icon="mdi-cash-plus" class="mr-2"></v-icon>
@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { RULES } from '../utils/validation'
 import { adminService } from '../utils/adminService'
 
@@ -70,18 +70,11 @@ const emit = defineEmits(['creditApplied', 'close'])
 
 const formRef = ref()
 const isSubmitting = ref(false)
+const isFormValid = ref(false)
 const creditAmount = ref(0)
 const creditReason = ref('')
 
-
-const isFormValid = computed(() => {
-  const amountError = RULES.creditAmount(creditAmount.value)
-  const memoError = RULES.creditMemo(creditReason.value)
-  return amountError === true && memoError === true
-})
-
 const handleSubmit = async () => {
-  if (!isFormValid.value) return
 
   try {
     isSubmitting.value = true    
