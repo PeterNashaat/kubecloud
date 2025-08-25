@@ -286,7 +286,6 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, sse *internal.SSEManage
 			ID:             userID,
 			Sponsored:      true,
 			AccountAddress: sponseeAddress,
-			Verified:       true,
 		}); err != nil {
 			return fmt.Errorf("failed to update user data: %w", err)
 		}
