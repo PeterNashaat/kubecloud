@@ -285,20 +285,21 @@ func (app *App) registerHandlers() {
 				deploymentGroup.GET("/:name", app.handlers.HandleGetDeployment)
 				deploymentGroup.GET("/:name/kubeconfig", app.handlers.HandleGetKubeconfig)
 				deploymentGroup.DELETE("/:name", app.handlers.HandleDeleteCluster)
-
-				// Node management routes
 				deploymentGroup.POST("/:name/nodes", app.handlers.HandleAddNode)
 				deploymentGroup.DELETE("/:name/nodes/:node_name", app.handlers.HandleRemoveNode)
 			}
 
-			// Notification routes
-			deployerGroup.GET("/notifications", app.handlers.GetNotificationsHandler)
-			deployerGroup.PUT("/notifications/:notification_id/read", app.handlers.MarkNotificationReadHandler)
-			deployerGroup.PUT("/notifications/read-all", app.handlers.MarkAllNotificationsReadHandler)
-			deployerGroup.GET("/notifications/unread-count", app.handlers.GetUnreadNotificationCountHandler)
-			deployerGroup.DELETE("/notifications/:notification_id", app.handlers.DeleteNotificationHandler)
+			notificationGroup := deployerGroup.Group("/notifications")
+			{
+				notificationGroup.GET("", app.handlers.GetAllNotificationsHandler)
+				notificationGroup.GET("/unread", app.handlers.GetUnreadNotificationsHandler)
+				notificationGroup.PUT("/read-all", app.handlers.MarkAllNotificationsReadHandler)
+				notificationGroup.PUT("", app.handlers.DeleteAllNotificationsHandler)
+				notificationGroup.PUT("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
+				notificationGroup.PUT("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
+				notificationGroup.DELETE("/:notification_id", app.handlers.DeleteNotificationHandler)
+			}
 		}
-
 	}
 	app.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

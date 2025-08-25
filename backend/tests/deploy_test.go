@@ -119,7 +119,7 @@ func TestClient_RemoveNode(t *testing.T) {
 		t.Errorf("Remove node failed: %v", err)
 		return
 	}
-	t.Log("Node removed successfully")
+	t.Log("Node removing scheduled")
 }
 
 func TestClient_DeleteCluster(t *testing.T) {
@@ -135,7 +135,7 @@ func TestClient_DeleteCluster(t *testing.T) {
 		t.Errorf("Failed to delete cluster: %v", err)
 		return
 	}
-	t.Log("Cluster deleted successfully")
+	t.Log("Cluster deletion scheduled")
 }
 
 func TestClient_DeleteAll(t *testing.T) {

@@ -19,7 +19,28 @@ import (
 var (
 	criticalRetryPolicy = &ewf.RetryPolicy{MaxAttempts: 5, BackOff: ewf.ConstantBackoff(5 * time.Second)}
 	standardRetryPolicy = &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}
+
+	workflowsDescriptions = map[string]string{
+		WorkflowAddNode:       "Adding Node",
+		WorkflowRemoveNode:    "Removing Node",
+		WorkflowDeleteCluster: "Deleting Cluster",
+	}
 )
+
+// getWorkflowDescription returns a user-friendly description for the workflow
+func getWorkflowDescription(workflowName string) string {
+	if desc, exists := workflowsDescriptions[workflowName]; exists {
+		return desc
+	}
+
+	// Handle deploy-X-nodes workflows
+	if strings.Contains(workflowName, "deploy") {
+		return "Deploying Cluster"
+	}
+
+	// Fallback to workflow name
+	return workflowName
+}
 
 func isWorkloadAlreadyDeployedError(err error) bool {
 	errMsg := err.Error()
@@ -524,26 +545,43 @@ func NotifyUser(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 			return
 		}
 
-		notificationData := map[string]interface{}{
-			"type":    "workflow_update",
-			"message": "Workflow failed",
-		}
+		workflowDesc := getWorkflowDescription(wf.Name)
+		var notificationData map[string]interface{}
 
 		if err != nil {
-			notificationData["data"] = map[string]interface{}{"name": wf.Name, "error": err.Error()}
+			message := fmt.Sprintf("%s failed: %s", workflowDesc, err.Error())
+			if cluster, clusterErr := statemanager.GetCluster(wf.State); clusterErr == nil {
+				message = fmt.Sprintf("%s for cluster '%s' failed: %s", workflowDesc, cluster.Name, err.Error())
+			}
+
+			notificationData = map[string]interface{}{
+				"type":    "workflow_update",
+				"message": message,
+				"data":    map[string]interface{}{"name": wf.Name, "error": err.Error()},
+			}
 		} else {
 			cluster, clusterErr := statemanager.GetCluster(wf.State)
 			if clusterErr != nil {
 				notificationData = map[string]interface{}{
 					"type":    "workflow_update",
-					"message": "Workflow completed",
+					"message": fmt.Sprintf("%s completed successfully", workflowDesc),
 					"data":    map[string]interface{}{"name": wf.Name, "error": false},
 				}
 			} else {
+				nodeCount := len(cluster.Nodes)
+				message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
+					workflowDesc, cluster.Name, nodeCount)
+
 				notificationData = map[string]interface{}{
 					"type":    "workflow_update",
-					"message": "Workflow completed successfully",
-					"data":    map[string]interface{}{"name": wf.Name, "cluster": cluster, "error": false},
+					"message": message,
+					"data": map[string]interface{}{
+						"name":         wf.Name,
+						"cluster_name": cluster.Name,
+						"node_count":   nodeCount,
+						"cluster":      cluster,
+						"error":        false,
+					},
 				}
 			}
 		}

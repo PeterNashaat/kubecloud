@@ -40,10 +40,12 @@ type DB interface {
 	// Notification methods
 	CreateNotification(notification *Notification) error
 	GetUserNotifications(userID string, limit, offset int) ([]Notification, error)
+	GetUnreadNotifications(userID string, limit, offset int) ([]Notification, error)
 	MarkNotificationAsRead(notificationID uint, userID string) error
+	MarkNotificationAsUnread(notificationID uint, userID string) error
 	MarkAllNotificationsAsRead(userID string) error
-	GetUnreadNotificationCount(userID string) (int64, error)
 	DeleteNotification(notificationID uint, userID string) error
+	DeleteAllNotifications(userID string) error
 	// Cluster methods
 	CreateCluster(userID string, cluster *Cluster) error
 	ListUserClusters(userID string) ([]Cluster, error)
