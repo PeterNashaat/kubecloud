@@ -5,11 +5,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
 )
 
 type Stats struct {
-	TotalUsers    int64 `json:"total_users"`
-	TotalClusters int64 `json:"total_clusters"`
+	TotalUsers    uint32 `json:"total_users"`
+	TotalClusters uint32 `json:"total_clusters"`
+	UpNodes       uint32 `json:"up_nodes"`
+	Countries     uint32 `json:"countries"`
 }
 
 // @Summary Get system statistics
@@ -38,8 +41,17 @@ func (h *Handler) GetStatsHandler(c *gin.Context) {
 		return
 	}
 
+	stats, err := h.proxyClient.Stats(c.Request.Context(), types.StatsFilter{Status: []string{"up"}})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to retrieve up nodes count")
+		InternalServerError(c)
+		return
+	}
+
 	c.JSON(http.StatusOK, Stats{
-		TotalUsers:    totalUsers,
-		TotalClusters: totalClusters,
+		TotalUsers:    uint32(totalUsers),
+		TotalClusters: uint32(totalClusters),
+		UpNodes:       uint32(stats.Nodes),
+		Countries:     uint32(stats.Countries),
 	})
 }
