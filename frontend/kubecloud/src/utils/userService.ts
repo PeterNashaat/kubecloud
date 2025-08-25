@@ -143,7 +143,7 @@ export class UserService {
       })
     }
 
-    const endpoint = `/v1/nodes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    const endpoint = `/v1/user/nodes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     return api.get<NodesResponse>(endpoint, {
       requiresAuth: true,
       showNotifications: false // Don't show notifications for node listing
