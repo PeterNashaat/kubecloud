@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -24,18 +25,27 @@ const (
 	NotificationStatusRead   NotificationStatus = "read"
 )
 
+type NotificationSeverity string
+
+const (
+	NotificationSeverityInfo    NotificationSeverity = "info"
+	NotificationSeverityError   NotificationSeverity = "error"
+	NotificationSeverityWarning NotificationSeverity = "warning"
+	NotificationSeveritySuccess NotificationSeverity = "success"
+)
+
 // Notification represents a persistent notification
 type Notification struct {
-	ID        uint               `json:"id" gorm:"primaryKey"`
-	UserID    int                `json:"user_id" gorm:"not null;index"`
-	Type      NotificationType   `json:"type" gorm:"not null"`
-	Title     string             `json:"title" gorm:"not null"`
-	Message   string             `json:"message" gorm:"not null"`
-	Data      string             `json:"data,omitempty" gorm:"type:text"` // JSON string for additional data
-	TaskID    string             `json:"task_id,omitempty" gorm:"index"`
-	Status    NotificationStatus `json:"status" gorm:"default:'unread'"`
-	CreatedAt time.Time          `json:"created_at" gorm:"autoCreateTime"`
-	ReadAt    *time.Time         `json:"read_at,omitempty"`
+	ID        uuid.UUID            `json:"id" gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
+	UserID    int                  `json:"user_id" gorm:"not null;index"`
+	TaskID    string               `json:"task_id,omitempty" gorm:"index"`
+	Type      NotificationType     `json:"type" gorm:"not null"`
+	Severity  NotificationSeverity `json:"severity" gorm:"not null"`
+	Channels  []string             `json:"channels" gorm:"not null"`
+	Payload   map[string]string    `json:"payload" gorm:"not null"`
+	Status    NotificationStatus   `json:"status" gorm:"default:'unread'"`
+	CreatedAt time.Time            `json:"created_at" gorm:"autoCreateTime"`
+	ReadAt    *time.Time           `json:"read_at,omitempty"`
 }
 
 // CreateNotification creates a new notification

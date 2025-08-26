@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -20,26 +21,24 @@ const (
 
 // NotificationResponse represents a notification response
 type NotificationResponse struct {
-	ID        uint                      `json:"id"`
-	Type      models.NotificationType   `json:"type"`
-	Title     string                    `json:"title"`
-	Message   string                    `json:"message"`
-	Data      string                    `json:"data,omitempty"`
-	TaskID    string                    `json:"task_id,omitempty"`
-	Status    models.NotificationStatus `json:"status"`
-	CreatedAt string                    `json:"created_at"`
-	ReadAt    *string                   `json:"read_at,omitempty"`
+	ID        uuid.UUID                   `json:"id"`
+	TaskID    string                      `json:"task_id,omitempty"`
+	Type      models.NotificationType     `json:"type"`
+	Severity  models.NotificationSeverity `json:"severity"`
+	Payload   map[string]string           `json:"payload"`
+	Status    models.NotificationStatus   `json:"status"`
+	CreatedAt string                      `json:"created_at"`
+	ReadAt    *string                     `json:"read_at,omitempty"`
 }
 
 // convertToNotificationResponse converts a models.Notification to NotificationResponse
 func convertToNotificationResponse(notification models.Notification) NotificationResponse {
 	resp := NotificationResponse{
 		ID:        notification.ID,
-		Type:      notification.Type,
-		Title:     notification.Title,
-		Message:   notification.Message,
-		Data:      notification.Data,
 		TaskID:    notification.TaskID,
+		Type:      notification.Type,
+		Severity:  notification.Severity,
+		Payload:   notification.Payload,
 		Status:    notification.Status,
 		CreatedAt: notification.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
