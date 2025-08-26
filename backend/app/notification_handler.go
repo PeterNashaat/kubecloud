@@ -126,13 +126,13 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 	}
 
 	notificationIDStr := c.Param("notification_id")
-	notificationID, err := strconv.ParseUint(notificationIDStr, 10, 32)
-	if err != nil || notificationID == 0 {
+	notificationID, err := uuid.Parse(notificationIDStr)
+	if err != nil {
 		Error(c, http.StatusBadRequest, "Invalid notification ID", "Notification ID must be a positive integer")
 		return
 	}
 
-	err = h.db.MarkNotificationAsRead(uint(notificationID), userID)
+	err = h.db.MarkNotificationAsRead(notificationID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
@@ -171,13 +171,13 @@ func (h *Handler) DeleteNotificationHandler(c *gin.Context) {
 	}
 
 	notificationIDStr := c.Param("notification_id")
-	notificationID, err := strconv.ParseUint(notificationIDStr, 10, 32)
-	if err != nil || notificationID == 0 {
+	notificationID, err := uuid.Parse(notificationIDStr)
+	if err != nil {
 		Error(c, http.StatusBadRequest, "Invalid notification ID", "Notification ID must be a positive integer")
 		return
 	}
 
-	err = h.db.DeleteNotification(uint(notificationID), userID)
+	err = h.db.DeleteNotification(notificationID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
@@ -254,13 +254,13 @@ func (h *Handler) MarkNotificationUnreadHandler(c *gin.Context) {
 	}
 
 	notificationIDStr := c.Param("notification_id")
-	notificationID, err := strconv.ParseUint(notificationIDStr, 10, 32)
-	if err != nil || notificationID == 0 {
+	notificationID, err := uuid.Parse(notificationIDStr)
+	if err != nil {
 		Error(c, http.StatusBadRequest, "Invalid notification ID", "Notification ID must be a positive integer")
 		return
 	}
 
-	err = h.db.MarkNotificationAsUnread(uint(notificationID), userID)
+	err = h.db.MarkNotificationAsUnread(notificationID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			Error(c, http.StatusNotFound, "Notification not found", "The notification does not exist or you don't have access to it")
