@@ -195,7 +195,7 @@ export const VALIDATION_RULES = {
 
 // Node validation constants
 export const NODE_VALIDATION = {
-  CPU: { min: 1, max: 255 },
+  CPU: { min: 1, max: 256 },
   RAM: { min: 2, max: 256 }, // in GB
   STORAGE: { min: 10, max: 10000 }, // in GB
   ROOTFS: { min: 5, max: 100 } // in GB
