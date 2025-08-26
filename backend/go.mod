@@ -3,6 +3,7 @@ module kubecloud
 go 1.24.3
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/mattn/go-sqlite3 v1.14.29

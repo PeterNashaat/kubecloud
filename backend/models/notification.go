@@ -41,8 +41,8 @@ type Notification struct {
 	TaskID    string               `json:"task_id,omitempty" gorm:"index"`
 	Type      NotificationType     `json:"type" gorm:"not null"`
 	Severity  NotificationSeverity `json:"severity" gorm:"not null"`
-	Channels  []string             `json:"channels" gorm:"not null"`
-	Payload   map[string]string    `json:"payload" gorm:"not null"`
+	Channels  []string             `json:"channels" gorm:"serializer:json"`
+	Payload   map[string]string    `json:"payload" gorm:"serializer:json"`
 	Status    NotificationStatus   `json:"status" gorm:"default:'unread'"`
 	CreatedAt time.Time            `json:"created_at" gorm:"autoCreateTime"`
 	ReadAt    *time.Time           `json:"read_at,omitempty"`
@@ -67,7 +67,7 @@ func (s *GormDB) GetUserNotifications(userID int, limit, offset int) ([]Notifica
 }
 
 // MarkNotificationAsRead marks a specific notification as read
-func (s *GormDB) MarkNotificationAsRead(notificationID uint, userID int) error {
+func (s *GormDB) MarkNotificationAsRead(notificationID uuid.UUID, userID int) error {
 	now := time.Now()
 	result := s.db.Model(&Notification{}).
 		Where("id = ? AND user_id = ?", notificationID, userID).
@@ -99,7 +99,7 @@ func (s *GormDB) MarkAllNotificationsAsRead(userID int) error {
 }
 
 // DeleteNotification deletes a notification for a user
-func (s *GormDB) DeleteNotification(notificationID uint, userID int) error {
+func (s *GormDB) DeleteNotification(notificationID uuid.UUID, userID int) error {
 	result := s.db.Where("id = ? AND user_id = ?", notificationID, userID).Delete(&Notification{})
 
 	if result.Error != nil {
@@ -129,7 +129,7 @@ func (s *GormDB) DeleteAllNotifications(userID int) error {
 }
 
 // MarkNotificationAsUnread marks a specific notification as unread
-func (s *GormDB) MarkNotificationAsUnread(notificationID uint, userID int) error {
+func (s *GormDB) MarkNotificationAsUnread(notificationID uuid.UUID, userID int) error {
 	result := s.db.Model(&Notification{}).
 		Where("id = ? AND user_id = ?", notificationID, userID).
 		Updates(map[string]interface{}{
