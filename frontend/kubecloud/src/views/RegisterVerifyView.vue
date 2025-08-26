@@ -6,7 +6,7 @@
         <h1 class="auth-title">Verify Your Email</h1>
         <p class="auth-subtitle">Enter the verification code sent to your email</p>
       </div>
-      <v-form @submit.prevent="handleVerify" class="auth-form">
+      <v-form @submit.prevent="handleVerify" class="auth-form" v-model="isFormValid">
         <v-text-field
           v-model="form.email"
           label="Email Address"
@@ -14,18 +14,23 @@
           prepend-inner-icon="mdi-email"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.email"
+          :rules="[RULES.email]"
           required
+          placeholder="Enter your email address"
+          :disabled="loading || resending"
         />
         <v-text-field
           v-model="form.code"
           label="Verification Code"
-          type="text"
+          type="number"
           prepend-inner-icon="mdi-shield-key"
           variant="outlined"
           class="auth-field"
-          :error-messages="errors.code"
+          :rules="[RULES.verificationCode]"
           required
+          placeholder="Enter 4-6 digit code"
+          maxlength="6"
+          :disabled="loading"
         />
         <v-btn
           type="submit"
@@ -34,7 +39,7 @@
           size="large"
           variant="outlined"
           :loading="loading"
-          :disabled="resending"
+          :disabled="resending || !isFormValid"
         >
           <v-icon icon="mdi-check-circle" class="mr-2"></v-icon>
           Verify
@@ -52,6 +57,7 @@
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '../utils/authService'
+import { RULES } from '../utils/validation'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,49 +67,32 @@ const form = reactive({
   code: ''
 })
 
-const errors = reactive({
-  email: '',
-  code: ''
-})
 const loading = ref(false)
 const resending = ref(false)
-
-const clearErrors = () => {
-  errors.email = ''
-  errors.code = ''
-}
+const isFormValid = ref(false)
 
 const handleVerify = async () => {
-  clearErrors()
-  if (!form.email) {
-    errors.email = 'Email is required'
-    return
-  }
-  if (!form.code) {
-    errors.code = 'Verification code is required'
-    return
-  }
   try {
     loading.value = true
-    await authService.verifyCode({ email: form.email, code: Number(form.code) })
-    loading.value = false
+    await authService.verifyCode({
+      email: form.email.trim(),
+      code: Number(form.code.trim())
+    })
     router.push('/sign-in')
   } catch (error) {
-    loading.value = false
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 
 const resendCode = async () => {
+
   resending.value = true
-  if (!form.email) {
-    errors.email = 'Email is required to resend code'
-    return
-  }
   try {
     await authService.register({
       name: 'User',
-      email: form.email,
+      email: form.email.trim(),
       password: 'temporary',
       confirm_password: 'temporary'
     })
@@ -113,8 +102,6 @@ const resendCode = async () => {
     resending.value = false
   }
 }
-
-
 </script>
 
 <style scoped>
