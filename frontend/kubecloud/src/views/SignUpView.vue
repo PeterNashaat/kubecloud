@@ -31,7 +31,7 @@
           label="Password"
           :type="showPassword ? 'text' : 'password'"
           prepend-inner-icon="mdi-lock"
-          :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
           @click:append-inner="showPassword = !showPassword"
           variant="outlined"
           class="auth-field"
