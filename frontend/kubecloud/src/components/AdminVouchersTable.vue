@@ -11,7 +11,7 @@
         <p class="dashboard-card-subtitle">Create new vouchers for user promotions</p>
       </div>
       
-      <v-form @submit.prevent="handleGenerateVouchers" class="voucher-form">
+      <v-form @submit.prevent="handleGenerateVouchers" class="voucher-form" v-model="isFormValid">
         <div class="form-row">
           <v-text-field
             v-model.number="form.voucherValue"
@@ -19,13 +19,9 @@
             type="number"
             prepend-inner-icon="mdi-currency-usd"
             variant="outlined"
-            min="1"
-            max="10000"
             density="comfortable"
-            required
-            :rules="[rules.required, rules.range(1, 10000)]"
+            :rules="[RULES.creditAmount]"
             class="form-field"
-            :disabled="isGenerating"
           />
           <v-text-field
             v-model.number="form.voucherCount"
@@ -33,13 +29,9 @@
             type="number"
             prepend-inner-icon="mdi-pound"
             variant="outlined"
-            min="1"
-            max="1000"
             density="comfortable"
-            required
-            :rules="[rules.required, rules.range(1, 1000)]"
+            :rules="[RULES.voucherCount]"
             class="form-field"
-            :disabled="isGenerating"
           />
           <v-text-field
             v-model.number="form.voucherExpiry"
@@ -47,13 +39,9 @@
             type="number"
             prepend-inner-icon="mdi-calendar-clock"
             variant="outlined"
-            min="1"
-            max="365"
             density="comfortable"
-            required
-            :rules="[rules.required, rules.range(1, 365)]"
+            :rules="[RULES.voucherExpiry]"
             class="form-field"
-            :disabled="isGenerating"
           />
         </div>
         
@@ -63,7 +51,7 @@
           variant="elevated" 
           class="btn-primary"
           :loading="isGenerating"
-          :disabled="!isFormValid"
+          :disabled="!isFormValid || isGenerating"
         >
           <v-icon icon="mdi-ticket-percent" class="mr-2"></v-icon>
           {{ isGenerating ? 'Generating...' : 'Generate' }}
@@ -112,6 +100,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { RULES } from '../utils/validation'
 
 const props = defineProps({
   vouchers: { type: Array as () => any[], default: () => [] }
@@ -123,21 +112,7 @@ const emit = defineEmits(['generateVouchers'])
 const form = ref({ voucherValue: 50, voucherCount: 10, voucherExpiry: 30 })
 const isGenerating = ref(false)
 const currentPage = ref(1)
-
-// Minimal validation rules
-const rules = {
-  required: (value: any) => !!value || 'This field is required',
-  range: (min: number, max: number) => (value: number) => 
-    (value >= min && value <= max) || `Value must be between ${min} and ${max}`
-}
-
-// Simple form validation
-const isFormValid = computed(() => 
-  Object.values(form.value).every(val => val >= 1) &&
-  form.value.voucherValue <= 10000 &&
-  form.value.voucherCount <= 1000 &&
-  form.value.voucherExpiry <= 365
-)
+const isFormValid = ref(false)
 
 // Table configuration
 const tableHeaders = [
@@ -158,11 +133,9 @@ const paginatedVouchers = computed(() => {
 
 // Form submission
 const handleGenerateVouchers = async () => {
-  if (!isFormValid.value) return
-  
   try {
     isGenerating.value = true
-    await emit('generateVouchers', {
+    emit('generateVouchers', {
       count: form.value.voucherCount,
       value: form.value.voucherValue,
       expire_after_days: form.value.voucherExpiry

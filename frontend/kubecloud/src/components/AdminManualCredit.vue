@@ -13,14 +13,9 @@
           type="number"
           prepend-inner-icon="mdi-currency-usd"
           variant="outlined"
-          min="0.01"
-          max="10000"
-          step="0.01"
           density="comfortable"
-          required
           class="form-field mb-3"
           :rules="[RULES.creditAmount]"
-          :disabled="isSubmitting"
           placeholder="Enter amount (e.g., 25.50)"
         />
         <v-text-field
@@ -29,12 +24,8 @@
           prepend-inner-icon="mdi-note-text"
           variant="outlined"
           density="comfortable"
-          minlength="3"
-          maxlength="255"
-          required
           class="form-field mb-3"
           :rules="[RULES.creditMemo]"
-          :disabled="isSubmitting"
           placeholder="Enter reason for credit (e.g., Account adjustment)"
           counter="255"
         />
@@ -67,7 +58,6 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits(['creditApplied', 'close'])
-
 const formRef = ref()
 const isSubmitting = ref(false)
 const isFormValid = ref(false)
@@ -75,7 +65,6 @@ const creditAmount = ref(0)
 const creditReason = ref('')
 
 const handleSubmit = async () => {
-
   try {
     isSubmitting.value = true    
     await adminService.creditUser(props.userId, {
@@ -100,16 +89,4 @@ const handleSubmit = async () => {
     isSubmitting.value = false
   }
 }
-
-// Reset form when component mounts
-const resetForm = () => {
-  creditAmount.value = 0
-  creditReason.value = ''
-  if (formRef.value) {
-    formRef.value.resetValidation()
-  }
-}
-
-// Expose reset method for parent
-defineExpose({ resetForm })
 </script>

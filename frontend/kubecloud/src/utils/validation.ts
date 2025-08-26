@@ -337,14 +337,9 @@ const createCustomRule = (fieldName: string, customValidator: (val: any) => bool
 export const RULES = {
   nodeName: createNameRule('Name'),
   clusterName: createNameRule('Cluster name'),  
-  ram: createNumberRule('RAM', 2, 256),
-  storage: createNumberRule('Storage', 10, 10000),  
-  cpu: createCustomRule('CPU', (val: any) => {
-    const num = Number(val)
-    if (isNaN(num)) return 'CPU must be a valid number'
-    if (!Number.isInteger(num)) return 'CPU must be a whole number (no decimals)'
-    return true
-  }),
+  ram: createNumberRule('RAM', NODE_VALIDATION.RAM.min, NODE_VALIDATION.RAM.max),
+  storage: createNumberRule('Storage', NODE_VALIDATION.STORAGE.min, NODE_VALIDATION.STORAGE.max),  
+  cpu: createNumberRule('CPU', NODE_VALIDATION.CPU.min, NODE_VALIDATION.CPU.max),
   email: toVuetifyRule(validateEmail),
   verificationCode: toVuetifyRule(validateVerificationCode),  
   creditAmount: toVuetifyRule(validateCreditAmount),
@@ -363,6 +358,23 @@ export const RULES = {
   confirmPassword: (value: any, password: string): string | boolean => {
     if (!value) return 'Please confirm your password'
     if (value !== password) return 'Passwords do not match'
+    return true
+  },
+
+  voucherCount: (value: any): string | boolean => {
+    const num = Number(value)
+    if (isNaN(num)) return 'Number of vouchers must be a valid number'
+    if (!Number.isInteger(num)) return 'Number of vouchers must be a whole number'
+    if (num < 1) return 'Number of vouchers must be at least 1'
+    if (num > 1000) return 'Number of vouchers cannot exceed 1000'
+    return true
+  },
+  voucherExpiry: (value: any): string | boolean => {
+    const num = Number(value)
+    if (isNaN(num)) return 'Expiry days must be a valid number'
+    if (!Number.isInteger(num)) return 'Expiry days must be a whole number'
+    if (num < 1) return 'Expiry days must be at least 1'
+    if (num > 365) return 'Expiry days cannot exceed 365'
     return true
   },
 
