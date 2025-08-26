@@ -36,7 +36,7 @@
           label="Confirm Password"
           :type="showConfirmPassword ? 'text' : 'password'"
           prepend-inner-icon="mdi-lock-check"
-          :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          :append-inner-icon="showConfirmPassword ? 'mdi-eye' : 'mdi-eye-off'"
           @click:append-inner="showConfirmPassword = !showConfirmPassword"
           variant="outlined"
           class="auth-field"
