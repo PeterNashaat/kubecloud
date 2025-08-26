@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -42,10 +41,10 @@ type DB interface {
 	CreateNotification(notification *Notification) error
 	GetUserNotifications(userID int, limit, offset int) ([]Notification, error)
 	GetUnreadNotifications(userID int, limit, offset int) ([]Notification, error)
-	MarkNotificationAsRead(notificationID uuid.UUID, userID int) error
-	MarkNotificationAsUnread(notificationID uuid.UUID, userID int) error
+	MarkNotificationAsRead(notificationID string, userID int) error
+	MarkNotificationAsUnread(notificationID string, userID int) error
 	MarkAllNotificationsAsRead(userID int) error
-	DeleteNotification(notificationID uuid.UUID, userID int) error
+	DeleteNotification(notificationID string, userID int) error
 	DeleteAllNotifications(userID int) error
 	// Cluster methods
 	CreateCluster(userID int, cluster *Cluster) error

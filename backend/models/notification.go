@@ -3,7 +3,6 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -36,11 +35,11 @@ const (
 
 // Notification represents a persistent notification
 type Notification struct {
-	ID        uuid.UUID            `json:"id" gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
+	ID        string               `json:"id" gorm:"primaryKey"`
 	UserID    int                  `json:"user_id" gorm:"not null;index"`
 	TaskID    string               `json:"task_id,omitempty" gorm:"index"`
 	Type      NotificationType     `json:"type" gorm:"not null"`
-	Severity  NotificationSeverity `json:"severity" gorm:"not null"`
+	Severity  NotificationSeverity `json:"severity" gorm:"not null;default:'info'"`
 	Channels  []string             `json:"channels" gorm:"serializer:json"`
 	Payload   map[string]string    `json:"payload" gorm:"serializer:json"`
 	Status    NotificationStatus   `json:"status" gorm:"default:'unread'"`
@@ -67,7 +66,7 @@ func (s *GormDB) GetUserNotifications(userID int, limit, offset int) ([]Notifica
 }
 
 // MarkNotificationAsRead marks a specific notification as read
-func (s *GormDB) MarkNotificationAsRead(notificationID uuid.UUID, userID int) error {
+func (s *GormDB) MarkNotificationAsRead(notificationID string, userID int) error {
 	now := time.Now()
 	result := s.db.Model(&Notification{}).
 		Where("id = ? AND user_id = ?", notificationID, userID).
@@ -99,7 +98,7 @@ func (s *GormDB) MarkAllNotificationsAsRead(userID int) error {
 }
 
 // DeleteNotification deletes a notification for a user
-func (s *GormDB) DeleteNotification(notificationID uuid.UUID, userID int) error {
+func (s *GormDB) DeleteNotification(notificationID string, userID int) error {
 	result := s.db.Where("id = ? AND user_id = ?", notificationID, userID).Delete(&Notification{})
 
 	if result.Error != nil {
@@ -129,7 +128,7 @@ func (s *GormDB) DeleteAllNotifications(userID int) error {
 }
 
 // MarkNotificationAsUnread marks a specific notification as unread
-func (s *GormDB) MarkNotificationAsUnread(notificationID uuid.UUID, userID int) error {
+func (s *GormDB) MarkNotificationAsUnread(notificationID string, userID int) error {
 	result := s.db.Model(&Notification{}).
 		Where("id = ? AND user_id = ?", notificationID, userID).
 		Updates(map[string]interface{}{
