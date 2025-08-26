@@ -204,15 +204,17 @@ func (s *SSEManager) persistNotification(userID int, message SSEMessage) {
 			}
 		}
 	}
-
+	
 	dataJSON, _ := json.Marshal(message.Data)
 
 	notification := &models.Notification{
 		UserID:  userID,
 		Type:    models.NotificationTypeTaskUpdate,
-		Title:   title,
-		Message: messageText,
-		Data:    string(dataJSON),
+		Payload: map[string]string{
+			"message": messageText,
+			"status":  title,
+			"data":    string(dataJSON),
+		},
 		TaskID:  message.TaskID,
 		Status:  models.NotificationStatusUnread,
 	}
