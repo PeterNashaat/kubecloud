@@ -30,7 +30,7 @@ export class ValidationError extends Error {
 
 // Common validation patterns
 export const PATTERNS = {
-  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  EMAIL: /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
   URL: /^https?:\/\/.+/,
   PHONE: /^\+?[\d\s\-\(\)]+$/,
   PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,

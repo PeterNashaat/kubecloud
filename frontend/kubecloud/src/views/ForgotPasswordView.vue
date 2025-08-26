@@ -35,7 +35,7 @@
         <v-text-field
           v-model="code"
           label="Verification Code"
-          type="text"
+          type="number"
           prepend-inner-icon="mdi-numeric"
           variant="outlined"
           class="auth-field"

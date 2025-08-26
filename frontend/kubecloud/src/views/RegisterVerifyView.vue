@@ -22,7 +22,7 @@
         <v-text-field
           v-model="form.code"
           label="Verification Code"
-          type="text"
+          type="number"
           prepend-inner-icon="mdi-shield-key"
           variant="outlined"
           class="auth-field"
