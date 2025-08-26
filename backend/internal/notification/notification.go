@@ -21,10 +21,10 @@ type NotificationServiceInterface interface {
 	Send(notificationType string, payload any, userID string) error
 	GetUserNotifications(userID string, limit, offset int) ([]models.Notification, error)
 	MarkAsRead(notificationID string) error
-	DeleteNotification(notificationID uuid.UUID, userID string) error
+	DeleteNotification(notificationID string, userID string) error
 	DeleteAllNotifications(userID string) error
 	MarkAllNotificationsAsRead(userID string) error
-	MarkNotificationAsUnread(notificationID uuid.UUID, userID string) error
+	MarkNotificationAsUnread(notificationID string, userID string) error
 	GetUnreadNotifications(userID string, limit, offset int) ([]models.Notification, error)
 	RegisterTemplate(notificationType models.NotificationType, severity models.NotificationSeverity, notifiers []string)
 }
@@ -91,6 +91,7 @@ func (s *NotificationService) Stop() {
 
 func (s *NotificationService) Send(notificationType models.NotificationType, payload map[string]string, userID string) error {
 	notification := &models.Notification{
+		ID:      uuid.NewString(),
 		UserID:  userID,
 		Type:    notificationType,
 		Payload: payload,
@@ -106,7 +107,7 @@ func (s *NotificationService) Send(notificationType models.NotificationType, pay
 
 	select {
 	case s.jobs <- notification:
-		log.Info().Str("notification_id", notification.ID.String()).Msg("Notification enqueued")
+		log.Info().Str("notification_id", notification.ID).Msg("Notification enqueued")
 	default:
 		log.Error().Msg("Notification queue is full")
 	}
@@ -114,7 +115,7 @@ func (s *NotificationService) Send(notificationType models.NotificationType, pay
 	return nil
 }
 
-func (s *NotificationService) MarkNotificationAsRead(userID string, notificationID uuid.UUID) error {
+func (s *NotificationService) MarkNotificationAsRead(userID string, notificationID string) error {
 	return s.db.MarkNotificationAsRead(notificationID, userID)
 }
 
@@ -126,7 +127,7 @@ func (s *NotificationService) MarkAllNotificationsAsRead(userID string) error {
 	return s.db.MarkAllNotificationsAsRead(userID)
 }
 
-func (s *NotificationService) MarkNotificationAsUnread(userID string, notificationID uuid.UUID) error {
+func (s *NotificationService) MarkNotificationAsUnread(userID string, notificationID string) error {
 	return s.db.MarkNotificationAsUnread(notificationID, userID)
 }
 
@@ -134,7 +135,7 @@ func (s *NotificationService) GetUnreadNotifications(userID string, limit, offse
 	return s.db.GetUnreadNotifications(userID, limit, offset)
 }
 
-func (s *NotificationService) DeleteNotification(userID string, notificationID uuid.UUID) error {
+func (s *NotificationService) DeleteNotification(userID string, notificationID string) error {
 	return s.db.DeleteNotification(notificationID, userID)
 }
 

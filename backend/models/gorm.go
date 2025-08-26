@@ -39,6 +39,10 @@ func NewGormStorage(dialector gorm.Dialector) (DB, error) {
 		return nil, err
 	}
 
+	if err := migrateNotifications(db); err != nil {
+		return nil, err
+	}
+
 	gormDB := &GormDB{db: db}
 	return gormDB, gormDB.UpdatePendingRecordsWithUsername()
 }
@@ -405,4 +409,27 @@ func (s *GormDB) CountAllClusters() (int64, error) {
 	var count int64
 	err := s.db.Model(&Cluster{}).Count(&count).Error
 	return count, err
+}
+
+func migrateNotifications(db *gorm.DB) error {
+	m := db.Migrator()
+	if !m.HasTable(&Notification{}) {
+		return nil
+	}
+
+	if m.HasColumn(&Notification{}, "data") {
+		if err := db.Exec("UPDATE notifications SET payload = data").Error; err != nil {
+			return err
+		}
+		_ = m.DropColumn(&Notification{}, "data")
+	}
+
+	if m.HasColumn(&Notification{}, "message") {
+		_ = m.DropColumn(&Notification{}, "message")
+	}
+	if m.HasColumn(&Notification{}, "title") {
+		_ = m.DropColumn(&Notification{}, "title")
+	}
+
+	return nil
 }
