@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent, type Ref } from 'vue'
 import { adminService, type User, type Voucher, type GenerateVouchersRequest, type CreditUserRequest, type Invoice } from '../utils/adminService'
+import { statsService, type SystemStats} from '../utils/statsService'
 import AdminUsersTable from '../components/AdminUsersTable.vue'
 import AdminStatsCards from '../components/AdminStatsCards.vue'
 import AdminManualCredit from '../components/AdminManualCredit.vue'
@@ -12,12 +13,19 @@ import AdminPendingRecordsCard from '../components/dashboard/AdminPendingRecords
 import AdminEmailsCard from '../components/dashboard/AdminEmailsCard.vue'
 // Use defineAsyncComponent to avoid TypeScript issues
 const AdminSidebar = defineAsyncComponent(() => import('../components/AdminSidebar.vue'))
-
 const selected = ref('overview')
-
-const adminStats = ref([
-  { label: 'Total Users', value: 0, icon: 'mdi-account-group', color: '#3B82F6' },
-  { label: 'Active Clusters', value: 42, icon: 'mdi-server', color: '#3B82F6' },
+const systemStats = ref<SystemStats>({
+  total_users: 0,
+  total_clusters: 0,
+  up_nodes: 0,
+  countries: 0
+})
+const statsLoaded = ref(false)
+const adminStats = computed(() => [
+  { label: 'Total Users', value: systemStats.value.total_users, icon: 'mdi-account-group', color: '#3B82F6' },
+  { label: 'Active Clusters', value: systemStats.value.total_clusters, icon: 'mdi-server', color: '#3B82F6' },
+  { label: 'Up Nodes', value: systemStats.value.up_nodes, icon: 'mdi-server-network', color: '#10B981' },
+  { label: 'Countries', value: systemStats.value.countries, icon: 'mdi-earth', color: '#F59E0B' },
 ])
 
 // User management state
@@ -48,8 +56,6 @@ async function loadUsers() {
     // Map ID to id for compatibility if backend returns ID
     const rawUsers = await adminService.listUsers()
     users.value = rawUsers.map(u => ({ ...u, id: u.id ?? (u as any).ID }))
-    // Update admin stats
-    adminStats.value[0].value = users.value.length
 }
 
 function goToPage(page: number) {
@@ -142,14 +148,6 @@ async function applyManualCreditDialog() {
     closeCreditDialog()
 }
 
-const tabs = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'users', label: 'Users' },
-  { key: 'clusters', label: 'Clusters' },
-  { key: 'system', label: 'System' },
-  { key: 'vouchers', label: 'Vouchers' },
-  { key: 'invoices', label: 'Invoices' },
-]
 
 const invoices: Ref<Invoice[]> = ref([])
 
@@ -158,10 +156,20 @@ onMounted(async () => {
   await loadUsers()
   await loadVouchers()
   await loadInvoices()
+  await loadStats()
 })
 
 async function loadInvoices() {
   invoices.value = await adminService.listInvoices()
+}
+
+async function loadStats() {
+  try {
+    systemStats.value = await statsService.getStats()
+    statsLoaded.value = true
+  } catch (error) {
+    console.error('Failed to load system stats:', error)
+  }
 }
 </script>
 
@@ -173,7 +181,18 @@ async function loadInvoices() {
           <AdminSidebar :selected="selected" @update:selected="handleSidebarSelect" />
         </div>
         <div class="dashboard-main" style="width: 100%;">
-          <AdminStatsCards v-if="selected === 'overview'" :adminStats="adminStats" />
+          <AdminStatsCards v-if="selected === 'overview' && statsLoaded" :adminStats="adminStats" />
+          <div v-else-if="selected === 'overview' && !statsLoaded" class="d-flex justify-center align-center" style="min-height: 400px; width: 100%;">
+            <div class="text-center">
+              <v-progress-circular
+                indeterminate
+                color="white"
+                size="64"
+                width="3"
+              ></v-progress-circular>
+              <p class="text-white text-body-1 font-weight-medium mt-4 mb-0">Loading system statistics...</p>
+            </div>
+          </div>
           <AdminUsersTable
             v-else-if="selected === 'users'"
             :users="paginatedUsers"
