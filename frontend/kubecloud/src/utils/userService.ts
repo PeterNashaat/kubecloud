@@ -143,7 +143,7 @@ export class UserService {
       })
     }
 
-    const endpoint = `/v1/user/nodes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    const endpoint = `/v1/user/nodes/rentable${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     return api.get<NodesResponse>(endpoint, {
       requiresAuth: true,
       showNotifications: false // Don't show notifications for node listing
@@ -183,7 +183,7 @@ export class UserService {
 
   // List reserved nodes
   async listReservedNodes() {
-    return api.get('/v1/user/nodes', { requiresAuth: true })
+    return api.get('/v1/user/nodes/rented', { requiresAuth: true })
   }
 
   // Unreserve a node
