@@ -9,7 +9,7 @@ const globeSize = ref(700)
 const isLoading = ref(true)
 const STAT_FIELDS: Array<{ label: string; key: keyof SystemStats }> = [
   { label: 'Clusters Deployed', key: 'total_clusters' },
-  { label: 'Active Users', key: 'total_users' },
+  { label: 'Total Users', key: 'total_users' },
   { label: 'Global Locations', key: 'countries' }
 ]
 
