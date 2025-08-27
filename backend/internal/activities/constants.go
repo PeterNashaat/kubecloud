@@ -13,6 +13,7 @@ const (
 	WorkflowAddNode                  = "add-node"
 	WorkflowRemoveNode               = "remove-node"
 	WorkflowDeleteAllClusters        = "delete-all-clusters"
+	WorkflowSendNotification     = "send-notification"
 	WorkflowRollbackFailedDeployment = "rollback-failed-deployment"
 
 	// Step names
@@ -43,4 +44,5 @@ const (
 	StepDeployNetwork           = "deploy-network"
 	StepFetchKubeconfig         = "fetch_kubeconfig"
 	StepVerifyClusterReady      = "verify-cluster-ready"
+	StepSendNotification        = "send-notification"
 )

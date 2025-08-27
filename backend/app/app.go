@@ -6,6 +6,7 @@ import (
 	"kubecloud/internal"
 	"kubecloud/internal/activities"
 	"kubecloud/internal/metrics"
+	"kubecloud/internal/notification"
 	"kubecloud/middlewares"
 	"kubecloud/models"
 	"net/http"
@@ -175,6 +176,9 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		nil, // Use default http.Client
 	)
 
+	notificationService:= notification.InitNotificationService(db, ewfEngine, mailService, sseManager)
+
+
 	metrics := metrics.NewMetrics()
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
@@ -205,6 +209,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		sponsorAddress,
 		sponsorKeyPair,
 		app.metrics,
+		notificationService.GetNotifiers(),
 	)
 
 	app.registerHandlers()
