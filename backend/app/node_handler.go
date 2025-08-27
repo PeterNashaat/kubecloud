@@ -17,6 +17,13 @@ import (
 	proxyTypes "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
 )
 
+var (
+	zos3NodeFeatures = []string{
+		"zmachine",
+		"network",
+	}
+)
+
 // ListNodesResponse holds the response for reserved nodes
 type ListNodesResponse struct {
 	Total int               `json:"total"`
@@ -99,6 +106,7 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 	healthy := true
 	filter.Healthy = &healthy
 	filter.AvailableFor = &twinID
+	filter.Features = zos3NodeFeatures
 	availableNodes, availableNodesCount, err := h.proxyClient.Nodes(c.Request.Context(), filter, limit)
 	if err != nil {
 		InternalServerError(c)
@@ -171,7 +179,8 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	}
 
 	filter := proxyTypes.NodeFilter{
-		NodeID: &nodeID64,
+		NodeID:   &nodeID64,
+		Features: zos3NodeFeatures,
 	}
 
 	nodes, _, err := h.proxyClient.Nodes(c.Request.Context(), filter, proxyTypes.Limit{})
@@ -238,6 +247,7 @@ func (h *Handler) ListRentableNodesHandler(c *gin.Context) {
 	filter := proxyTypes.NodeFilter{
 		Healthy:  &healthy,
 		Rentable: &rentable,
+		Features: zos3NodeFeatures,
 	}
 
 	limit := proxyTypes.DefaultLimit()
@@ -465,6 +475,7 @@ func (h *Handler) getRentedNodesForUser(ctx context.Context, userID int, healthy
 
 	filter := proxyTypes.NodeFilter{
 		RentedBy: &twinID,
+		Features: zos3NodeFeatures,
 	}
 
 	if healthy {
