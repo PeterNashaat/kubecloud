@@ -21,7 +21,7 @@ type Notifier interface {
 }
 
 type NotificationServiceInterface interface {
-	Send(ctx context.Context, notificationType string, payload any, userID string) error
+	Send(ctx context.Context, notificationType string, payload map[string]string, userID string) error
 	GetNotifiers() map[string]Notifier
 	GetUserNotifications(userID string, limit, offset int) ([]models.Notification, error)
 	MarkAsRead(notificationID string) error
@@ -47,7 +47,7 @@ var (
 
 func InitNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notifier) *NotificationService {
 	notificationServiceOnce.Do(func() {
-		notificationServiceInstance = NewNotificationService(db, engine, notifiers...)
+		notificationServiceInstance = newNotificationService(db, engine, notifiers...)
 	})
 	return notificationServiceInstance
 }
@@ -63,7 +63,7 @@ func (s *NotificationService) GetNotifiers() map[string]Notifier {
 	return s.notifiers
 }
 
-func NewNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notifier) *NotificationService {
+func newNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notifier) *NotificationService {
 	notifiersMap := make(map[string]Notifier)
 	for _, notifier := range notifiers {
 		notifiersMap[notifier.GetType()] = notifier
@@ -75,6 +75,8 @@ func NewNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notif
 		engine:                engine,
 		notificationTemplates: make(map[models.NotificationType]models.Notification),
 	}
+
+	s.RegisterTemplate(models.NotificationTypeDeploymentUpdate, models.NotificationSeverityInfo, []string{ChannelUI, ChannelEmail})
 	return s
 }
 
