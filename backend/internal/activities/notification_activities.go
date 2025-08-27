@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kubecloud/internal/notification"
 	"kubecloud/models"
+	"strconv"
 
 	"github.com/xmonader/ewf"
 )
@@ -19,8 +20,16 @@ func SendNotification(db models.DB, notifiers map[string]notification.Notifier) 
 		if !ok || notif == nil {
 			return fmt.Errorf("invalid notification in workflow state")
 		}
+		userID, err := strconv.Atoi(notif.UserID)
+		if err != nil {
+			return fmt.Errorf("invalid user ID: %v", notif.UserID)
+		}
+		user, err := db.GetUserByID(userID)
+		if err != nil {
+			return fmt.Errorf("failed to get user by ID (id: %v): %w", userID, err)
+		}
 		for _, notifChan := range notif.Channels {
-			err := notifiers[notifChan].Notify(*notif)
+			err := notifiers[notifChan].Notify(*notif, user.Email)
 			if err != nil {
 				return fmt.Errorf("failed to send notification (id: %v) to %s: %w", notif.ID, notifChan, err)
 			}
