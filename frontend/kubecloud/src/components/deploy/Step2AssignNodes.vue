@@ -10,12 +10,23 @@
       <v-alert
         type="info"
         variant="tonal"
-        class="mb-4"
+        class="mb-7"
         icon="mdi-tag-outline"
       >
-        <div class="discount-info">
-          <strong>💰 50% Discount Available!</strong>
-          <p class="mb-0">Reserve a node to get 50% discount and exclusive usage. Shared nodes are available at full price.</p>
+        <span class="text-h6 font-weight-bold">50% Discount Available!</span>
+        <div class="d-flex align-center justify-space-between flex-wrap">
+          <p class="text-body-1 flex-grow-1 me-4 mb-0">
+            Reserve a node to get 50% discount and exclusive usage. Shared nodes are available at full price.
+          </p>
+          <v-btn
+            variant="outlined"
+            color="white"
+            class="ms-auto"
+            :to="{ name: 'reserve' }"
+            prepend-icon="mdi-arrow-right"
+          >
+            Reserve Node
+          </v-btn>
         </div>
       </v-alert>
 
