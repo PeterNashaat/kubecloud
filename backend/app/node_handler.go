@@ -23,6 +23,16 @@ type ListNodesResponse struct {
 	Nodes []proxyTypes.Node `json:"nodes"`
 }
 
+type NodesWithDiscount struct {
+	proxyTypes.Node
+	DiscountPrice float64 `json:"discount_price"`
+}
+
+type ListNodesWithDiscountResponse struct {
+	Total int                 `json:"total"`
+	Nodes []NodesWithDiscount `json:"nodes"`
+}
+
 // ReserveNodeResponse holds the response for reserve node response
 type ReserveNodeResponse struct {
 	WorkflowID string `json:"workflow_id"`
@@ -219,7 +229,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 // @ID list-rentable-nodes
 // @Accept json
 // @Produce json
-// @Success 200 {object} APIResponse{data=ListNodesResponse} "Rentable nodes retrieved successfully"
+// @Success 200 {object} APIResponse{data=ListNodesWithDiscountResponse} "Rentable nodes retrieved successfully"
 // @Failure 500 {object} APIResponse "Internal server error"
 // @Router /user/nodes/rentable [get]
 func (h *Handler) ListRentableNodesHandler(c *gin.Context) {
@@ -240,9 +250,16 @@ func (h *Handler) ListRentableNodesHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Nodes are retrieved successfully", ListNodesResponse{
+	var nodesWithDiscount []NodesWithDiscount
+	for _, node := range nodes {
+		nodesWithDiscount = append(nodesWithDiscount, NodesWithDiscount{
+			Node:          node,
+			DiscountPrice: node.PriceUsd * 0.5,
+		})
+	}
+	Success(c, http.StatusOK, "Nodes are retrieved successfully", ListNodesWithDiscountResponse{
 		Total: count,
-		Nodes: nodes,
+		Nodes: nodesWithDiscount,
 	})
 }
 
@@ -252,7 +269,7 @@ func (h *Handler) ListRentableNodesHandler(c *gin.Context) {
 // @ID list-reserved-nodes
 // @Accept json
 // @Produce json
-// @Success 200 {array} APIResponse
+// @Success 200 {object} APIResponse{data=ListNodesWithDiscountResponse}
 // @Failure 500 {object} APIResponse
 // @Security UserMiddleware
 // @Router /user/nodes/rented [get]
@@ -265,9 +282,16 @@ func (h *Handler) ListRentedNodesHandler(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusOK, "Nodes are retrieved successfully", ListNodesResponse{
+	var nodesWithDiscount []NodesWithDiscount
+	for _, node := range nodes {
+		nodesWithDiscount = append(nodesWithDiscount, NodesWithDiscount{
+			Node:          node,
+			DiscountPrice: node.PriceUsd * 0.5,
+		})
+	}
+	Success(c, http.StatusOK, "Nodes are retrieved successfully", ListNodesWithDiscountResponse{
 		Total: count,
-		Nodes: nodes,
+		Nodes: nodesWithDiscount,
 	})
 }
 
