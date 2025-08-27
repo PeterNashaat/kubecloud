@@ -7,7 +7,7 @@
           <p class="dashboard-card-subtitle">Manage your cloud-native infrastructure</p>
         </div>
       </div>
-      <v-btn :disabled="!haveNodes" variant="outlined" class="btn btn-outline" @click="goToDeployCluster">
+      <v-btn variant="outlined" class="btn btn-outline" @click="goToDeployCluster">
         <v-icon icon="mdi-plus" size="16" class="mr-1"></v-icon>
         New Cluster
       </v-btn>
@@ -31,14 +31,6 @@
       <v-divider class="mb-4" />
       <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
       <v-progress-linear v-if="isLoading" indeterminate color="primary" class="mb-4" />
-      <div v-if="!haveNodes" class="empty-message">
-        <v-icon icon="mdi-cloud-off-outline" size="48" class="mb-2" color="grey" />
-        <div>You don't have any nodes reserved<br/>you have to reserve one to create a cluster</div>
-        <v-btn variant="outlined" class="btn btn-outline mt-3" @click="handleGoToReserveNode">
-          <v-icon icon="mdi-plus" size="16" class="mr-1"></v-icon>
-          Reserve Node
-        </v-btn>
-      </div>
       <div v-else-if="filteredClusters.length === 0 && !isLoading" class="empty-message">
         <v-icon icon="mdi-cloud-off-outline" size="48" class="mb-2" color="grey" />
         <div>No clusters found.</div>
@@ -153,9 +145,6 @@ watch([() => clusterStore.clusters.length, () => clusterStore.isLoading], ([clus
   if (!isClusterLoading && clustersLength === 0) {
     fetchRentedNodes()
   }
-})
-const haveNodes = computed(() => {
- return clusterStore.clusters.length > 0 || rentedNodes.value.length > 0
 })
 
 function setSort(field: string) {
