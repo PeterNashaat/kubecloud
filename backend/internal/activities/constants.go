@@ -12,6 +12,7 @@ const (
 	WorkflowDeleteCluster      = "delete-cluster"
 	WorkflowAddNode            = "add-node"
 	WorkflowRemoveNode         = "remove-node"
+	WorkflowDeleteAllClusters  = "delete-all-clusters"
 
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"
@@ -34,6 +35,9 @@ const (
 	StepUpdateNetwork           = "update-network"
 	StepRemoveCluster           = "remove-cluster"
 	StepRemoveClusterFromDB     = "remove-cluster-from-db"
+	StepGatherAllContractIDs    = "gather-all-contract-ids"
+	StepBatchCancelContracts    = "batch-cancel-contracts"
+	StepDeleteAllUserClusters   = "delete-all-user-clusters"
 	StepDeployNode              = "deploy-node"
 	StepDeployNetwork           = "deploy-network"
 )
