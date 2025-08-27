@@ -3,6 +3,7 @@ package activities
 import (
 	"kubecloud/internal"
 	"kubecloud/internal/metrics"
+	"kubecloud/internal/notification"
 	"kubecloud/models"
 	"time"
 
@@ -22,6 +23,7 @@ func RegisterEWFWorkflows(
 	sponsorAddress string,
 	sponsorKeyPair subkey.KeyPair,
 	metrics *metrics.Metrics,
+	notifiers map[string]notification.Notifier,
 ) {
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
 	engine.Register(StepCreateUser, CreateUserStep(config, db))
@@ -37,6 +39,7 @@ func RegisterEWFWorkflows(
 	engine.Register(StepReserveNode, ReserveNodeStep(db, substrate))
 	engine.Register(StepUnreserveNode, UnreserveNodeStep(db, substrate))
 	engine.Register(StepUpdateCreditedBalance, UpdateCreditedBalanceStep(db))
+	engine.Register(StepSendNotification,SendNotification(notifiers) )
 
 	registerWorkflowTemplate := newKubecloudWorkflowTemplate()
 	registerWorkflowTemplate.Steps = []ewf.Step{
@@ -112,4 +115,10 @@ func RegisterEWFWorkflows(
 	engine.RegisterTemplate(WorkflowUnreserveNode, &unreserveNodeTemplate)
 
 	registerDeploymentActivities(engine, metrics, db, sse, config)
+
+	notificationTemplate := newKubecloudWorkflowTemplate()
+	notificationTemplate.Steps = []ewf.Step{
+		{Name: StepSendNotification, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 3, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
+	}
+	engine.RegisterTemplate(WorkflowSendNotification, &notificationTemplate)
 }
