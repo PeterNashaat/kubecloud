@@ -74,7 +74,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create user storage: %w", err)
 	}
 
-	mailService := internal.NewMailService(config.MailSender.SendGridKey)
+	mailService := internal.NewMailService(config.MailSender.SendGridKey, config.MailSender.Email)
 
 	gridProxy := proxy.NewRetryingClient(proxy.NewClient(config.GridProxyURL))
 
@@ -133,6 +133,13 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to init workflow engine: %w", err)
 	}
 
+	sseNotifier := notification.NewSSENotifier(sseManager)
+	err = mailService.InitNotificationTemplates()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init notification templates: %w", err)
+	}
+	notificationService := notification.InitNotificationService(db, ewfEngine, mailService, sseNotifier)
+
 	// Create an app-level context for coordinating shutdown
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
 	if err != nil {
@@ -175,9 +182,6 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		config.KYCChallengeDomain,
 		nil, // Use default http.Client
 	)
-
-	notificationService:= notification.InitNotificationService(db, ewfEngine, mailService, sseManager)
-
 
 	metrics := metrics.NewMetrics()
 

@@ -39,7 +39,7 @@ func RegisterEWFWorkflows(
 	engine.Register(StepReserveNode, ReserveNodeStep(db, substrate))
 	engine.Register(StepUnreserveNode, UnreserveNodeStep(db, substrate))
 	engine.Register(StepUpdateCreditedBalance, UpdateCreditedBalanceStep(db))
-	engine.Register(StepSendNotification,SendNotification(notifiers) )
+	engine.Register(StepSendNotification, SendNotification(db, notifiers))
 
 	registerWorkflowTemplate := newKubecloudWorkflowTemplate()
 	registerWorkflowTemplate.Steps = []ewf.Step{

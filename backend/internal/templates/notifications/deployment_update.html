@@ -1,0 +1,115 @@
+{{define "deployment_update"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deployment Failed</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f6f8fb;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+      }
+      .header {
+        background: #f44336;
+        color: #ffffff;
+        padding: 16px 20px;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .content {
+        padding: 20px;
+        color: #222;
+      }
+      .kv {
+        margin: 12px 0;
+      }
+      .kv .label {
+        color: #555;
+        font-weight: bold;
+        width: 160px;
+        display: inline-block;
+      }
+      .kv .value {
+        color: #111;
+      }
+      .code {
+        background: #fff5f5;
+        color: #c62828;
+        padding: 12px;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        white-space: pre-wrap;
+      }
+      .footer {
+        padding: 16px 20px;
+        color: #666;
+        font-size: 12px;
+        text-align: center;
+      }
+      .btn {
+        display: inline-block;
+        background: #1976d2;
+        color: #fff !important;
+        text-decoration: none;
+        padding: 10px 14px;
+        border-radius: 6px;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Deployment Failed</h1>
+      </div>
+      <div class="content">
+        <p>Hi {{ index .Payload "username" }},</p>
+        <p>Your deployment encountered an error and could not be completed.</p>
+
+        <div class="kv">
+          <span class="label">Project:</span>
+          <span class="value">{{ index .Payload "project_name" }}</span>
+        </div>
+        <div class="kv">
+          <span class="label">Cluster:</span>
+          <span class="value">{{ index .Payload "cluster_name" }}</span>
+        </div>
+        <div class="kv">
+          <span class="label">Task ID:</span>
+          <span class="value">{{ .TaskID }}</span>
+        </div>
+        <div class="kv">
+          <span class="label">Time:</span>
+          <span class="value">{{ index .Payload "timestamp" }}</span>
+        </div>
+        <div class="kv">
+          <span class="label">Severity:</span>
+          <span class="value">{{ .Severity }}</span>
+        </div>
+
+        <h3>Error Details</h3>
+        <div class="code">{{ index .Payload "error" }}</div>
+
+        <p>
+          If you need assistance, please reply to this email or contact support.
+        </p>
+      </div>
+      <div class="footer">KubeCloud. All rights reserved.</div>
+    </div>
+  </body>
+</html>
+{{end}}

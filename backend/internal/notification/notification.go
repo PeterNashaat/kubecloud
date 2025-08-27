@@ -16,13 +16,13 @@ const (
 )
 
 type Notifier interface {
-	Notify(notification *models.Notification) error
+	Notify(notification models.Notification, receiver ...string) error
 	GetType() string
 }
 
 type NotificationServiceInterface interface {
-	Send(notificationType string, payload any, userID string) error
-	GetNotifiers()map[string]Notifier
+	Send(ctx context.Context, notificationType string, payload any, userID string) error
+	GetNotifiers() map[string]Notifier
 	GetUserNotifications(userID string, limit, offset int) ([]models.Notification, error)
 	MarkAsRead(notificationID string) error
 	DeleteNotification(notificationID string, userID string) error
@@ -45,7 +45,6 @@ var (
 	notificationServiceInstance *NotificationService
 )
 
-
 func InitNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notifier) *NotificationService {
 	notificationServiceOnce.Do(func() {
 		notificationServiceInstance = NewNotificationService(db, engine, notifiers...)
@@ -60,7 +59,7 @@ func GetNotificationService() (*NotificationService, error) {
 	return notificationServiceInstance, nil
 }
 
-func(s *NotificationService) GetNotifiers()map[string]Notifier{
+func (s *NotificationService) GetNotifiers() map[string]Notifier {
 	return s.notifiers
 }
 
@@ -87,7 +86,7 @@ func (s *NotificationService) RegisterTemplate(notificationType models.Notificat
 	}
 }
 
-func (s *NotificationService) Send(notificationType models.NotificationType, payload map[string]string, userID string) error {
+func (s *NotificationService) Send(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string) error {
 	notificationTemplate, ok := s.notificationTemplates[notificationType]
 	if !ok {
 		return fmt.Errorf("notification template not found for type: %s", notificationType)
@@ -111,7 +110,7 @@ func (s *NotificationService) Send(notificationType models.NotificationType, pay
 		return fmt.Errorf("failed to create workflow: %w", err)
 	}
 	workflow.State["notification"] = notification
-	s.engine.RunAsync(context.Background(), workflow)
+	s.engine.RunAsync(ctx, workflow)
 
 	return nil
 }
