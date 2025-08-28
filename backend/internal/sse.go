@@ -34,6 +34,7 @@ type SSEManager struct {
 type SSEMessage struct {
 	Type      string    `json:"type"`
 	Data      any       `json:"data"`
+	Severity  string    `json:"severity"`
 	TaskID    string    `json:"task_id,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -99,20 +100,16 @@ func (s *SSEManager) RemoveClient(userID int, clientChan chan SSEMessage) {
 }
 
 // Notify sends a message to all clients of a specific user
-func (s *SSEManager) Notify(userID int, msgType string, data any, taskID ...string) {
+func (s *SSEManager) Notify(userID int, msgType string, severity models.NotificationSeverity, data any, taskID ...string) {
 	message := SSEMessage{
 		Type:      msgType,
+		Severity:  string(severity),
 		Data:      data,
 		Timestamp: time.Now(),
 	}
 
 	if len(taskID) > 0 {
 		message.TaskID = taskID[0]
-	}
-
-	// Persist notification to database (except connection messages)
-	if msgType != "connected" {
-		s.persistNotification(userID, message)
 	}
 
 	s.mu.RLock()
@@ -153,7 +150,7 @@ func (s *SSEManager) HandleSSE(c *gin.Context) {
 	defer s.RemoveClient(userID, clientChan)
 
 	// Send initial connection message
-	s.Notify(userID, "connected", map[string]string{"status": "connected"})
+	s.Notify(userID, "connected", models.NotificationSeverityInfo, map[string]string{"status": "connected"})
 
 	// Stream messages to client
 	c.Stream(func(w io.Writer) bool {
@@ -180,46 +177,4 @@ func (s *SSEManager) HandleSSE(c *gin.Context) {
 			return false
 		}
 	})
-}
-
-// persistNotification saves notification to database
-func (s *SSEManager) persistNotification(userID int, message SSEMessage) {
-	if s.db == nil {
-		return
-	}
-
-	// Extract meaningful title and message
-	title := "Notification"
-	messageText := "New notification"
-
-	if data, ok := message.Data.(map[string]interface{}); ok {
-		if msg, exists := data["message"]; exists {
-			if msgStr, ok := msg.(string); ok {
-				messageText = msgStr
-			}
-		}
-		if status, exists := data["status"]; exists {
-			if statusStr, ok := status.(string); ok {
-				title = fmt.Sprintf("Task %s", statusStr)
-			}
-		}
-	}
-
-	dataJSON, _ := json.Marshal(message.Data)
-
-	notification := &models.Notification{
-		UserID: userID,
-		Type:   models.NotificationTypeTaskUpdate,
-		Payload: map[string]string{
-			"message": messageText,
-			"status":  title,
-			"data":    string(dataJSON),
-		},
-		TaskID: message.TaskID,
-		Status: models.NotificationStatusUnread,
-	}
-
-	if err := s.db.CreateNotification(notification); err != nil {
-		logger.GetLogger().Error().Err(err).Int("user_id", userID).Msg("Failed to persist notification")
-	}
 }

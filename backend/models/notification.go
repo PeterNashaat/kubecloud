@@ -10,10 +10,10 @@ import (
 type NotificationType string
 
 const (
-	NotificationTypeDeploymentUpdate NotificationType = "deployment_update"
-	NotificationTypeTaskUpdate       NotificationType = "task_update"
-	NotificationTypeConnected        NotificationType = "connected"
-	NotificationTypeError            NotificationType = "error"
+	NotificationTypeDeployment NotificationType = "deployment"
+	NotificationTypeBilling    NotificationType = "billing"
+	NotificationTypeUser       NotificationType = "user"
+	NotificationTypeConnected  NotificationType = "connected"
 )
 
 // NotificationStatus represents the status of a notification

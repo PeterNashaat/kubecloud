@@ -305,7 +305,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 			return
 		}
 
-		h.sseManager.Notify(user.ID, "user_registration", "User email is verified")
+		h.sseManager.Notify(user.ID, "user_registration", models.NotificationSeverityInfo, map[string]string{"status": "User email is verified"})
 	}
 
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)

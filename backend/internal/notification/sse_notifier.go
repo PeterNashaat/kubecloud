@@ -2,7 +2,6 @@ package notification
 
 import (
 	"fmt"
-	"strings"
 
 	"kubecloud/internal"
 	"kubecloud/models"
@@ -30,13 +29,7 @@ func (n *SSENotifier) Notify(notification models.Notification, receiver ...strin
 	if data == nil {
 		data = map[string]string{}
 	}
-	if notification.Severity != "" {
-		data["severity"] = string(notification.Severity)
-	}
-	if len(notification.Channels) > 0 {
-		data["channels"] = strings.Join(notification.Channels, ",")
-	}
 
-	n.sse.Notify(notification.UserID, msgType, data, notification.TaskID)
+	n.sse.Notify(notification.UserID, msgType, notification.Severity, data, notification.TaskID)
 	return nil
 }
