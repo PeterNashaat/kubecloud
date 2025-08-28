@@ -189,16 +189,16 @@ export class UserService {
   // Unreserve a node
   async unreserveNode(contractId: string) {
     const response = await api.delete<ApiResponse<UnreserveNodeResponse>>(`/v1/user/nodes/unreserve/${contractId}`, { requiresAuth: true, showNotifications: true })
-    const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
-    const status = await workflowChecker.status
-    if (status === WorkflowStatus.StatusFailed) {
-      useNotificationStore().error(
-        'Node unreservation error',
-        'Failed to unreserve node',
-      )
-      throw new Error('Failed to unreserve node')
-    }
-    if (status === WorkflowStatus.StatusCompleted) {
+    // const workflowChecker = createWorkflowStatusChecker(response.data.data.workflow_id, { initialDelay: 3000, interval: 1000 })
+    // const status = await workflowChecker.status
+    // if (status === WorkflowStatus.StatusFailed) {
+    //   useNotificationStore().error(
+    //     'Node unreservation error',
+    //     'Failed to unreserve node',
+    //   )
+    //   throw new Error('Failed to unreserve node')
+    // }
+    // if (status === WorkflowStatus.StatusCompleted) {
       try {
         await this.trackNodeStatus(response.data.data.contract_id, "rentable")
         useNotificationStore().success(
@@ -211,7 +211,7 @@ export class UserService {
           'Failed to verify node status',
         )
       }
-    }
+    // }
   }
 
   // Charge balance
