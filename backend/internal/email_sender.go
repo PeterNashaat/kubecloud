@@ -37,6 +37,12 @@ var emailTplFS embed.FS
 
 var emailTpls *template.Template
 
+var typeToTemplate = map[models.NotificationType]string{
+	models.NotificationTypeDeployment: "deployment_update",
+	models.NotificationTypeBilling:    "billing",
+	models.NotificationTypeUser:       "user_event",
+}
+
 // MailService struct hods all functionalities of mail service
 type MailService struct {
 	client        *sendgrid.Client
@@ -173,10 +179,15 @@ func (service MailService) Notify(notification models.Notification, receiver ...
 	from := mail.NewEmail("KubeCloud", service.defaultSender)
 	receiverEmail := mail.NewEmail("KubeCloud User", receiver[0])
 
+	tplName := typeToTemplate[notification.Type]
+	if tplName == "" {
+
+		tplName = string(notification.Type)
+	}
+
 	var buf bytes.Buffer
-	err := emailTpls.ExecuteTemplate(&buf, string(notification.Type), notification)
-	if err != nil {
-		return fmt.Errorf("failed to execute notification template: %w", err)
+	if err := emailTpls.ExecuteTemplate(&buf, tplName, notification); err != nil {
+		return fmt.Errorf("failed to execute notification template '%s': %w", tplName, err)
 	}
 
 	subject := notification.Payload["subject"]
@@ -189,7 +200,7 @@ func (service MailService) Notify(notification models.Notification, receiver ...
 		mail.NewContent("text/html", buf.String()),
 	}
 
-	_, err = service.client.Send(message)
+	_, err := service.client.Send(message)
 	if err != nil {
 		return fmt.Errorf("failed to send notification: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/metrics"
+	"kubecloud/internal/notification"
 	"kubecloud/internal/statemanager"
 	"kubecloud/kubedeployer"
 	"kubecloud/models"
@@ -499,6 +500,22 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 	steps = append(steps, ewf.Step{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy})
 
 	workflow := createDeployerWorkflowTemplate(sseManager, engine, metrics)
+	workflow.BeforeWorkflowHooks = append(workflow.BeforeWorkflowHooks, func(ctx context.Context, w *ewf.Workflow) {
+		userID := w.State["config"].(statemanager.ClientConfig).UserID
+		notificationService, err := notification.GetNotificationService()
+		payload := map[string]string{
+			"status":  "started",
+			"message": "Your cluster has started deploying.",
+		}
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to get notification service")
+		}
+
+		err = notificationService.Send(ctx, models.NotificationTypeDeployment, payload, userID, w.UUID)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to send notification")
+		}
+	})
 	workflow.Steps = steps
 	workflow.AfterStepHooks = []ewf.AfterStepHook{
 		notifyStepHook(sseManager),
