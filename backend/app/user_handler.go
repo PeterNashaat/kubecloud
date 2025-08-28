@@ -7,6 +7,7 @@ import (
 	"kubecloud/internal"
 	"kubecloud/internal/activities"
 	"kubecloud/internal/metrics"
+	"kubecloud/internal/notification"
 	"kubecloud/models"
 	"net/http"
 	"strconv"
@@ -631,6 +632,15 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 
 	}
 
+	if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
+		payload := map[string]string{
+			"status":  "password_changed",
+			"subject": "Your password was changed",
+			"message": "Your account password has been successfully updated.",
+		}
+		_ = notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", c.GetInt("user_id")))
+	}
+
 	Success(c, http.StatusAccepted, "password is updated successfully", nil)
 
 }
@@ -971,6 +981,15 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 		logger.GetLogger().Error().Err(err).Msg("failed to create SSH key")
 		InternalServerError(c)
 		return
+	}
+
+	if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
+		payload := map[string]string{
+			"status":  "ssh_key_added",
+			"subject": "New SSH key added",
+			"message": fmt.Sprintf("SSH key '%s' was added to your account.", sshKey.Name),
+		}
+		_ = notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", userID))
 	}
 
 	Success(c, http.StatusCreated, "SSH key added successfully", sshKey)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/metrics"
+	"kubecloud/internal/notification"
 	"kubecloud/models"
 	"strings"
 
@@ -353,6 +354,16 @@ func CreatePaymentIntentStep(currency string, metrics *metrics.Metrics) ewf.Step
 		intent, err := internal.CreatePaymentIntent(customerID, paymentMethodID, currency, amount)
 		if err != nil {
 			metrics.IncrementStripePaymentFailure()
+			if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
+				payload := map[string]string{
+					"status":  "funds_failed",
+					"message": "Adding funds failed",
+					"reason":  err.Error(),
+					"amount":  fmt.Sprintf("%.2f", internal.FromUSDMilliCentToUSD(amount)),
+					"subject": "Adding funds failed",
+				}
+				_ = notificationService.Send(ctx, models.NotificationTypeBilling, payload, fmt.Sprintf("%v", state["user_id"]))
+			}
 			return fmt.Errorf("error creating payment intent: %w", err)
 		}
 
@@ -461,6 +472,19 @@ func UpdateCreditCardBalanceStep(db models.DB) ewf.StepFn {
 
 		state["new_balance"] = user.CreditCardBalance
 		state["mnemonic"] = user.Mnemonic
+
+		if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
+			amountUSD := internal.FromUSDMilliCentToUSD(amount)
+			newBalanceUSD := internal.FromUSDMilliCentToUSD(user.CreditCardBalance)
+			payload := map[string]string{
+				"status":  "funds_succeeded",
+				"message": "Adding funds succeeded",
+				"amount":  fmt.Sprintf("%.2f", amountUSD),
+				"balance": fmt.Sprintf("%.2f", newBalanceUSD),
+				"subject": "Funds added to your balance",
+			}
+			_ = notificationService.Send(ctx, models.NotificationTypeBilling, payload, fmt.Sprintf("%d", userID))
+		}
 		return nil
 	}
 }
@@ -495,6 +519,27 @@ func UpdateCreditedBalanceStep(db models.DB) ewf.StepFn {
 			return fmt.Errorf("error updating user: %w", err)
 		}
 		state["new_balance"] = user.CreditedBalance
+
+		if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
+			amountUSD := internal.FromUSDMilliCentToUSD(amount)
+			newBalanceUSD := internal.FromUSDMilliCentToUSD(user.CreditedBalance)
+			status := "voucher_redeemed"
+			if mode, ok := state["transfer_mode"].(string); ok && mode != models.RedeemVoucherMode {
+				status = "funds_succeeded"
+			}
+			message := "Voucher redeemed"
+			if status == "funds_succeeded" {
+				message = "Balance credited"
+			}
+			payload := map[string]string{
+				"status":  status,
+				"message": message,
+				"amount":  fmt.Sprintf("%.2f", amountUSD),
+				"balance": fmt.Sprintf("%.2f", newBalanceUSD),
+				"subject": message,
+			}
+			_ = notificationService.Send(ctx, models.NotificationTypeBilling, payload, fmt.Sprintf("%d", userID))
+		}
 		return nil
 	}
 }

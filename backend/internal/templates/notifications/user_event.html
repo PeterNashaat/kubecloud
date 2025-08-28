@@ -1,0 +1,40 @@
+<html>
+  <body
+    style="font-family: Arial, sans-serif; background: #f7f7f7; padding: 24px"
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+      "
+    >
+      <tr>
+        <td style="padding: 24px">
+          <h2 style="margin: 0 0 16px 0">{{.Payload.subject}}</h2>
+          <p style="margin: 0 0 12px 0">{{.Payload.message}}</p>
+          {{if .Payload.detail}}
+          <p style="margin: 0 0 8px 0">{{.Payload.detail}}</p>
+          {{end}}
+        </td>
+      </tr>
+      <tr>
+        <td
+          style="
+            padding: 16px 24px;
+            font-size: 12px;
+            color: #666;
+            background: #fafafa;
+          "
+        >
+          <p style="margin: 0">This is an automated message from KubeCloud.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

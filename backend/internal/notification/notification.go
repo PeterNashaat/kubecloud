@@ -31,7 +31,7 @@ type NotificationTemplate struct {
 }
 
 type NotificationServiceInterface interface {
-	Send(ctx context.Context, notificationType string, payload map[string]string, userID string, taskID string) error
+	Send(ctx context.Context, notificationType string, payload map[string]string, userID string, taskID ...string) error
 	GetNotifiers() map[string]Notifier
 	RegisterTemplate(notificationType models.NotificationType, template NotificationTemplate)
 }
@@ -79,14 +79,32 @@ func newNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notif
 		templates: make(map[models.NotificationType]NotificationTemplate),
 	}
 
-	// Register status-aware template for deployment
 	s.RegisterTemplate(models.NotificationTypeDeployment, NotificationTemplate{
 		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
 		ByStatus: map[string]ChannelRule{
 			"started":   {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
-			"succeeded": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
-			"failed":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeverityError},
+			"succeeded": {Channels: []string{ChannelUI}, Severity: models.NotificationSeveritySuccess},
+			"failed":    {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityError},
 			"deleted":   {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityWarning},
+		},
+	})
+
+	s.RegisterTemplate(models.NotificationTypeBilling, NotificationTemplate{
+		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
+		ByStatus: map[string]ChannelRule{
+			// Adding funds events
+			"funds_succeeded": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
+			"funds_failed":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeverityError},
+			// Voucher
+			"voucher_redeemed": {Channels: []string{ChannelUI}, Severity: models.NotificationSeveritySuccess},
+		},
+	})
+
+	s.RegisterTemplate(models.NotificationTypeUser, NotificationTemplate{
+		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
+		ByStatus: map[string]ChannelRule{
+			"password_changed": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
+			"ssh_key_added":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
 		},
 	})
 	return s
@@ -96,7 +114,7 @@ func (s *NotificationService) RegisterTemplate(notificationType models.Notificat
 	s.templates[notificationType] = template
 }
 
-func (s *NotificationService) Send(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, taskID string) error {
+func (s *NotificationService) Send(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, taskID ...string) error {
 	tpl, ok := s.templates[notificationType]
 	if !ok {
 		return fmt.Errorf("notification template not found for type: %s", notificationType)
@@ -112,11 +130,14 @@ func (s *NotificationService) Send(ctx context.Context, notificationType models.
 	notification := &models.Notification{
 		ID:       uuid.NewString(),
 		UserID:   userID,
-		TaskID:   taskID,
 		Type:     notificationType,
 		Channels: append([]string{}, rule.Channels...),
 		Severity: rule.Severity,
 		Payload:  payload,
+	}
+
+	if len(taskID) > 0 {
+		notification.TaskID = taskID[0]
 	}
 
 	if err := s.db.CreateNotification(notification); err != nil {

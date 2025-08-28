@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Deployment Failed</title>
+    <title>Deployment {{ index .Payload "status" }}</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -21,9 +21,20 @@
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
       }
       .header {
-        background: #f44336;
         color: #ffffff;
         padding: 16px 20px;
+      }
+      .header.error {
+        background: #f44336;
+      }
+      .header.success {
+        background: #2e7d32;
+      }
+      .header.warning {
+        background: #ed6c02;
+      }
+      .header.info {
+        background: #1976d2;
       }
       .header h1 {
         margin: 0;
@@ -74,23 +85,13 @@
   <body>
     <div class="container">
       <div class="header">
-        <h1>Deployment Failed</h1>
+        <h1>Deployment {{ index .Payload "status" }}</h1>
       </div>
       <div class="content">
-        <p>Hi {{ index .Payload "username" }},</p>
-        <p>Your deployment encountered an error and could not be completed.</p>
-
-        <div class="kv">
-          <span class="label">Project:</span>
-          <span class="value">{{ index .Payload "project_name" }}</span>
-        </div>
+        <p>{{ index .Payload "message" }}</p>
         <div class="kv">
           <span class="label">Cluster:</span>
           <span class="value">{{ index .Payload "cluster_name" }}</span>
-        </div>
-        <div class="kv">
-          <span class="label">Task ID:</span>
-          <span class="value">{{ .TaskID }}</span>
         </div>
         <div class="kv">
           <span class="label">Time:</span>
@@ -101,8 +102,20 @@
           <span class="value">{{ .Severity }}</span>
         </div>
 
+        {{ $err := index .Payload "error" }} {{ if $err }}
         <h3>Error Details</h3>
-        <div class="code">{{ index .Payload "error" }}</div>
+        <div class="code">{{ $err }}</div>
+        {{ end }} {{ $dash := index .Payload "dashboard_url" }} {{ if $dash }}
+        <p>
+          <a
+            class="btn"
+            href="{{ $dash }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            >View in Dashboard</a
+          >
+        </p>
+        {{ end }}
 
         <p>
           If you need assistance, please reply to this email or contact support.
