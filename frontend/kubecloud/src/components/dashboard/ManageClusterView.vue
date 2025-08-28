@@ -149,10 +149,12 @@
 import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
-import { useNodeManagement, type RentedNode } from '../../composables/useNodeManagement'
+import { useNodes } from '../../composables/useNodes'
+import type { RawNode } from '../../types/rawNode'
 import { useNotificationStore } from '../../stores/notifications'
 import { useKubeconfig } from '../../composables/useKubeconfig'
 import { api } from '../../utils/api'
+import { userService } from '../../utils/userService'
 
 import { getAvailableRAM, getAvailableStorage } from '../../utils/nodeNormalizer'
 
@@ -293,18 +295,27 @@ const editClusterNodesDialog = ref(false)
 
 async function openEditClusterNodesDialog() {
   editClusterNodesDialog.value = true;
-  await fetchRentedNodes();
+  await fetchNodes();
 }
 
-const availableNodes = computed<RentedNode[]>(() => {
-  return rentedNodes.value.filter((node: RentedNode) => {
+const availableNodes = computed<RawNode[]>(() => {
+  return nodes.value.filter((node: RawNode) => {
     const availRAM = getAvailableRAM(node);
     const availStorage = getAvailableStorage(node);
     return availRAM > 0 && availStorage > 0;
   });
 });
 
-const { rentedNodes, loading: nodesLoading, fetchRentedNodes, addNodeToDeployment, removeNodeFromDeployment } = useNodeManagement()
+const { nodes, loading: nodesLoading, fetchNodes, getNodeType } = useNodes()
+
+// Node management functions
+async function addNodeToDeployment(deploymentName: string, clusterPayload: { name: string, nodes: any[] }) {
+  return await userService.addNodeToDeployment(deploymentName, clusterPayload)
+}
+
+async function removeNodeFromDeployment(deploymentName: string, nodeName: string) {
+  return await userService.removeNodeFromDeployment(deploymentName, nodeName)
+}
 
 // Notification store
 const notificationStore = useNotificationStore()

@@ -127,7 +127,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { getAvailableCPU, getAvailableRAM, getAvailableStorage, getTotalCPU } from '../../utils/nodeNormalizer';
-import type { RentedNode } from '../../composables/useNodeManagement';
+import type { RawNode } from '../../types/rawNode';
 import BaseDialogCard from './BaseDialogCard.vue';
 import { userService } from '../../utils/userService';
 import { ROOTFS } from '../../composables/useDeployCluster';
@@ -139,7 +139,7 @@ const props = defineProps<{
   cluster: any,
   nodes: any[],
   loading: boolean,
-  availableNodes: RentedNode[],
+  availableNodes: RawNode[],
   onAddNode: (payload: any) => Promise<void>
 }>();
 const emit = defineEmits(['update:modelValue', 'nodes-updated', 'remove-node']);
@@ -203,7 +203,7 @@ onMounted(async () => {
     sshKeysLoading.value = false;
   }
 });
-const addFormNode = computed<RentedNode | undefined>(() => (props.availableNodes || []).find((n: RentedNode) => n.nodeId === addFormNodeId.value));
+const addFormNode = computed<RawNode | undefined>(() => (props.availableNodes || []).find((n: RawNode) => n.nodeId === addFormNodeId.value));
 const canAssignToNode = computed(() => {
   const node = addFormNode.value;
   if (!node) return false;

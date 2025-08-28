@@ -22,22 +22,24 @@
 				{{ node.country }}
 			</v-chip>
       <v-chip
-				v-if="node.rented"
+				v-if="node.rented && node.rentedByTwinId"
 				color="green"
-				variant="outlined"
-				size="x-small"
+				variant="tonal"
+				size="small"
+				class="node-type-chip"
 			>
-				<v-icon size="12" class="mr-1">mdi-lock</v-icon>
-				Reserved
+				<v-icon size="14" class="mr-1">mdi-lock</v-icon>
+				Reserved (50% off)
 			</v-chip>
 			<v-chip
 				v-else
-				color="orange"
-				variant="outlined"
-				size="x-small"
+				color="blue"
+				variant="tonal"
+				size="small"
+				class="node-type-chip"
 			>
-				<v-icon size="12" class="mr-1">mdi-share-variant</v-icon>
-				Shared
+				<v-icon size="14" class="mr-1">mdi-share-variant</v-icon>
+				Shared{{ node.rentable && !node.rented ? ' (Rentable)' : '' }}
 			</v-chip>
 		</div>
 	</div>
@@ -65,5 +67,9 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
+	}
+	.node-type-chip {
+		font-weight: 600;
+		border-width: 2px;
 	}
 </style>
