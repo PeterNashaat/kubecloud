@@ -95,7 +95,7 @@
                     Available Nodes
                   </h2>
                   <div class="nodes-count">
-                    {{ filteredNodes.length }} nodes
+                    {{ filteredNodes.length }}  of {{ nodes.length }} nodes
                   </div>
                 </div>
                 <v-btn
@@ -121,7 +121,7 @@
                 <p class="loading-text">Loading available nodes...</p>
               </div>
               <template v-else>
-                <div v-if="filteredNodes.filter(n => !reservedNodeIds.has(n.nodeId)).length === 0" class="no-results">
+                <div v-if="paginatedNodes.length === 0" class="no-results">
                   <v-icon size="64" color="primary" class="mb-4">mdi-magnify-close</v-icon>
                   <h3>No nodes match your filters</h3>
                   <p>Try adjusting your filter criteria to see more options.</p>
@@ -136,7 +136,7 @@
                 <div v-else>
                   <v-row dense align="stretch">
                     <v-col
-                      v-for="node in filteredNodes.filter(n => !reservedNodeIds.has(n.nodeId))"
+                      v-for="node in paginatedNodes"
                       :key="node.nodeId"
                       cols="12" sm="6" md="4" lg="3"
                     >
@@ -153,6 +153,12 @@
                     </v-col>
                   </v-row>
                 </div>
+                <v-pagination
+                  v-model="currentPage"
+                  :length="totalPages"
+                  color="primary"
+                  class="mt-6"
+                />
               </template>
             </v-card>
           </v-col>
@@ -239,13 +245,13 @@ const goBack = () => {
 }
 
 // Pagination logic
-// const currentPage = ref(1)
-// const pageSize = 50
+const currentPage = ref(1)
+const pageSize = 8
 
-// const totalPages = computed(() => Math.max(1, Math.ceil(filteredNodes.value.length / pageSize)))
-// const paginatedNodes = computed(() =>
-//   filteredNodes.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
-// )
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredNodes.value.length / pageSize)))
+const paginatedNodes = computed(() =>
+  filteredNodes.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize).filter(n => !reservedNodeIds.value.has(n.nodeId))
+)
 
 function handleNodeAction(node: any, payload: { nodeId: number; action: string }) {
   if (payload.action === 'reserve') {
@@ -253,14 +259,14 @@ function handleNodeAction(node: any, payload: { nodeId: number; action: string }
   }
 }
 
-// watch(filteredNodes, () => {
-//   if (currentPage.value > totalPages.value) {
-//     currentPage.value = totalPages.value;
-//   }
-//   if (currentPage.value < 1) {
-//     currentPage.value = 1;
-//   }
-// })
+watch(filteredNodes, () => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value;
+  }
+  if (currentPage.value < 1) {
+    currentPage.value = 1;
+  }
+})
 </script>
 
 <style scoped>
