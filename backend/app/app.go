@@ -33,16 +33,17 @@ import (
 
 // App holds all configurations for the app
 type App struct {
-	router     *gin.Engine
-	httpServer *http.Server
-	config     internal.Configuration
-	handlers   Handler
-	db         models.DB
-	redis      *internal.RedisClient
-	sseManager *internal.SSEManager
-	gridClient deployer.TFPluginClient
-	appCancel  context.CancelFunc
-	metrics    *metrics.Metrics
+	router           *gin.Engine
+	httpServer       *http.Server
+	config           internal.Configuration
+	handlers         Handler
+	db               models.DB
+	redis            *internal.RedisClient
+	sseManager       *internal.SSEManager
+	notificationsSSE *internal.SSEManager
+	gridClient       deployer.TFPluginClient
+	appCancel        context.CancelFunc
+	metrics          *metrics.Metrics
 }
 
 // NewApp create new instance of the app with all configs
@@ -106,8 +107,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create Redis client: %w", err)
 	}
 
-	sseManager := internal.NewSSEManager(db)
-
+	sseManager := internal.NewSSEManager()
 	plugingOpts := []deployer.PluginOpt{
 		deployer.WithNetwork(config.SystemAccount.Network),
 	}
@@ -133,7 +133,8 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to init workflow engine: %w", err)
 	}
 
-	sseNotifier := notification.NewSSENotifier(sseManager)
+	notificationsSSE := internal.NewSSEManager()
+	sseNotifier := notification.NewSSENotifier(notificationsSSE)
 	err = mailService.InitNotificationTemplates()
 	if err != nil {
 		return nil, fmt.Errorf("failed to init notification templates: %w", err)
@@ -326,6 +327,7 @@ func (app *App) registerHandlers() {
 				notificationGroup.PUT("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
 				notificationGroup.PUT("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
 				notificationGroup.DELETE("/:notification_id", app.handlers.DeleteNotificationHandler)
+				notificationGroup.GET("/stream", app.notificationsSSE.HandleSSE)
 			}
 		}
 	}
