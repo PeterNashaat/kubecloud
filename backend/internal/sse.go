@@ -27,7 +27,6 @@ type SSEManager struct {
 	mu      sync.RWMutex
 	ctx     context.Context
 	cancel  context.CancelFunc
-	db      models.DB
 }
 
 // SSEMessage represents a server-sent event message
@@ -40,13 +39,12 @@ type SSEMessage struct {
 }
 
 // NewSSEManager creates a new SSE manager
-func NewSSEManager(db models.DB) *SSEManager {
+func NewSSEManager() *SSEManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	manager := &SSEManager{
 		clients: make(map[int][]chan SSEMessage),
 		ctx:     ctx,
 		cancel:  cancel,
-		db:      db,
 	}
 
 	return manager

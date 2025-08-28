@@ -1,40 +1,73 @@
-<html>
-  <body
-    style="font-family: Arial, sans-serif; background: #f7f7f7; padding: 24px"
-  >
-    <table
-      width="100%"
-      cellpadding="0"
-      cellspacing="0"
-      style="
+{{define "user_event"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ index .Payload "subject" }}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f6f8fb;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
         max-width: 600px;
         margin: 0 auto;
         background: #ffffff;
         border-radius: 8px;
         overflow: hidden;
-      "
-    >
-      <tr>
-        <td style="padding: 24px">
-          <h2 style="margin: 0 0 16px 0">{{.Payload.subject}}</h2>
-          <p style="margin: 0 0 12px 0">{{.Payload.message}}</p>
-          {{if .Payload.detail}}
-          <p style="margin: 0 0 8px 0">{{.Payload.detail}}</p>
-          {{end}}
-        </td>
-      </tr>
-      <tr>
-        <td
-          style="
-            padding: 16px 24px;
-            font-size: 12px;
-            color: #666;
-            background: #fafafa;
-          "
-        >
-          <p style="margin: 0">This is an automated message from KubeCloud.</p>
-        </td>
-      </tr>
-    </table>
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+      }
+      .header {
+        background: #1976d2;
+        color: #ffffff;
+        padding: 16px 20px;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .content {
+        padding: 20px;
+        color: #222;
+      }
+      .kv {
+        margin: 12px 0;
+      }
+      .kv .label {
+        color: #555;
+        font-weight: bold;
+        width: 180px;
+        display: inline-block;
+      }
+      .kv .value {
+        color: #111;
+      }
+      .footer {
+        padding: 16px 20px;
+        color: #666;
+        font-size: 12px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>{{ index .Payload "subject" }}</h1>
+      </div>
+      <div class="content">
+        <p>{{ index .Payload "message" }}</p>
+
+        <p>
+          If you did not perform this action, please contact support
+          immediately.
+        </p>
+      </div>
+      <div class="footer">KubeCloud. All rights reserved.</div>
+    </div>
   </body>
 </html>
+{{end}}
