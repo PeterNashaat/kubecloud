@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -431,5 +432,54 @@ func migrateNotifications(db *gorm.DB) error {
 		_ = m.DropColumn(&Notification{}, "title")
 	}
 
-	return nil
+	type columnInfo struct {
+		Name string `gorm:"column:name"`
+		Type string `gorm:"column:type"`
+	}
+	var cols []columnInfo
+	if err := db.Raw("PRAGMA table_info(notifications)").Scan(&cols).Error; err != nil {
+		return err
+	}
+
+	idType := ""
+	for _, c := range cols {
+		if strings.EqualFold(c.Name, "id") {
+			idType = strings.ToUpper(c.Type)
+			break
+		}
+	}
+
+	if idType == "" || idType == "TEXT" {
+		return nil
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("DROP INDEX IF EXISTS idx_notifications_task_id").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DROP INDEX IF EXISTS idx_notifications_user_id").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("ALTER TABLE notifications RENAME TO notifications_old").Error; err != nil {
+			return err
+		}
+
+		if err := tx.AutoMigrate(&Notification{}); err != nil {
+			return err
+		}
+
+		copySQL := `INSERT INTO notifications 
+			(id, user_id, task_id, type, severity, channels, payload, status, created_at, read_at)
+			SELECT CAST(id AS TEXT), user_id, task_id, type, severity, channels, payload, status, created_at, read_at
+			FROM notifications_old`
+		if err := tx.Exec(copySQL).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec("DROP TABLE notifications_old").Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
