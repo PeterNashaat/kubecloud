@@ -104,7 +104,7 @@ type LoggerConfig struct {
 	LogDir     string `json:"log_dir"`
 	MaxSize    int    `json:"max_size"` // in MB
 	MaxBackups int    `json:"max_backups"`
-	MaxAge     int    `json:"max_age"` // in days
+	MaxAgeDays int    `json:"max_age_days"` // in days
 	Compress   bool   `json:"compress"`
 }
 

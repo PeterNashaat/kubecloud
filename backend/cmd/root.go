@@ -189,8 +189,8 @@ func addFlags() error {
 	if err := bindIntFlag(rootCmd, "logger.max_backups", 12, "Logger max backups"); err != nil {
 		return fmt.Errorf("failed to bind logger.max_backups flag: %w", err)
 	}
-	if err := bindIntFlag(rootCmd, "logger.max_age", 30, "Logger max age (days)"); err != nil {
-		return fmt.Errorf("failed to bind logger.max_age flag: %w", err)
+	if err := bindIntFlag(rootCmd, "logger.max_age_days", 30, "Logger max age (days)"); err != nil {
+		return fmt.Errorf("failed to bind logger.max_age_days flag: %w", err)
 	}
 	if err := bindBoolFlag(rootCmd, "logger.compress", true, "Logger compress backups"); err != nil {
 		return fmt.Errorf("failed to bind logger.compress flag: %w", err)
@@ -260,7 +260,7 @@ It supports:
 			Filename:   logFile,
 			MaxSize:    config.Logger.MaxSize,
 			MaxBackups: config.Logger.MaxBackups,
-			MaxAge:     config.Logger.MaxAge,
+			MaxAge:     config.Logger.MaxAgeDays,
 			Compress:   config.Logger.Compress,
 		}
 		multi := zerolog.MultiLevelWriter(
@@ -315,7 +315,6 @@ func gracefulShutdown(app *app.App) error {
 }
 
 func Execute() {
-
 	err := rootCmd.Execute()
 	if err != nil {
 		log.Error().Err(err).Msg("Command execution failed")
