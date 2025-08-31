@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/natefinch/lumberjack"
 	"kubecloud/app"
 	"kubecloud/internal"
 	"net/http"
@@ -273,7 +274,23 @@ func gracefulShutdown(app *app.App) error {
 }
 
 func Execute() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	rotator := &lumberjack.Logger{
+		Filename:   "./logs/app.log",
+		MaxSize:    10, //MB
+		MaxBackups: 12, // 12 backups
+		MaxAge:     30, //days
+		Compress:   true,
+	}
+
+	multi := zerolog.MultiLevelWriter(
+		zerolog.ConsoleWriter{Out: os.Stderr},
+		rotator,
+	)
+	log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+
+	log.Info().Msg("Application started")
+	log.Warn().Msg("This is a warning")
+	log.Error().Err(os.ErrNotExist).Msg("Example error")
 
 	err := rootCmd.Execute()
 	if err != nil {
