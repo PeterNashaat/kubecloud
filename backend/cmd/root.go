@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -254,7 +255,7 @@ It supports:
 		if err := os.MkdirAll(logDir, 0755); err != nil {
 			log.Fatal().Err(err).Msg("failed to create logs directory")
 		}
-		logFile := logDir + "/app.log"
+		logFile := filepath.Join(logDir, "app.log")
 		rotator := &lumberjack.Logger{
 			Filename:   logFile,
 			MaxSize:    config.Logger.MaxSize,
