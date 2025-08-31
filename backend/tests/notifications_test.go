@@ -69,13 +69,14 @@ func TestClient_MarkNotificationRead(t *testing.T) {
 	}
 	t.Log("Login successful")
 
-	err = client.MarkNotificationRead(1)
+	notificationID := "bf683123-ea52-4e4f-a0e0-1d43608a5214"
+	err = client.MarkNotificationRead(notificationID)
 	if err != nil {
 		t.Errorf("Failed to mark notification as read: %v", err)
 		return
 	}
 
-	t.Logf("Successfully marked notification ID %d as read", 1)
+	t.Logf("Successfully marked notification ID %s as read", notificationID)
 }
 
 func TestClient_MarkNotificationUnread(t *testing.T) {
@@ -89,13 +90,14 @@ func TestClient_MarkNotificationUnread(t *testing.T) {
 	}
 	t.Log("Login successful")
 
-	err = client.MarkNotificationUnread(1)
+	notificationID := "bf683123-ea52-4e4f-a0e0-1d43608a5214"
+	err = client.MarkNotificationUnread(notificationID)
 	if err != nil {
 		t.Errorf("Failed to mark notification as unread: %v", err)
 		return
 	}
 
-	t.Logf("Successfully marked notification ID %d as unread", 1)
+	t.Logf("Successfully marked notification ID %s as unread", notificationID)
 }
 
 func TestClient_MarkAllNotificationsRead(t *testing.T) {
@@ -153,14 +155,14 @@ func TestClient_DeleteNotification(t *testing.T) {
 	}
 	t.Log("Login successful")
 
-	notificationID := uint(1)
+	notificationID := "bf683123-ea52-4e4f-a0e0-1d43608a5214"
 	err = client.DeleteNotification(notificationID)
 	if err != nil {
 		t.Errorf("Failed to delete notification: %v", err)
 		return
 	}
 
-	t.Logf("Successfully deleted notification ID %d", notificationID)
+	t.Logf("Successfully deleted notification ID %s", notificationID)
 }
 
 func TestClient_DeleteAllNotifications(t *testing.T) {

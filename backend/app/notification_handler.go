@@ -30,6 +30,24 @@ type NotificationResponse struct {
 	ReadAt    *string                     `json:"read_at,omitempty"`
 }
 
+func (n NotificationResponse) String() string {
+	base := fmt.Sprintf(`Notification{
+	ID: %s,
+	TaskID: %s,
+	Type: %s,
+	Severity: %s,
+	Payload: %v,
+	Status: %s,
+	CreatedAt: %s`, n.ID, n.TaskID, n.Type, n.Severity, n.Payload, n.Status, n.CreatedAt)
+
+	if n.ReadAt != nil {
+		base += fmt.Sprintf(`,
+	ReadAt: %s`, *n.ReadAt)
+	}
+
+	return base + "\n}"
+}
+
 // convertToNotificationResponse converts a models.Notification to NotificationResponse
 func convertToNotificationResponse(notification models.Notification) NotificationResponse {
 	resp := NotificationResponse{

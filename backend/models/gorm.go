@@ -468,14 +468,6 @@ func migrateNotifications(db *gorm.DB) error {
 			return err
 		}
 
-		copySQL := `INSERT INTO notifications 
-				(id, user_id, task_id, type, severity, channels, payload, status, created_at, read_at)
-				SELECT CAST(id AS TEXT), user_id, task_id, type, severity, channels, payload, status, created_at, read_at
-				FROM notifications_old`
-		if err := tx.Exec(copySQL).Error; err != nil {
-			return err
-		}
-
 		if err := tx.Exec("DROP TABLE notifications_old").Error; err != nil {
 			return err
 		}
