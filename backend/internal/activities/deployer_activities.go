@@ -512,6 +512,9 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 			log.Error().Err(err).Msg("Failed to send notification")
 		}
 	})
+	workflow.AfterWorkflowHooks = append(workflow.AfterWorkflowHooks,
+		NotifyCreateDeploymentResult(notificationService),
+	)
 	workflow.Steps = steps
 	workflow.AfterStepHooks = []ewf.AfterStepHook{
 		notifyStepHook(sseManager),
