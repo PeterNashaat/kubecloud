@@ -276,9 +276,9 @@ func gracefulShutdown(app *app.App) error {
 func Execute() {
 	rotator := &lumberjack.Logger{
 		Filename:   "./logs/app.log",
-		MaxSize:    10, //MB
-		MaxBackups: 12, // 12 backups
-		MaxAge:     30, //days
+		MaxSize:    512, //MB
+		MaxBackups: 12,  // 12 backups
+		MaxAge:     30,  //days
 		Compress:   true,
 	}
 
