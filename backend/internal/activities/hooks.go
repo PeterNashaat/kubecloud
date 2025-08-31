@@ -32,19 +32,21 @@ func hookStepDone(_ context.Context, w *ewf.Workflow, step *ewf.Step, err error)
 	}
 }
 
-var baseWorkflowTemplate = ewf.WorkflowTemplate{
-	BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
-		hookWorkflowStarted,
-	},
-	AfterWorkflowHooks: []ewf.AfterWorkflowHook{
-		hookWorkflowDone,
-	},
-	BeforeStepHooks: []ewf.BeforeStepHook{
-		hookStepStarted,
-	},
-	AfterStepHooks: []ewf.AfterStepHook{
-		hookStepDone,
-	},
+func newKubecloudWorkflowTemplate() ewf.WorkflowTemplate {
+	return ewf.WorkflowTemplate{
+		BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
+			hookWorkflowStarted,
+		},
+		AfterWorkflowHooks: []ewf.AfterWorkflowHook{
+			hookWorkflowDone,
+		},
+		BeforeStepHooks: []ewf.BeforeStepHook{
+			hookStepStarted,
+		},
+		AfterStepHooks: []ewf.AfterStepHook{
+			hookStepDone,
+		},
+	}
 }
 
 func getOrdinalSuffix(n int) string {
