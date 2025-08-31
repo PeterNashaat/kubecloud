@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/mattn/go-sqlite3 v1.14.29
 	github.com/mitchellh/mapstructure v1.4.1
+	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.0
 	github.com/redis/go-redis/v9 v9.12.0

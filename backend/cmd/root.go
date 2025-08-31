@@ -8,9 +8,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/natefinch/lumberjack"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -176,6 +179,23 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind kyc_challenge_domain flag: %w", err)
 	}
 
+	// === Logger Config ===
+	if err := bindStringFlag(rootCmd, "logger.log_dir", "./logs", "Logger directory"); err != nil {
+		return fmt.Errorf("failed to bind logger.log_dir flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "logger.max_size", 512, "Logger max size (MB)"); err != nil {
+		return fmt.Errorf("failed to bind logger.max_size flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "logger.max_backups", 12, "Logger max backups"); err != nil {
+		return fmt.Errorf("failed to bind logger.max_backups flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "logger.max_age_days", 30, "Logger max age (days)"); err != nil {
+		return fmt.Errorf("failed to bind logger.max_age_days flag: %w", err)
+	}
+	if err := bindBoolFlag(rootCmd, "logger.compress", true, "Logger compress backups"); err != nil {
+		return fmt.Errorf("failed to bind logger.compress flag: %w", err)
+	}
+
 	return nil
 }
 
@@ -227,6 +247,28 @@ It supports:
 			return fmt.Errorf("failed to read configuration: %w", err)
 		}
 
+		// === LOGGER SETUP  ===
+		logDir := config.Logger.LogDir
+		if logDir == "" {
+			logDir = "./logs"
+		}
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			log.Fatal().Err(err).Msg("failed to create logs directory")
+		}
+		logFile := filepath.Join(logDir, "app.log")
+		rotator := &lumberjack.Logger{
+			Filename:   logFile,
+			MaxSize:    config.Logger.MaxSize,
+			MaxBackups: config.Logger.MaxBackups,
+			MaxAge:     config.Logger.MaxAgeDays,
+			Compress:   config.Logger.Compress,
+		}
+		multi := zerolog.MultiLevelWriter(
+			zerolog.ConsoleWriter{Out: os.Stderr},
+			rotator,
+		)
+		log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+
 		// Set log level based on debug configuration
 		if config.Debug {
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
@@ -273,8 +315,6 @@ func gracefulShutdown(app *app.App) error {
 }
 
 func Execute() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 	err := rootCmd.Execute()
 	if err != nil {
 		log.Error().Err(err).Msg("Command execution failed")
