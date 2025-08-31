@@ -468,7 +468,7 @@ func (c *Client) DeleteNotification(notificationID string) error {
 
 // DeleteAllNotifications deletes all notifications for the authenticated user
 func (c *Client) DeleteAllNotifications() error {
-	resp, err := c.makeRequest("PUT", "/notifications", nil, true)
+	resp, err := c.makeRequest("DELETE", "/notifications", nil, true)
 	if err != nil {
 		return err
 	}

@@ -324,7 +324,7 @@ func (app *App) registerHandlers() {
 				notificationGroup.GET("", app.handlers.GetAllNotificationsHandler)
 				notificationGroup.GET("/unread", app.handlers.GetUnreadNotificationsHandler)
 				notificationGroup.PUT("/read-all", app.handlers.MarkAllNotificationsReadHandler)
-				notificationGroup.PUT("", app.handlers.DeleteAllNotificationsHandler)
+				notificationGroup.DELETE("", app.handlers.DeleteAllNotificationsHandler)
 				notificationGroup.PUT("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
 				notificationGroup.PUT("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
 				notificationGroup.DELETE("/:notification_id", app.handlers.DeleteNotificationHandler)
