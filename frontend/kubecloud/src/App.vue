@@ -12,7 +12,7 @@
 
 <script lang="ts" setup>
 import { RouterView, useRoute } from 'vue-router'
-import { computed, onMounted, onErrorCaptured } from 'vue'
+import { computed, onMounted, onUnmounted, onErrorCaptured } from 'vue'
 import { useUserStore } from './stores/user'
 import { useNotificationStore } from './stores/notifications'
 import { useMaintenanceStore } from './stores/maintenance'
@@ -32,8 +32,7 @@ onErrorCaptured((error: Error) => {
   // Show error as toast notification
   notificationStore.error(
     'Something went wrong',
-    error.message || 'An unexpected error occurred. Please try refreshing the page.',
-    { duration: 8000 }
+    error.message || 'An unexpected error occurred. Please try refreshing the page.'
   )
 
   // Prevent error from propagating and breaking the app
@@ -55,6 +54,20 @@ onMounted(async () => {
     }
     userStore.initializeAuth()
     useSseEvents()
+    
+    // Initialize notifications after auth is ready
+    const initializeNotifications = async () => {
+      if (userStore.user && userStore.user.id) {
+        try {
+          await notificationStore.loadNotifications()
+        } catch (error) {
+          console.error('Failed to initialize notifications:', error)
+        }
+      }
+    }
+    
+    // Initialize notifications after a short delay to ensure auth is ready
+    setTimeout(initializeNotifications, 500)
   } catch (error) {
     console.error('Failed to initialize application:', error)
   }
@@ -64,10 +77,14 @@ onMounted(async () => {
     console.error('Unhandled error:', event.error)
     notificationStore.error(
       'Unexpected Error',
-      event.error?.message || 'An unexpected error occurred',
-      { duration: 8000 }
+      event.error?.message || 'An unexpected error occurred'
     )
   })
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  notificationStore.cleanup()
 })
 
 </script>

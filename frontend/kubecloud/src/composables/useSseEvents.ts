@@ -1,6 +1,5 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useNotificationStore } from '../stores/notifications'
-import { usePersistentNotificationStore } from '../stores/persistentNotifications'
 import { useUserStore } from '../stores/user'
 import { useClusterStore } from '../stores/clusters'
 import { useNodeManagement } from './useNodeManagement'
@@ -15,8 +14,7 @@ export interface SseEvent {
 
 export function useSseEvents() {
   const eventSource = ref<EventSource | null>(null)
-  const uiToast = useNotificationStore()
-  const persistentStore = usePersistentNotificationStore()
+  const notificationStore = useNotificationStore()
   const userStore = useUserStore()
   const clusterStore = useClusterStore()
   const { fetchRentedNodes } = useNodeManagement()
@@ -79,11 +77,11 @@ export function useSseEvents() {
       if (message) {
         const text = message.toLowerCase()
         if (text.includes('failed')) {
-          uiToast.error('Workflow', message)
+          notificationStore.error('Workflow', message)
         } else if (text.includes('completed')) {
-          uiToast.success('Workflow', message)
+          notificationStore.success('Workflow', message)
         } else {
-          uiToast.info('Workflow', message)
+          notificationStore.info('Workflow', message)
         }
       }
 
@@ -92,16 +90,14 @@ export function useSseEvents() {
     }
 
     // Default channel: create a persistent notification entry so bell shows it
-    persistentStore.addNotification({
-      id: Date.now(), // temporary client id; server-provided ids will overwrite on fetch
+    notificationStore.addNotification({
       type: (evt.type as any) || 'task_update',
       title: evt.data?.status || 'Notification',
       message: evt.data?.message || evt.message || 'New notification',
-      data: JSON.stringify(evt.data || {}),
-      task_id: evt.taskId || '',
       status: 'unread',
+      persistent: true,
       created_at: new Date().toISOString()
-    } as any)
+    })
   }
 
   async function refreshClusterData() {
