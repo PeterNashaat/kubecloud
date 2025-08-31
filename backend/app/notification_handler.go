@@ -18,6 +18,16 @@ const (
 	DefaultOffset            = 0
 )
 
+// @Model NotificationResponse
+// @Description A notification response
+// @Property ID string
+// @Property TaskID string
+// @Property Type models.NotificationType
+// @Property Severity models.NotificationSeverity
+// @Property Payload map[string]string
+// @Property Status models.NotificationStatus
+// @Property CreatedAt string
+// @Property ReadAt *string
 // NotificationResponse represents a notification response
 type NotificationResponse struct {
 	ID        string                      `json:"id"`
@@ -96,6 +106,17 @@ func validatePaginationParams(limitStr, offsetStr string) (int, int, error) {
 	return limit, offset, nil
 }
 
+// @Summary Get all notifications
+// @Description Retrieves all user notifications with pagination
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Param limit query int false "Maximum number of notifications to return (default: 20, max: 100)"
+// @Param offset query int false "Number of notifications to skip (default: 0)"
+// @Success 200 {object} APIResponse{data=object{notifications=[]NotificationResponse,limit=int,offset=int,count=int}} "Notifications retrieved successfully"
+// @Failure 400 {object} APIResponse "Invalid pagination parameters"
+// @Failure 500 {object} APIResponse "Failed to retrieve notifications"
+// @Router /notifications [get]
 // GetAllNotificationsHandler retrieves all user notifications with pagination
 func (h *Handler) GetAllNotificationsHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -134,6 +155,17 @@ func (h *Handler) GetAllNotificationsHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Mark a specific notification as read
+// @Description Marks a specific notification as read for a user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Param notification_id path string true "Notification ID"
+// @Success 200 {object} APIResponse{data=object{}} "Notification marked as read successfully"
+// @Failure 401 {object} APIResponse "Authentication required"
+// @Failure 404 {object} APIResponse "Notification not found"
+// @Failure 500 {object} APIResponse "Failed to mark notification as read"
+// @Router /notifications/{notification_id}/read [put]
 // MarkNotificationReadHandler marks a specific notification as read
 func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -157,6 +189,15 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "Notification marked as read", nil)
 }
 
+// @Summary Mark all notifications as read
+// @Description Marks all notifications as read for a user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Success 200 {object} APIResponse{data=object{}} "All notifications marked as read successfully"
+// @Failure 401 {object} APIResponse "Authentication required"
+// @Failure 500 {object} APIResponse "Failed to mark notifications as read"
+// @Router /notifications/read-all [put]
 // MarkAllNotificationsReadHandler marks all notifications as read for a user
 func (h *Handler) MarkAllNotificationsReadHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -174,6 +215,17 @@ func (h *Handler) MarkAllNotificationsReadHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "All notifications marked as read", nil)
 }
 
+// @Summary Delete a specific notification
+// @Description Deletes a specific notification for a user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Param notification_id path string true "Notification ID"
+// @Success 200 {object} APIResponse{data=object{}} "Notification deleted successfully"
+// @Failure 401 {object} APIResponse "Authentication required"
+// @Failure 404 {object} APIResponse "Notification not found"
+// @Failure 500 {object} APIResponse "Failed to delete notification"
+// @Router /notifications/{notification_id} [delete]
 // DeleteNotificationHandler deletes a specific notification
 func (h *Handler) DeleteNotificationHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -197,6 +249,17 @@ func (h *Handler) DeleteNotificationHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "Notification deleted successfully", nil)
 }
 
+// @Summary Get unread notifications
+// @Description Retrieves only unread notifications for a user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Param limit query int false "Limit"
+// @Param offset query int false "Offset"
+// @Success 200 {object} APIResponse{data=object{notifications=[]NotificationResponse,limit=int,offset=int,count=int}} "Unread notifications retrieved successfully"
+// @Failure 400 {object} APIResponse "Invalid pagination parameters"
+// @Failure 500 {object} APIResponse "Failed to retrieve unread notifications"
+// @Router /notifications/unread [get]
 // GetUnreadNotificationsHandler retrieves only unread notifications for a user
 func (h *Handler) GetUnreadNotificationsHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -235,6 +298,15 @@ func (h *Handler) GetUnreadNotificationsHandler(c *gin.Context) {
 	})
 }
 
+// @Summary Delete all notifications
+// @Description Deletes all notifications for a user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Success 200 {object} APIResponse{data=object{}} "All notifications deleted successfully"
+// @Failure 401 {object} APIResponse "Authentication required"
+// @Failure 500 {object} APIResponse "Failed to delete notifications"
+// @Router /notifications [put]
 // DeleteAllNotificationsHandler deletes all notifications for a user
 func (h *Handler) DeleteAllNotificationsHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -252,6 +324,17 @@ func (h *Handler) DeleteAllNotificationsHandler(c *gin.Context) {
 	Success(c, http.StatusOK, "All notifications deleted successfully", nil)
 }
 
+// @Summary Mark a specific notification as unread
+// @Description Marks a specific notification as unread for a user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Param notification_id path string true "Notification ID"
+// @Success 200 {object} APIResponse{data=object{}} "Notification marked as unread successfully"
+// @Failure 401 {object} APIResponse "Authentication required"
+// @Failure 404 {object} APIResponse "Notification not found"
+// @Failure 500 {object} APIResponse "Failed to mark notification as unread"
+// @Router /notifications/{notification_id}/unread [put]
 // MarkNotificationUnreadHandler marks a specific notification as unread
 func (h *Handler) MarkNotificationUnreadHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
