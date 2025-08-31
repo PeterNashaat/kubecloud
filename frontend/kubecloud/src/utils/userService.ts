@@ -292,11 +292,13 @@ export class UserService {
     )
     const { balance_usd, debt_usd, pending_balance_usd } = response.data.data
     return {balance: (balance_usd || 0) - (debt_usd || 0), pending_balance: pending_balance_usd || 0}
-  }catch(e){
-    useNotificationStore().error(
-      'Error',
-      'Failed to fetch balance',
-    )
+  }catch(e: any){
+    if (!e?.silent) {
+      useNotificationStore().error(
+        'Error',
+        'Failed to fetch balance',
+      )
+    }
     return {balance: 0, pending_balance: 0}
   }
   }
