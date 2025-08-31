@@ -430,7 +430,7 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 	}
 
 	wfName := fmt.Sprintf("deploy-%d-nodes", len(cluster.Nodes))
-	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, h.metrics, wfName, len(cluster.Nodes))
+	activities.NewDynamicDeployWorkflowTemplate(h.ewfEngine, h.metrics, wfName, len(cluster.Nodes), h.sseManager)
 
 	// Get the workflow
 	wf, err := h.ewfEngine.NewWorkflow(wfName)

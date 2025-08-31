@@ -28,21 +28,6 @@ var (
 	}
 )
 
-// getWorkflowDescription returns a user-friendly description for the workflow
-func getWorkflowDescription(workflowName string) string {
-	if desc, exists := workflowsDescriptions[workflowName]; exists {
-		return desc
-	}
-
-	// Handle deploy-X-nodes workflows
-	if isDeployWorkflow(workflowName) {
-		return "Deploying Cluster"
-	}
-
-	// Fallback to workflow name
-	return workflowName
-}
-
 func isWorkloadAlreadyDeployedError(err error) bool {
 	errMsg := err.Error()
 	return strings.Contains(errMsg, "exists: conflict")
@@ -51,11 +36,6 @@ func isWorkloadAlreadyDeployedError(err error) bool {
 func isWorkloadInvalid(err error) bool {
 	errMsg := err.Error()
 	return strings.Contains(errMsg, "invalid deployment")
-}
-
-func isStorageError(err error) bool {
-	errMsg := err.Error()
-	return strings.Contains(errMsg, "not enough space left in pools of this type ssd")
 }
 
 func ensureClient(state ewf.State) {
@@ -480,7 +460,7 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 	}
 }
 
-func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metrics, wfName string, nodesNum int) {
+func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metrics, wfName string, nodesNum int, sseManager *internal.SSEManager) {
 	steps := []ewf.Step{
 		{Name: StepDeployNetwork, RetryPolicy: criticalRetryPolicy},
 	}
@@ -496,6 +476,9 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 
 	workflow := deployerWorkflowTemplate
 	workflow.Steps = steps
+	workflow.AfterStepHooks = []ewf.AfterStepHook{
+		notifyStepHook(sseManager),
+	}
 
 	engine.RegisterTemplate(wfName, &workflow)
 }
@@ -513,60 +496,7 @@ func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
 
 }
 
-func NotifyUser(sse *internal.SSEManager) ewf.AfterWorkflowHook {
-	return func(ctx context.Context, wf *ewf.Workflow, err error) {
-		config, confErr := getConfig(wf.State)
-		if confErr != nil {
-			log.Error().Msg("Missing or invalid 'config' in workflow state")
-			return
-		}
-
-		workflowDesc := getWorkflowDescription(wf.Name)
-		var notificationData map[string]interface{}
-
-		if err != nil {
-			message := fmt.Sprintf("%s failed", workflowDesc)
-			if cluster, clusterErr := statemanager.GetCluster(wf.State); clusterErr == nil {
-				message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
-			}
-
-			notificationData = map[string]interface{}{
-				"type":    "workflow_update",
-				"message": message,
-				"data":    map[string]interface{}{"name": wf.Name, "error": err.Error()},
-			}
-		} else {
-			cluster, clusterErr := statemanager.GetCluster(wf.State)
-			if clusterErr != nil {
-				notificationData = map[string]interface{}{
-					"type":    "workflow_update",
-					"message": fmt.Sprintf("%s completed successfully", workflowDesc),
-					"data":    map[string]interface{}{"name": wf.Name, "error": false},
-				}
-			} else {
-				nodeCount := len(cluster.Nodes)
-				message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
-					workflowDesc, cluster.Name, nodeCount)
-
-				notificationData = map[string]interface{}{
-					"type":    "workflow_update",
-					"message": message,
-					"data": map[string]interface{}{
-						"name":         wf.Name,
-						"cluster_name": cluster.Name,
-						"node_count":   nodeCount,
-						"cluster":      cluster,
-						"error":        false,
-					},
-				}
-			}
-		}
-
-		sse.Notify(config.UserID, "workflow_update", notificationData)
-	}
-}
-
-func DeploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.AfterWorkflowHook {
+func deploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
 		if err != nil && isDeployWorkflow(wf.Name) {
 			cluster, clusterErr := statemanager.GetCluster(wf.State)
@@ -592,13 +522,14 @@ func DeploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.Aft
 			defer cancel()
 
 			// wait the rollback workflow to finish before closing the client
-			engine.RunSync(rollbackCtx, rollbackWf)
+			if err := engine.RunSync(rollbackCtx, rollbackWf); err != nil {
+				log.Error().Err(err).Str("project_name", cluster.ProjectName).Msg("Failed to run rollback workflow")
+				return
+			}
+
+			metrics.DecActiveClusterCount()
 		}
 	}
-}
-
-func isDeployWorkflow(name string) bool {
-	return strings.HasPrefix(name, "deploy-") && strings.HasSuffix(name, "-nodes")
 }
 
 var deployerWorkflowTemplate ewf.WorkflowTemplate
@@ -618,9 +549,10 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepDeleteAllUserClusters, DeleteAllUserClustersStep(db))
 
 	deployerWorkflowTemplate = baseWorkflowTemplate
+
 	deployerWorkflowTemplate.AfterWorkflowHooks = append(deployerWorkflowTemplate.AfterWorkflowHooks, []ewf.AfterWorkflowHook{
-		NotifyUser(sse),
-		DeploymentFailureHook(engine, metrics),
+		notifyWorkflowProgress(sse),
+		deploymentFailureHook(engine, metrics),
 		CloseClient,
 	}...)
 
