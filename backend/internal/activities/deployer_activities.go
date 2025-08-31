@@ -540,8 +540,8 @@ func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
 
 func NotifyUser(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
-		config, ok := wf.State["config"].(statemanager.ClientConfig)
-		if !ok {
+		config, confErr := getConfig(wf.State)
+		if confErr != nil {
 			log.Error().Msg("Missing or invalid 'config' in workflow state")
 			return
 		}
@@ -550,9 +550,9 @@ func NotifyUser(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 		var notificationData map[string]interface{}
 
 		if err != nil {
-			message := fmt.Sprintf("%s failed: %s", workflowDesc, err.Error())
+			message := fmt.Sprintf("%s failed", workflowDesc)
 			if cluster, clusterErr := statemanager.GetCluster(wf.State); clusterErr == nil {
-				message = fmt.Sprintf("%s for cluster '%s' failed: %s", workflowDesc, cluster.Name, err.Error())
+				message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
 			}
 
 			notificationData = map[string]interface{}{
