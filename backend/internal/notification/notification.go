@@ -62,8 +62,8 @@ func NewNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notif
 		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
 		ByStatus: map[string]ChannelRule{
 			"started":   {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
-			"succeeded": {Channels: []string{ChannelUI}, Severity: models.NotificationSeveritySuccess},
-			"failed":    {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityError},
+			"succeeded": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
+			"failed":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeverityError},
 			"deleted":   {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityWarning},
 		},
 	})

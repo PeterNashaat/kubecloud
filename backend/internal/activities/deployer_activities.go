@@ -602,6 +602,9 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: StepRemoveCluster, RetryPolicy: standardRetryPolicy},
 		{Name: StepRemoveClusterFromDB, RetryPolicy: standardRetryPolicy},
 	}
+	deleteWFTemplate.AfterWorkflowHooks = append(deleteWFTemplate.AfterWorkflowHooks,
+		NotifyDeploymentDeleted(notificationService),
+	)
 	engine.RegisterTemplate(WorkflowDeleteCluster, &deleteWFTemplate)
 
 	deleteAllDeploymentsWFTemplate := createDeployerWorkflowTemplate(sse, engine, metrics)
