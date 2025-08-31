@@ -337,6 +337,13 @@ type NotificationsResponse struct {
 	Count         int                        `json:"count"`
 }
 
+// APIResponseWrapper represents the standard API response structure
+type APIResponseWrapper struct {
+	Status  int                   `json:"status"`
+	Message string                `json:"message"`
+	Data    NotificationsResponse `json:"data"`
+}
+
 // GetAllNotifications retrieves all notifications with optional pagination
 func (c *Client) GetAllNotifications(limit, offset int) (*NotificationsResponse, error) {
 	endpoint := "/notifications"
@@ -355,12 +362,14 @@ func (c *Client) GetAllNotifications(limit, offset int) (*NotificationsResponse,
 		return nil, fmt.Errorf("get all notifications failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var notificationResp NotificationsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&notificationResp); err != nil {
-		return nil, fmt.Errorf("failed to decode notifications response: %w", err)
+	// Decode the API response wrapper first
+	var apiResp APIResponseWrapper
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil, fmt.Errorf("failed to decode API response: %w", err)
 	}
 
-	return &notificationResp, nil
+	return &apiResp.Data, nil
 }
 
 // GetUnreadNotifications retrieves only unread notifications with optional pagination
@@ -377,12 +386,14 @@ func (c *Client) GetUnreadNotifications(limit, offset int) (*NotificationsRespon
 		return nil, fmt.Errorf("get unread notifications failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var notificationResp NotificationsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&notificationResp); err != nil {
-		return nil, fmt.Errorf("failed to decode unread notifications response: %w", err)
+	// Decode the API response wrapper first
+	var apiResp APIResponseWrapper
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil, fmt.Errorf("failed to decode API response: %w", err)
 	}
 
-	return &notificationResp, nil
+	return &apiResp.Data, nil
 }
 
 // MarkNotificationRead marks a specific notification as read

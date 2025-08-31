@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -41,26 +40,11 @@ type Notification struct {
 	TaskID    string               `json:"task_id,omitempty" gorm:"index"`
 	Type      NotificationType     `json:"type" gorm:"not null"`
 	Severity  NotificationSeverity `json:"severity" gorm:"not null;default:'info'"`
-	Channels  []string             `json:"channels" gorm:"serializer:json"`
+	Channels  []string             `json:"channels" gorm:"serializer:json;default:'[\"ui\"]'"`
 	Payload   map[string]string    `json:"payload" gorm:"serializer:json"`
 	Status    NotificationStatus   `json:"status" gorm:"default:'unread'"`
 	CreatedAt time.Time            `json:"created_at" gorm:"autoCreateTime"`
 	ReadAt    *time.Time           `json:"read_at,omitempty"`
-}
-
-func (n Notification) String() string {
-	return fmt.Sprintf(`Notification{
-	ID: %s,
-	UserID: %s,
-	TaskID: %s,
-	Type: %s,
-	Severity: %s,
-	Channels: %v,
-	Payload: %v,
-	Status: %s,
-	CreatedAt: %s,
-	ReadAt: %s
-}`, n.ID, n.UserID, n.TaskID, n.Type, n.Severity, n.Channels, n.Payload, n.Status, n.CreatedAt, n.ReadAt)
 }
 
 // CreateNotification creates a new notification
