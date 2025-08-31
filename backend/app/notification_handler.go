@@ -306,7 +306,7 @@ func (h *Handler) GetUnreadNotificationsHandler(c *gin.Context) {
 // @Success 200 {object} APIResponse{data=object{}} "All notifications deleted successfully"
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 500 {object} APIResponse "Failed to delete notifications"
-// @Router /notifications [put]
+// @Router /notifications [delete]
 // DeleteAllNotificationsHandler deletes all notifications for a user
 func (h *Handler) DeleteAllNotificationsHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
