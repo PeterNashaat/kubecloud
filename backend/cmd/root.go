@@ -274,6 +274,11 @@ func gracefulShutdown(app *app.App) error {
 }
 
 func Execute() {
+	// Ensure logs directory exists
+	if err := os.MkdirAll("./logs", 0755); err != nil {
+		log.Fatal().Err(err).Msg("failed to create logs directory")
+	}
+
 	rotator := &lumberjack.Logger{
 		Filename:   "./logs/app.log",
 		MaxSize:    512, //MB
