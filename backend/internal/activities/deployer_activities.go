@@ -35,7 +35,7 @@ func getWorkflowDescription(workflowName string) string {
 	}
 
 	// Handle deploy-X-nodes workflows
-	if strings.Contains(workflowName, "deploy") {
+	if isDeployWorkflow(workflowName) {
 		return "Deploying Cluster"
 	}
 
@@ -51,6 +51,11 @@ func isWorkloadAlreadyDeployedError(err error) bool {
 func isWorkloadInvalid(err error) bool {
 	errMsg := err.Error()
 	return strings.Contains(errMsg, "invalid deployment")
+}
+
+func isStorageError(err error) bool {
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "not enough space left in pools of this type ssd")
 }
 
 func ensureClient(state ewf.State) {
@@ -481,43 +486,18 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 	}
 
 	for i := 0; i < nodesNum; i++ {
-		stepName := fmt.Sprintf("deploy_node_%d", i) // TODO: should be cleaned
+		stepName := getDeployNodeStepName(i + 1)
 		engine.Register(stepName, DeployNodeStep(metrics))
+
 		steps = append(steps, ewf.Step{Name: stepName, RetryPolicy: criticalRetryPolicy})
 	}
 
 	steps = append(steps, ewf.Step{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy})
 
-	workflow := BaseWFTemplate
+	workflow := deployerWorkflowTemplate
 	workflow.Steps = steps
 
 	engine.RegisterTemplate(wfName, &workflow)
-}
-
-func validateConfig(config statemanager.ClientConfig) error {
-	return statemanager.ValidateConfig(config)
-}
-
-// DEPRECATED: each setup uses ensureClient now
-func SetupClient(ctx context.Context, wf *ewf.Workflow) {
-	config, ok := wf.State["config"].(statemanager.ClientConfig)
-	if !ok {
-		log.Error().Msg("Missing or invalid 'config' in workflow state")
-		return
-	}
-
-	if err := validateConfig(config); err != nil {
-		log.Error().Err(err).Msg("Invalid workflow configuration")
-		return
-	}
-
-	kubeClient, err := kubedeployer.NewClient(config.Mnemonic, config.Network)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to create kubeclient")
-		return
-	}
-
-	wf.State["kubeclient"] = kubeClient
 }
 
 func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
@@ -531,11 +511,6 @@ func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
 		log.Warn().Msg("No kubeclient found in workflow state to close")
 	}
 
-	if err != nil {
-		log.Error().Err(err).Str("workflow_name", wf.Name).Msg("Workflow completed with error")
-	} else {
-		log.Info().Str("workflow_name", wf.Name).Msg("Workflow completed successfully")
-	}
 }
 
 func NotifyUser(sse *internal.SSEManager) ewf.AfterWorkflowHook {
@@ -591,55 +566,40 @@ func NotifyUser(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 	}
 }
 
-var BaseWFTemplate = ewf.WorkflowTemplate{
-	BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
-		func(ctx context.Context, w *ewf.Workflow) {
-			log.Info().Str("workflow_name", w.Name).Msg("Starting workflow")
-		},
-		// SetupClient,
-	},
-	AfterWorkflowHooks: []ewf.AfterWorkflowHook{
-		// NotifyUser,
-		CloseClient,
-	},
-	BeforeStepHooks: []ewf.BeforeStepHook{
-		func(ctx context.Context, w *ewf.Workflow, step *ewf.Step) {
-			log.Info().Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Starting step")
-		},
-	},
-	AfterStepHooks: []ewf.AfterStepHook{
-		func(ctx context.Context, w *ewf.Workflow, step *ewf.Step, err error) {
-			if err != nil {
-				log.Error().Err(err).Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step failed")
-			} else {
-				log.Info().Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step completed successfully")
+func DeploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.AfterWorkflowHook {
+	return func(ctx context.Context, wf *ewf.Workflow, err error) {
+		if err != nil && isDeployWorkflow(wf.Name) {
+			cluster, clusterErr := statemanager.GetCluster(wf.State)
+			if clusterErr != nil || cluster.ProjectName == "" {
+				log.Error().Err(clusterErr).Str("workflow_name", wf.Name).Msg("nothing to rollback")
+				return
 			}
-		},
-	},
-}
 
-func createDeployWorkflowTemplates(engine *ewf.Engine, metrics *metrics.Metrics) {
-	for i := 1; i <= 10; i++ {
-		workflowName := fmt.Sprintf("deploy-%d-nodes", i)
+			log.Info().Str("project_name", cluster.ProjectName).Str("workflow_name", wf.Name).Msg("Triggering rollback workflow for failed deployment")
 
-		steps := []ewf.Step{
-			{Name: StepDeployNetwork, RetryPolicy: criticalRetryPolicy},
+			rollbackWf, rollbackErr := engine.NewWorkflow("rollback-failed-deployment")
+			if rollbackErr != nil {
+				log.Error().Err(rollbackErr).Str("project_name", cluster.ProjectName).Msg("Failed to create rollback workflow")
+				return
+			}
+
+			rollbackWf.State["config"] = wf.State["config"]
+			rollbackWf.State["cluster"] = wf.State["cluster"]
+			rollbackWf.State["kubeclient"] = wf.State["kubeclient"]
+			rollbackWf.State["project_name"] = cluster.ProjectName
+
+			rollbackCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			engine.RunAsync(rollbackCtx, rollbackWf)
 		}
-
-		for j := 0; j < i; j++ {
-			stepName := fmt.Sprintf("deploy_node_%d", j)
-			engine.Register(stepName, DeployNodeStep(metrics))
-			steps = append(steps, ewf.Step{Name: stepName, RetryPolicy: criticalRetryPolicy})
-		}
-
-		steps = append(steps, ewf.Step{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy})
-
-		workflowTemplate := BaseWFTemplate
-		workflowTemplate.Steps = steps
-
-		engine.RegisterTemplate(workflowName, &workflowTemplate)
 	}
 }
+
+func isDeployWorkflow(name string) bool {
+	return strings.HasPrefix(name, "deploy-") && strings.HasSuffix(name, "-nodes")
+}
+
+var deployerWorkflowTemplate ewf.WorkflowTemplate
 
 func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, sse *internal.SSEManager) {
 
@@ -655,18 +615,21 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepBatchCancelContracts, BatchCancelContractsStep())
 	engine.Register(StepDeleteAllUserClusters, DeleteAllUserClustersStep(db))
 
-	createDeployWorkflowTemplates(engine, metrics)
+	deployerWorkflowTemplate = baseWorkflowTemplate
+	deployerWorkflowTemplate.AfterWorkflowHooks = append(deployerWorkflowTemplate.AfterWorkflowHooks, []ewf.AfterWorkflowHook{
+		NotifyUser(sse),
+		DeploymentFailureHook(engine, metrics),
+		CloseClient,
+	}...)
 
-	BaseWFTemplate.AfterWorkflowHooks = append(BaseWFTemplate.AfterWorkflowHooks, NotifyUser(sse))
-
-	deleteWFTemplate := BaseWFTemplate
+	deleteWFTemplate := deployerWorkflowTemplate
 	deleteWFTemplate.Steps = []ewf.Step{
 		{Name: StepRemoveCluster, RetryPolicy: standardRetryPolicy},
 		{Name: StepRemoveClusterFromDB, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(WorkflowDeleteCluster, &deleteWFTemplate)
 
-	deleteAllDeploymentsWFTemplate := BaseWFTemplate
+	deleteAllDeploymentsWFTemplate := deployerWorkflowTemplate
 	deleteAllDeploymentsWFTemplate.Steps = []ewf.Step{
 		{Name: StepGatherAllContractIDs, RetryPolicy: standardRetryPolicy},
 		{Name: StepBatchCancelContracts, RetryPolicy: standardRetryPolicy},
@@ -674,7 +637,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	}
 	engine.RegisterTemplate(WorkflowDeleteAllClusters, &deleteAllDeploymentsWFTemplate)
 
-	addNodeWFTemplate := BaseWFTemplate
+	addNodeWFTemplate := deployerWorkflowTemplate
 	addNodeWFTemplate.Steps = []ewf.Step{
 		{Name: StepUpdateNetwork, RetryPolicy: criticalRetryPolicy},
 		{Name: StepAddNode, RetryPolicy: standardRetryPolicy},
@@ -682,12 +645,18 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	}
 	engine.RegisterTemplate(WorkflowAddNode, &addNodeWFTemplate)
 
-	removeNodeWFTemplate := BaseWFTemplate
+	removeNodeWFTemplate := deployerWorkflowTemplate
 	removeNodeWFTemplate.Steps = []ewf.Step{
 		{Name: StepRemoveNode, RetryPolicy: standardRetryPolicy},
 		{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(WorkflowRemoveNode, &removeNodeWFTemplate)
+
+	rollbackWFTemplate := deployerWorkflowTemplate
+	rollbackWFTemplate.Steps = []ewf.Step{
+		{Name: StepRemoveCluster, RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate(WorkflowRollbackFailedDeployment, &rollbackWFTemplate)
 }
 
 func getFromState[T any](state ewf.State, key string) (T, error) {
