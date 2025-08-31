@@ -31,24 +31,25 @@ import (
 
 // Handler struct holds configs for all handlers
 type Handler struct {
-	tokenManager    internal.TokenManager
-	db              models.DB
-	config          internal.Configuration
-	mailService     internal.MailService
-	proxyClient     proxy.Client
-	substrateClient *substrate.Substrate
-	graphqlClient   graphql.GraphQl
-	firesquidClient graphql.GraphQl
-	redis           *internal.RedisClient
-	sseManager      *internal.SSEManager
-	ewfEngine       *ewf.Engine
-	gridNet         string // Network name for the grid
-	sshPublicKey    string // SSH public key loaded at startup
-	systemIdentity  substrate.Identity
-	kycClient       *internal.KYCClient
-	sponsorKeyPair  subkey.KeyPair
-	sponsorAddress  string
-	metrics         *metrics.Metrics
+	tokenManager        internal.TokenManager
+	db                  models.DB
+	config              internal.Configuration
+	mailService         internal.MailService
+	proxyClient         proxy.Client
+	substrateClient     *substrate.Substrate
+	graphqlClient       graphql.GraphQl
+	firesquidClient     graphql.GraphQl
+	redis               *internal.RedisClient
+	sseManager          *internal.SSEManager
+	ewfEngine           *ewf.Engine
+	gridNet             string // Network name for the grid
+	sshPublicKey        string // SSH public key loaded at startup
+	systemIdentity      substrate.Identity
+	kycClient           *internal.KYCClient
+	sponsorKeyPair      subkey.KeyPair
+	sponsorAddress      string
+	metrics             *metrics.Metrics
+	notificationService *notification.NotificationService
 }
 
 // NewHandler create new handler
@@ -59,27 +60,28 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine,
 	gridNet string, sshPublicKey string, systemIdentity substrate.Identity,
 	kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string,
-	metrics *metrics.Metrics) *Handler {
+	metrics *metrics.Metrics, notificationService *notification.NotificationService) *Handler {
 
 	return &Handler{
-		tokenManager:    tokenManager,
-		db:              db,
-		config:          config,
-		mailService:     mailService,
-		proxyClient:     gridproxy,
-		substrateClient: substrateClient,
-		graphqlClient:   graphqlClient,
-		firesquidClient: firesquidClient,
-		redis:           redis,
-		sseManager:      sseManager,
-		ewfEngine:       ewfEngine,
-		gridNet:         gridNet,
-		sshPublicKey:    sshPublicKey,
-		systemIdentity:  systemIdentity,
-		kycClient:       kycClient,
-		sponsorKeyPair:  sponsorKeyPair,
-		sponsorAddress:  sponsorAddress,
-		metrics:         metrics,
+		tokenManager:        tokenManager,
+		db:                  db,
+		config:              config,
+		mailService:         mailService,
+		proxyClient:         gridproxy,
+		substrateClient:     substrateClient,
+		graphqlClient:       graphqlClient,
+		firesquidClient:     firesquidClient,
+		redis:               redis,
+		sseManager:          sseManager,
+		ewfEngine:           ewfEngine,
+		gridNet:             gridNet,
+		sshPublicKey:        sshPublicKey,
+		systemIdentity:      systemIdentity,
+		kycClient:           kycClient,
+		sponsorKeyPair:      sponsorKeyPair,
+		sponsorAddress:      sponsorAddress,
+		metrics:             metrics,
+		notificationService: notificationService,
 	}
 }
 
@@ -632,13 +634,14 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 
 	}
 
-	if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
-		payload := map[string]string{
-			"status":  "password_changed",
-			"subject": "Your password was changed",
-			"message": "Your account password has been successfully updated.",
-		}
-		_ = notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", c.GetInt("user_id")))
+	payload := map[string]string{
+		"status":  "password_changed",
+		"subject": "Your password was changed",
+		"message": "Your account password has been successfully updated.",
+	}
+	err = h.notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", c.GetInt("user_id")))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send password changed notification")
 	}
 
 	Success(c, http.StatusAccepted, "password is updated successfully", nil)
@@ -983,13 +986,14 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 		return
 	}
 
-	if notificationService, nerr := notification.GetNotificationService(); nerr == nil {
-		payload := map[string]string{
-			"status":  "ssh_key_added",
-			"subject": "New SSH key added",
-			"message": fmt.Sprintf("SSH key '%s' was added to your account.", sshKey.Name),
-		}
-		_ = notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", userID))
+	payload := map[string]string{
+		"status":  "ssh_key_added",
+		"subject": "New SSH key added",
+		"message": fmt.Sprintf("SSH key '%s' was added to your account.", sshKey.Name),
+	}
+	err := h.notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", userID))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send ssh key added notification")
 	}
 
 	Success(c, http.StatusCreated, "SSH key added successfully", sshKey)

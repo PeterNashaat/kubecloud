@@ -17,6 +17,10 @@ import (
 	"golang.org/x/text/language"
 )
 
+const (
+	ChannelEmail = "email"
+)
+
 //go:embed templates/reset_password.html
 var resetPassTemplate []byte
 
@@ -181,7 +185,6 @@ func (service MailService) Notify(notification models.Notification, receiver ...
 
 	tplName := typeToTemplate[notification.Type]
 	if tplName == "" {
-
 		tplName = string(notification.Type)
 	}
 
@@ -208,5 +211,5 @@ func (service MailService) Notify(notification models.Notification, receiver ...
 }
 
 func (service MailService) GetType() string {
-	return "email"
+	return ChannelEmail
 }

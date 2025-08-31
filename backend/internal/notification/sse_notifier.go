@@ -33,3 +33,7 @@ func (n *SSENotifier) Notify(notification models.Notification, receiver ...strin
 	n.sse.Notify(notification.UserID, msgType, notification.Severity, data, notification.TaskID)
 	return nil
 }
+
+func (n *SSENotifier) GetSSEManager() *internal.SSEManager {
+	return n.sse
+}

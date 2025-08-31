@@ -33,17 +33,17 @@ import (
 
 // App holds all configurations for the app
 type App struct {
-	router           *gin.Engine
-	httpServer       *http.Server
-	config           internal.Configuration
-	handlers         Handler
-	db               models.DB
-	redis            *internal.RedisClient
-	sseManager       *internal.SSEManager
-	notificationsSSE *internal.SSEManager
-	gridClient       deployer.TFPluginClient
-	appCancel        context.CancelFunc
-	metrics          *metrics.Metrics
+	router              *gin.Engine
+	httpServer          *http.Server
+	config              internal.Configuration
+	handlers            Handler
+	db                  models.DB
+	redis               *internal.RedisClient
+	sseManager          *internal.SSEManager
+	notificationService *notification.NotificationService
+	gridClient          deployer.TFPluginClient
+	appCancel           context.CancelFunc
+	metrics             *metrics.Metrics
 }
 
 // NewApp create new instance of the app with all configs
@@ -139,7 +139,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init notification templates: %w", err)
 	}
-	notificationService := notification.InitNotificationService(db, ewfEngine, mailService, sseNotifier)
+	notificationService := notification.NewNotificationService(db, ewfEngine, mailService, sseNotifier)
 
 	// Create an app-level context for coordinating shutdown
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
@@ -189,18 +189,19 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
 		sseManager, ewfEngine, config.SystemAccount.Network, sshPublicKey,
-		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress, metrics)
+		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress, metrics, notificationService)
 
 	app := &App{
-		router:     router,
-		config:     config,
-		handlers:   *handler,
-		redis:      redisClient,
-		db:         db,
-		sseManager: sseManager,
-		appCancel:  appCancel,
-		gridClient: gridClient,
-		metrics:    metrics,
+		router:              router,
+		config:              config,
+		handlers:            *handler,
+		redis:               redisClient,
+		db:                  db,
+		sseManager:          sseManager,
+		notificationService: notificationService,
+		appCancel:           appCancel,
+		gridClient:          gridClient,
+		metrics:             metrics,
 	}
 
 	activities.RegisterEWFWorkflows(
@@ -214,7 +215,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		sponsorAddress,
 		sponsorKeyPair,
 		app.metrics,
-		notificationService.GetNotifiers(),
+		app.notificationService,
 	)
 
 	app.registerHandlers()
@@ -327,7 +328,7 @@ func (app *App) registerHandlers() {
 				notificationGroup.PUT("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
 				notificationGroup.PUT("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
 				notificationGroup.DELETE("/:notification_id", app.handlers.DeleteNotificationHandler)
-				notificationGroup.GET("/stream", app.notificationsSSE.HandleSSE)
+				notificationGroup.GET("/stream", app.notificationService.HandleNotificationSSE)
 			}
 		}
 	}

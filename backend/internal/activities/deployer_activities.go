@@ -483,7 +483,7 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 	}
 }
 
-func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metrics, wfName string, nodesNum int, sseManager *internal.SSEManager) {
+func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metrics,notificationService *notification.NotificationService, wfName string, nodesNum int, sseManager *internal.SSEManager) {
 	steps := []ewf.Step{
 		{Name: StepDeployNetwork, RetryPolicy: criticalRetryPolicy},
 	}
@@ -502,16 +502,12 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 	workflow := createDeployerWorkflowTemplate(sseManager, engine, metrics)
 	workflow.BeforeWorkflowHooks = append(workflow.BeforeWorkflowHooks, func(ctx context.Context, w *ewf.Workflow) {
 		userID := w.State["config"].(statemanager.ClientConfig).UserID
-		notificationService, err := notification.GetNotificationService()
 		payload := map[string]string{
 			"status":  "started",
 			"message": "Your cluster has started deploying.",
 		}
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to get notification service")
-		}
 
-		err = notificationService.Send(ctx, models.NotificationTypeDeployment, payload, userID, w.UUID)
+		err := notificationService.Send(ctx, models.NotificationTypeDeployment, payload, userID, w.UUID)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to send notification")
 		}
@@ -537,7 +533,7 @@ func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
 
 }
 
-func deploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.AfterWorkflowHook {
+func deploymentFailureHook(engine *ewf.Engine, metrics *metrics.MetricsnotificationService *notification.NotificationService) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
 		if err != nil && isDeployWorkflow(wf.Name) {
 			cluster, clusterErr := statemanager.GetCluster(wf.State)
@@ -585,7 +581,7 @@ func createDeployerWorkflowTemplate(sse *internal.SSEManager, engine *ewf.Engine
 	return template
 }
 
-func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, sse *internal.SSEManager, config internal.Configuration) {
+func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, sse *internal.SSEManager, notificationService *notification.NotificationService, config internal.Configuration) {
 
 	engine.Register(StepDeployNetwork, DeployNetworkStep(metrics))
 	engine.Register(StepDeployNode, DeployNodeStep(metrics))
