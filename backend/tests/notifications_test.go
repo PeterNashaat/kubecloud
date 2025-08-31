@@ -28,20 +28,7 @@ func TestClient_GetAllNotifications(t *testing.T) {
 
 	// Print details of each notification
 	for i, notification := range notifications.Notifications {
-		t.Logf("Notification %d:", i+1)
-		t.Logf("  ID: %s", notification.ID)
-		t.Logf("  Type: %s", notification.Type)
-		t.Logf("  Title: %s", notification.Payload["subject"])
-		t.Logf("  Message: %s", notification.Payload["message"])
-		t.Logf("  Status: %s", notification.Status)
-		t.Logf("  Created At: %s", notification.CreatedAt)
-		if notification.ReadAt != nil {
-			t.Logf("  Read At: %s", *notification.ReadAt)
-		}
-		if notification.TaskID != "" {
-			t.Logf("  Task ID: %s", notification.TaskID)
-		}
-		t.Log("  ---")
+		t.Logf("Notification %d: %s", i+1, notification.String())
 	}
 }
 
@@ -67,20 +54,7 @@ func TestClient_GetUnreadNotifications(t *testing.T) {
 
 	// Print details of each notification
 	for i, notification := range notifications.Notifications {
-		t.Logf("Notification %d:", i+1)
-		t.Logf("  ID: %s", notification.ID)
-		t.Logf("  Type: %s", notification.Type)
-		t.Logf("  Title: %s", notification.Payload["subject"])
-		t.Logf("  Message: %s", notification.Payload["message"])
-		t.Logf("  Status: %s", notification.Status)
-		t.Logf("  Created At: %s", notification.CreatedAt)
-		if notification.ReadAt != nil {
-			t.Logf("  Read At: %s", *notification.ReadAt)
-		}
-		if notification.TaskID != "" {
-			t.Logf("  Task ID: %s", notification.TaskID)
-		}
-		t.Log("  ---")
+		t.Logf("Notification %d: %s", i+1, notification.String())
 	}
 }
 
