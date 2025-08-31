@@ -387,7 +387,7 @@ func (c *Client) GetUnreadNotifications(limit, offset int) (*NotificationsRespon
 
 // MarkNotificationRead marks a specific notification as read
 func (c *Client) MarkNotificationRead(notificationID string) error {
-	endpoint := fmt.Sprintf("/notifications/%d/read", notificationID)
+	endpoint := fmt.Sprintf("/notifications/%s/read", notificationID)
 
 	resp, err := c.makeRequest("PUT", endpoint, nil, true)
 	if err != nil {
@@ -405,7 +405,7 @@ func (c *Client) MarkNotificationRead(notificationID string) error {
 
 // MarkNotificationUnread marks a specific notification as unread
 func (c *Client) MarkNotificationUnread(notificationID string) error {
-	endpoint := fmt.Sprintf("/notifications/%d/unread", notificationID)
+	endpoint := fmt.Sprintf("/notifications/%s/unread", notificationID)
 
 	resp, err := c.makeRequest("PUT", endpoint, nil, true)
 	if err != nil {

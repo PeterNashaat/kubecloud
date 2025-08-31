@@ -483,7 +483,7 @@ func RemoveDeploymentNodeStep() ewf.StepFn {
 	}
 }
 
-func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metrics,notificationService *notification.NotificationService, wfName string, nodesNum int, sseManager *internal.SSEManager) {
+func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metrics, notificationService *notification.NotificationService, wfName string, nodesNum int, sseManager *internal.SSEManager) {
 	steps := []ewf.Step{
 		{Name: StepDeployNetwork, RetryPolicy: criticalRetryPolicy},
 	}

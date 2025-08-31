@@ -2,8 +2,8 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -432,25 +432,25 @@ func migrateNotifications(db *gorm.DB) error {
 		_ = m.DropColumn(&Notification{}, "title")
 	}
 
-	type columnInfo struct {
-		Name string `gorm:"column:name"`
-		Type string `gorm:"column:type"`
-	}
-	var cols []columnInfo
-	if err := db.Raw("PRAGMA table_info(notifications)").Scan(&cols).Error; err != nil {
-		return err
-	}
-
-	idType := ""
-	for _, c := range cols {
-		if strings.EqualFold(c.Name, "id") {
-			idType = strings.ToUpper(c.Type)
-			break
-		}
+	testNotification := &Notification{
+		ID:        "test-migration-id",
+		UserID:    "test-user",
+		Type:      NotificationTypeDeployment,
+		Severity:  NotificationSeverityInfo,
+		Channels:  []string{"ui"},
+		Payload:   map[string]string{"test": "value"},
+		Status:    NotificationStatusUnread,
+		CreatedAt: time.Now(),
 	}
 
-	if idType == "" || idType == "TEXT" {
+	err := db.Create(testNotification).Error
+	if err == nil {
+		db.Delete(testNotification, "id = ?", "test-migration-id")
 		return nil
+	}
+
+	if !errors.Is(err, gorm.ErrInvalidData) {
+		return fmt.Errorf("failed to create test notification during migration: %w", err)
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -469,9 +469,9 @@ func migrateNotifications(db *gorm.DB) error {
 		}
 
 		copySQL := `INSERT INTO notifications 
-			(id, user_id, task_id, type, severity, channels, payload, status, created_at, read_at)
-			SELECT CAST(id AS TEXT), user_id, task_id, type, severity, channels, payload, status, created_at, read_at
-			FROM notifications_old`
+				(id, user_id, task_id, type, severity, channels, payload, status, created_at, read_at)
+				SELECT CAST(id AS TEXT), user_id, task_id, type, severity, channels, payload, status, created_at, read_at
+				FROM notifications_old`
 		if err := tx.Exec(copySQL).Error; err != nil {
 			return err
 		}
