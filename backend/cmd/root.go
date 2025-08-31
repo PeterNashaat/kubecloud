@@ -288,10 +288,6 @@ func Execute() {
 	)
 	log.Logger = zerolog.New(multi).With().Timestamp().Logger()
 
-	log.Info().Msg("Application started")
-	log.Warn().Msg("This is a warning")
-	log.Error().Err(os.ErrNotExist).Msg("Example error")
-
 	err := rootCmd.Execute()
 	if err != nil {
 		log.Error().Err(err).Msg("Command execution failed")
