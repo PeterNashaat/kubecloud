@@ -1,6 +1,6 @@
 <template>
   <div class="notifications-page">
-    <div class="container mx-auto pa-6">
+    <div class="container mx-auto pa-6" style="margin-top: 6rem;">
       <!-- Header -->
       <div class="d-flex align-center justify-space-between mb-6">
         <div>
@@ -25,7 +25,7 @@
           <v-btn
             variant="outlined"
             color="secondary"
-            @click="clearAll"
+            @click="confirmClearAll"
             :loading="loading"
             prepend-icon="mdi-delete-sweep"
           >
@@ -66,7 +66,7 @@
       <!-- Notifications List -->
       <v-card elevation="2">
         <v-card-text class="pa-0">
-          <div v-if="loading && notifications.length === 0" class="pa-8 text-center">
+          <div v-if="loading && persistentNotifications.length === 0" class="pa-8 text-center">
             <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
             <div class="mt-4 text-h6 text-medium-emphasis">Loading notifications...</div>
           </div>
@@ -84,8 +84,11 @@
               <v-list-item
                 v-for="notification in paginatedNotifications"
                 :key="notification.id"
-                :class="{ 'bg-blue-lighten-5 border-s-lg border-primary': notification.status === 'unread' }"
-                @click="handleNotificationClick(notification)"
+                :class="{ 
+                  'bg-blue-lighten-5 border-s-lg border-primary': notification.status === 'unread',
+                  'notification-clickable': true
+                }"
+                @click="onNotificationClick(notification)"
                 class="pa-4 mb-2 mx-2 rounded-lg elevation-1"
                 :ripple="true"
               >
@@ -103,17 +106,17 @@
                   </v-avatar>
                 </template>
 
-                <v-list-item-title class="text-h6 font-weight-medium mb-2 text-primary">
+                <v-list-item-title class="text-h6 font-weight-medium mb-2 text-primary notification-title">
                   {{ notification.title }}
                 </v-list-item-title>
 
-                <v-list-item-subtitle class="text-body-1 mb-2 text-medium-emphasis">
+                <v-list-item-subtitle class="text-body-1 mb-2 text-medium-emphasis notification-message">
                   {{ notification.message }}
                 </v-list-item-subtitle>
 
                 <div class="d-flex align-center justify-space-between">
                   <v-list-item-subtitle class="notification-time text-caption text-medium-emphasis">
-                    {{ formatTime(notification.created_at) }}
+                    {{ formatNotificationTime(notification.created_at) }}
                   </v-list-item-subtitle>
 
                   <div class="d-flex gap-2">
@@ -163,18 +166,17 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { usePersistentNotificationStore, type PersistentNotification } from '../stores/persistentNotifications'
-import { formatDistanceToNow } from 'date-fns'
+import { useNotificationStore, type Notification } from '../stores/notifications'
+import { getNotificationIcon, getNotificationColor, formatNotificationTime } from '../utils/notificationUtils'
 
-const notificationStore = usePersistentNotificationStore()
+const notificationStore = useNotificationStore()
 const {
-  notifications,
+  persistentNotifications,
   loading,
   unreadCount,
-  fetchNotifications,
-  markAsRead,
   markAllAsRead,
-  clearAll
+  clearAll,
+  loadNotifications
 } = notificationStore
 
 // Filters
@@ -194,16 +196,16 @@ const typeOptions = computed(() => [
 
 // Filtered notifications
 const filteredNotifications = computed(() => {
-  let filtered = [...notifications]
+  let filtered = [...persistentNotifications]
 
   // Filter by status
   if (statusFilter.value !== 'all') {
-    filtered = filtered.filter((n: PersistentNotification) => n.status === statusFilter.value as 'read' | 'unread')
+    filtered = filtered.filter((n: Notification) => n.status === statusFilter.value as 'read' | 'unread')
   }
 
   // Filter by type
   if (typeFilter.value !== 'all') {
-    filtered = filtered.filter((n: PersistentNotification) => n.type === typeFilter.value)
+    filtered = filtered.filter((n: Notification) => n.type === typeFilter.value)
   }
 
   return filtered
@@ -218,42 +220,15 @@ const paginatedNotifications = computed(() =>
 )
 
 // Methods
-const handleNotificationClick = (notification: PersistentNotification) => {
+const onNotificationClick = async (notification: Notification) => {
   if (notification.status === 'unread') {
-    markAsRead(notification.id)
-  }
-
-  // Handle notification action based on type
-  if (notification.task_id) {
-    console.log('Navigate to task:', notification.task_id)
+    await notificationStore.markAsRead(notification.id)
   }
 }
 
-const getNotificationIcon = (type: string) => {
-  switch (type) {
-    case 'deployment_update': return 'mdi-rocket-launch'
-    case 'task_update': return 'mdi-cog'
-    case 'connected': return 'mdi-link'
-    case 'error': return 'mdi-alert-circle'
-    default: return 'mdi-bell'
-  }
-}
-
-const getNotificationColor = (type: string) => {
-  switch (type) {
-    case 'deployment_update': return 'success'
-    case 'task_update': return 'info'
-    case 'connected': return 'primary'
-    case 'error': return 'error'
-    default: return 'grey'
-  }
-}
-
-const formatTime = (timestamp: string) => {
-  try {
-    return formatDistanceToNow(new Date(timestamp), { addSuffix: true })
-  } catch {
-    return 'Unknown time'
+const confirmClearAll = () => {
+  if (confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
+    clearAll()
   }
 }
 
@@ -264,7 +239,9 @@ watch([statusFilter, typeFilter], () => {
 
 // Initial load
 onMounted(() => {
-  fetchNotifications(100, 0) // Load more notifications for the page
+  if (persistentNotifications.length === 0) {
+    loadNotifications()
+  }
 })
 </script>
 
@@ -273,7 +250,6 @@ onMounted(() => {
   min-height: 100vh;
   background: linear-gradient(120deg, #0a192f 60%, #1e293b 100%), radial-gradient(ellipse at 70% 30%, #60a5fa33 0%, #0a192f 80%);
 }
-
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
@@ -291,5 +267,25 @@ onMounted(() => {
     flex-direction: column;
     gap: 8px;
   }
+}
+
+.notification-clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-title {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.notification-message {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.5;
+  max-width: none;
 }
 </style>
