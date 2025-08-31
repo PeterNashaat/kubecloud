@@ -195,7 +195,6 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind logger.compress flag: %w", err)
 	}
 
-
 	return nil
 }
 
@@ -248,26 +247,26 @@ It supports:
 		}
 
 		// === LOGGER SETUP  ===
-        logDir := config.Logger.LogDir
-        if logDir == "" {
-            logDir = "./logs"
-        }
-        if err := os.MkdirAll(logDir, 0755); err != nil {
-            log.Fatal().Err(err).Msg("failed to create logs directory")
-        }
-        logFile := logDir + "/app.log"
-        rotator := &lumberjack.Logger{
-            Filename:   logFile,
-            MaxSize:    config.Logger.MaxSize,
-            MaxBackups: config.Logger.MaxBackups,
-            MaxAge:     config.Logger.MaxAge,
-            Compress:   config.Logger.Compress,
-        }
-        multi := zerolog.MultiLevelWriter(
-            zerolog.ConsoleWriter{Out: os.Stderr},
-            rotator,
-        )
-        log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+		logDir := config.Logger.LogDir
+		if logDir == "" {
+			logDir = "./logs"
+		}
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			log.Fatal().Err(err).Msg("failed to create logs directory")
+		}
+		logFile := logDir + "/app.log"
+		rotator := &lumberjack.Logger{
+			Filename:   logFile,
+			MaxSize:    config.Logger.MaxSize,
+			MaxBackups: config.Logger.MaxBackups,
+			MaxAge:     config.Logger.MaxAge,
+			Compress:   config.Logger.Compress,
+		}
+		multi := zerolog.MultiLevelWriter(
+			zerolog.ConsoleWriter{Out: os.Stderr},
+			rotator,
+		)
+		log.Logger = zerolog.New(multi).With().Timestamp().Logger()
 
 		// Set log level based on debug configuration
 		if config.Debug {

@@ -102,9 +102,9 @@ type InvoiceCompanyData struct {
 // Configuration struct holds all configs for the app
 type LoggerConfig struct {
 	LogDir     string `json:"log_dir"`
-	MaxSize    int    `json:"max_size"`      // in MB
+	MaxSize    int    `json:"max_size"` // in MB
 	MaxBackups int    `json:"max_backups"`
-	MaxAge     int    `json:"max_age"`       // in days
+	MaxAge     int    `json:"max_age"` // in days
 	Compress   bool   `json:"compress"`
 }
 
