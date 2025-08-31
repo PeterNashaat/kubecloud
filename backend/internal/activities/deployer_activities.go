@@ -590,7 +590,9 @@ func DeploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.Aft
 
 			rollbackCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
-			engine.RunAsync(rollbackCtx, rollbackWf)
+
+			// wait the rollback workflow to finish before closing the client
+			engine.RunSync(rollbackCtx, rollbackWf)
 		}
 	}
 }
