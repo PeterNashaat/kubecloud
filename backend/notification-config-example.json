@@ -1,0 +1,105 @@
+{
+  "email_templates_dir_path": "./email-templates",
+  "template_types": {
+    "deployment": {
+      "default": {
+        "channels": ["ui"],
+        "severity": "info"
+      },
+      "by_status": {
+        "started": {
+          "channels": ["ui"],
+          "severity": "info"
+        },
+        "succeeded": {
+          "channels": ["ui", "email"],
+          "severity": "success"
+        },
+        "failed": {
+          "channels": ["ui", "email"],
+          "severity": "error"
+        },
+        "deleted": {
+          "channels": ["ui"],
+          "severity": "warning"
+        }
+      }
+    },
+    "billing": {
+      "default": {
+        "channels": ["ui"],
+        "severity": "info"
+      },
+      "by_status": {
+        "funds_succeeded": {
+          "channels": ["ui", "email"],
+          "severity": "success"
+        },
+        "funds_failed": {
+          "channels": ["ui", "email"],
+          "severity": "error"
+        },
+        "voucher_redeemed": {
+          "channels": ["ui"],
+          "severity": "success"
+        }
+      }
+    },
+    "user": {
+      "default": {
+        "channels": ["ui"],
+        "severity": "info"
+      },
+      "by_status": {
+        "password_changed": {
+          "channels": ["ui", "email"],
+          "severity": "success"
+        },
+        "ssh_key_added": {
+          "channels": ["ui", "email"],
+          "severity": "success"
+        }
+      }
+    },
+    "system": {
+      "default": {
+        "channels": ["ui"],
+        "severity": "info"
+      },
+      "by_status": {
+        "maintenance_started": {
+          "channels": ["ui", "email"],
+          "severity": "warning"
+        },
+        "maintenance_completed": {
+          "channels": ["ui", "email"],
+          "severity": "success"
+        },
+        "system_error": {
+          "channels": ["ui", "email"],
+          "severity": "error"
+        }
+      }
+    },
+    "security": {
+      "default": {
+        "channels": ["ui", "email"],
+        "severity": "warning"
+      },
+      "by_status": {
+        "login_attempt": {
+          "channels": ["ui"],
+          "severity": "info"
+        },
+        "suspicious_activity": {
+          "channels": ["ui", "email"],
+          "severity": "error"
+        },
+        "account_locked": {
+          "channels": ["ui", "email"],
+          "severity": "error"
+        }
+      }
+    }
+  }
+}

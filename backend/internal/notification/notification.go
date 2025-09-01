@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"fmt"
+	"kubecloud/internal"
 	"kubecloud/models"
 
 	"net/http"
@@ -45,7 +46,7 @@ type NotificationService struct {
 	templates map[models.NotificationType]NotificationTemplate
 }
 
-func NewNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notifier) *NotificationService {
+func NewNotificationService(db models.DB, engine *ewf.Engine, notificationConfig internal.NotificationConfig, notifiers ...Notifier) (*NotificationService, error) {
 	notifiersMap := make(map[string]Notifier)
 	for _, notifier := range notifiers {
 		notifiersMap[notifier.GetType()] = notifier
@@ -58,39 +59,42 @@ func NewNotificationService(db models.DB, engine *ewf.Engine, notifiers ...Notif
 		templates: make(map[models.NotificationType]NotificationTemplate),
 	}
 
-	s.RegisterTemplate(models.NotificationTypeDeployment, NotificationTemplate{
-		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
-		ByStatus: map[string]ChannelRule{
-			"started":   {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
-			"succeeded": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
-			"failed":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeverityError},
-			"deleted":   {Channels: []string{ChannelUI}, Severity: models.NotificationSeverityWarning},
-		},
-	})
+	// Load notification templates from configuration file
+	if err := s.loadTemplatesFromConfigFile(notificationConfig); err != nil {
+		return nil, fmt.Errorf("failed to load notification templates: %w", err)
+	}
 
-	s.RegisterTemplate(models.NotificationTypeBilling, NotificationTemplate{
-		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
-		ByStatus: map[string]ChannelRule{
-			// Adding funds events
-			"funds_succeeded": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
-			"funds_failed":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeverityError},
-			// Voucher
-			"voucher_redeemed": {Channels: []string{ChannelUI}, Severity: models.NotificationSeveritySuccess},
-		},
-	})
-
-	s.RegisterTemplate(models.NotificationTypeUser, NotificationTemplate{
-		Default: ChannelRule{Channels: []string{ChannelUI}, Severity: models.NotificationSeverityInfo},
-		ByStatus: map[string]ChannelRule{
-			"password_changed": {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
-			"ssh_key_added":    {Channels: []string{ChannelUI, ChannelEmail}, Severity: models.NotificationSeveritySuccess},
-		},
-	})
-	return s
+	return s, nil
 }
 
 func (s *NotificationService) RegisterTemplate(notificationType models.NotificationType, template NotificationTemplate) {
 	s.templates[notificationType] = template
+}
+
+func (s *NotificationService) loadTemplatesFromConfigFile(notificationConfig internal.NotificationConfig) error {
+	for templateName, templateConfig := range notificationConfig.TemplateTypes {
+		notificationType := models.NotificationType(templateName)
+
+		defaultRule := ChannelRule{
+			Channels: templateConfig.Default.Channels,
+			Severity: models.NotificationSeverity(templateConfig.Default.Severity),
+		}
+
+		byStatusRules := make(map[string]ChannelRule)
+		for status, ruleConfig := range templateConfig.ByStatus {
+			byStatusRules[status] = ChannelRule{
+				Channels: ruleConfig.Channels,
+				Severity: models.NotificationSeverity(ruleConfig.Severity),
+			}
+		}
+
+		s.RegisterTemplate(notificationType, NotificationTemplate{
+			Default:  defaultRule,
+			ByStatus: byStatusRules,
+		})
+	}
+
+	return nil
 }
 
 func (s *NotificationService) GetNotifiers() map[string]Notifier {

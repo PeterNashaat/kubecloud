@@ -2,7 +2,7 @@ package internal
 
 import (
 	"bytes"
-	"embed"
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"html/template"
@@ -36,21 +36,13 @@ var notifyPaymentRecordsMail []byte
 //go:embed templates/system_announcement.html
 var systemAnnouncementMail []byte
 
-//go:embed templates/notifications/*.html
-var emailTplFS embed.FS
-
 var emailTpls *template.Template
-
-var typeToTemplate = map[models.NotificationType]string{
-	models.NotificationTypeDeployment: "deployment_update",
-	models.NotificationTypeBilling:    "billing",
-	models.NotificationTypeUser:       "user_event",
-}
 
 // MailService struct hods all functionalities of mail service
 type MailService struct {
 	client        *sendgrid.Client
 	defaultSender string
+	templatesDir  string
 }
 
 type Attachment struct {
@@ -59,10 +51,11 @@ type Attachment struct {
 }
 
 // NewMailService creates new instance of mail service
-func NewMailService(sendGridKey string, defaultSender string) MailService {
+func NewMailService(sendGridKey string, defaultSender string, templatesDir string) MailService {
 	return MailService{
 		client:        sendgrid.NewSendClient(sendGridKey),
 		defaultSender: defaultSender,
+		templatesDir:  templatesDir,
 	}
 }
 
@@ -165,9 +158,13 @@ func (service *MailService) SystemAnnouncementMailBody(body string) string {
 }
 
 func (service *MailService) InitNotificationTemplates() error {
-	tpl, err := template.ParseFS(emailTplFS, "templates/notifications/*.html")
+	if service.templatesDir == "" {
+		service.templatesDir = "templates/notifications"
+	}
+
+	tpl, err := template.ParseGlob(filepath.Join(service.templatesDir, "*.html"))
 	if err != nil {
-		return fmt.Errorf("failed to parse notification templates: %w", err)
+		return fmt.Errorf("failed to parse notification templates from directory %s: %w", service.templatesDir, err)
 	}
 	emailTpls = tpl
 	return nil
@@ -183,10 +180,7 @@ func (service MailService) Notify(notification models.Notification, receiver ...
 	from := mail.NewEmail("KubeCloud", service.defaultSender)
 	receiverEmail := mail.NewEmail("KubeCloud User", receiver[0])
 
-	tplName := typeToTemplate[notification.Type]
-	if tplName == "" {
-		tplName = string(notification.Type)
-	}
+	tplName := string(notification.Type)
 
 	var buf bytes.Buffer
 	if err := emailTpls.ExecuteTemplate(&buf, tplName, notification); err != nil {

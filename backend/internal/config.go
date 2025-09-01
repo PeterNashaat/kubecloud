@@ -41,6 +41,9 @@ type Configuration struct {
 	KYCChallengeDomain string `json:"kyc_challenge_domain" validate:"required"`
 
 	Logger LoggerConfig `json:"logger"`
+
+	// Notification configuration
+	NotificationConfigPath string `json:"notification_config_path"`
 }
 
 type SSHConfig struct {
@@ -109,6 +112,58 @@ type LoggerConfig struct {
 	MaxBackups int    `json:"max_backups"`
 	MaxAgeDays int    `json:"max_age_days"` // in days
 	Compress   bool   `json:"compress"`
+}
+
+// NotificationConfig holds notification template type rules
+type NotificationConfig struct {
+	TemplateTypes         map[string]NotificationTemplateTypeConfig `json:"template_types"`
+	EmailTemplatesDirPath string                                    `json:"email_templates_dir_path"`
+}
+
+// ChannelRuleConfig represents channel and severity rules for notification template type
+type ChannelRuleConfig struct {
+	Channels []string `json:"channels"`
+	Severity string   `json:"severity"`
+}
+
+// NotificationTemplateTypeConfig represents a notification template type configuration
+type NotificationTemplateTypeConfig struct {
+	Default  ChannelRuleConfig            `json:"default"`
+	ByStatus map[string]ChannelRuleConfig `json:"by_status"`
+}
+
+// LoadNotificationConfig loads notification configuration from a separate file
+func LoadNotificationConfig(configPath string) (NotificationConfig, error) {
+	var notificationConfig NotificationConfig
+
+	if configPath == "" {
+		return NotificationConfig{}, fmt.Errorf("notification config path is required")
+	}
+
+	// Use viper to load the notification config file
+	viper.SetConfigFile(configPath)
+	viper.SetConfigType("json")
+
+	if err := viper.ReadInConfig(); err != nil {
+		return NotificationConfig{}, fmt.Errorf("failed to read notification config file: %w", err)
+	}
+
+	// Use mapstructure to decode the config
+	decoderConfig := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  &notificationConfig,
+	}
+
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return NotificationConfig{}, fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	if err := decoder.Decode(viper.AllSettings()); err != nil {
+		return NotificationConfig{}, fmt.Errorf("unable to decode notification config: %w", err)
+	}
+
+	return notificationConfig, nil
 }
 
 // LoadConfig load configurations
