@@ -13,7 +13,7 @@ export interface ApiError {
   message: string
   status?: number
   code?: string
-  silent?: boolean
+  silent: boolean
 }
 
 export interface ApiOptions {
@@ -123,7 +123,7 @@ class ApiClient {
             status: 401,
             code: 'TOKEN_EXPIRED',
             silent: true
-          } as ApiError & { silent: boolean }
+          }
         }
       }
 
@@ -182,7 +182,7 @@ class ApiClient {
         }
       }
 
-      const isSilentError = (error as any)?.silent === true
+      const isSilentError = (error as ApiError)?.silent ?? false
       if (showNotifications && !isSilentError) {
         notificationStore.error(
           'Error',
