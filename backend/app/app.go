@@ -45,7 +45,18 @@ type App struct {
 
 // NewApp create new instance of the app with all configs
 func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
-	router := gin.Default()
+	// Disable gin's default logging since we're using zerolog
+	gin.DisableConsoleColor()
+	gin.SetMode(gin.ReleaseMode)
+	
+	// Create router without default middleware
+	router := gin.New()
+	
+	// Add recovery middleware
+	router.Use(gin.Recovery())
+	
+	// Add our custom logging middleware
+	router.Use(middlewares.GinLoggerMiddleware())
 
 	stripe.Key = config.StripeSecret
 
