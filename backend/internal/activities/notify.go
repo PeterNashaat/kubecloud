@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"kubecloud/internal"
+	"kubecloud/internal/notification"
 	"kubecloud/internal/statemanager"
+	"kubecloud/models"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/xmonader/ewf"
 	"kubecloud/internal/logger"
@@ -63,7 +66,7 @@ func notifyWorkflowProgress(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 			}
 		}
 
-		sse.Notify(config.UserID, "workflow_update", notificationData)
+		sse.Notify(config.UserID, "workflow_update", models.NotificationSeverityInfo, notificationData)
 	}
 }
 
@@ -125,7 +128,7 @@ func notifyStepProgress(sse *internal.SSEManager, state ewf.State, workflowName,
 		notificationData["data"].(map[string]interface{})["error"] = err.Error()
 	}
 
-	sse.Notify(config.UserID, notificationType, notificationData)
+	sse.Notify(config.UserID, notificationType, models.NotificationSeverityInfo, notificationData)
 }
 
 func notifyStepHook(sse *internal.SSEManager) ewf.AfterStepHook {
@@ -195,4 +198,92 @@ func isDeployWorkflow(name string) bool {
 
 func isDeployStep(stepName string) bool {
 	return strings.HasPrefix(stepName, "deploy-") && strings.HasSuffix(stepName, "-node")
+}
+
+func NotifyCreateDeploymentResult(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
+	return func(ctx context.Context, wf *ewf.Workflow, err error) {
+		config, confErr := getConfig(wf.State)
+		if confErr != nil {
+			log.Error().Msg("Missing or invalid 'config' in workflow state")
+			return
+		}
+
+		cluster, clusterErr := statemanager.GetCluster(wf.State)
+		workflowDesc := getWorkflowDescription(wf.Name)
+
+		var notificationPayload map[string]string
+		if err != nil {
+			message := fmt.Sprintf("%s failed", workflowDesc)
+			if clusterErr == nil {
+				message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
+			}
+			notificationPayload = map[string]string{
+				"subject": fmt.Sprintf("%s failed", workflowDesc),
+				"status":  "failed",
+				"message": message,
+				"error":   err.Error(),
+			}
+			err := notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send deployment failure notification")
+			}
+			return
+		}
+
+		message := fmt.Sprintf("%s completed successfully", workflowDesc)
+		if clusterErr == nil {
+			nodeCount := len(cluster.Nodes)
+			message = fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
+				workflowDesc, cluster.Name, nodeCount)
+		}
+		notificationPayload = map[string]string{
+			"subject":      fmt.Sprintf("%s completed successfully", workflowDesc),
+			"status":       "succeeded",
+			"message":      message,
+			"timestamp":    time.Now().Format(time.RFC3339),
+			"cluster_name": cluster.Name,
+		}
+
+		err = notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to send deployment success notification")
+		}
+	}
+}
+
+func NotifyDeploymentDeleted(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
+	return func(ctx context.Context, wf *ewf.Workflow, err error) {
+		config, confErr := getConfig(wf.State)
+		if confErr != nil {
+			log.Error().Msg("Missing or invalid 'config' in workflow state")
+			return
+		}
+
+		if err != nil {
+			return
+		}
+
+		// Try to get cluster and more data for richer notification
+		cluster, clusterErr := statemanager.GetCluster(wf.State)
+		message := "Deployment deleted successfully"
+		clusterName := ""
+		nodeCount := 0
+		if clusterErr == nil {
+			clusterName = cluster.Name
+			nodeCount = len(cluster.Nodes)
+			message = fmt.Sprintf("Deployment for cluster '%s' with %d nodes was deleted", clusterName, nodeCount)
+		}
+		notificationPayload := map[string]string{
+			"subject":      "Deployment deleted",
+			"status":       "deleted",
+			"message":      message,
+			"timestamp":    time.Now().Format(time.RFC3339),
+			"cluster_name": clusterName,
+		}
+
+		err = notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to send deployment deleted notification")
+		}
+	}
 }
