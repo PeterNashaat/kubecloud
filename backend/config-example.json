@@ -61,5 +61,5 @@
     "max_age": 30,
     "compress": true
   },
-  "notification_config_path": "./notification-config.json"
+  "notification_config_path": "./notification-config-example.json"
 }
