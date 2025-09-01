@@ -75,7 +75,13 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create user storage: %w", err)
 	}
 
-	mailService := internal.NewMailService(config.MailSender.SendGridKey, config.MailSender.Email)
+	notificationConfig, err := internal.LoadNotificationConfig(config.NotificationConfigPath)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to load notification config")
+		return nil, fmt.Errorf("failed to load notification config: %w", err)
+	}
+
+	mailService := internal.NewMailService(config.MailSender.SendGridKey, config.MailSender.Email, notificationConfig.EmailTemplatesDirPath)
 
 	gridProxy := proxy.NewRetryingClient(proxy.NewClient(config.GridProxyURL))
 
@@ -139,7 +145,10 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init notification templates: %w", err)
 	}
-	notificationService := notification.NewNotificationService(db, ewfEngine, mailService, sseNotifier)
+	notificationService, err := notification.NewNotificationService(db, ewfEngine, notificationConfig, mailService, sseNotifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create notification service: %w", err)
+	}
 
 	// Create an app-level context for coordinating shutdown
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
