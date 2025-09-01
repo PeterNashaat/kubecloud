@@ -24,6 +24,7 @@ func SetUp(t testing.TB) (*App, error) {
 	configPath := filepath.Join(dir, "config.json")
 	dbPath := filepath.Join(dir, "testing.db")
 	workflowPath := filepath.Join(dir, "workflow_testing.db")
+	notificationConfigPath := filepath.Join(dir, "notification-config.json")
 
 	privateKeyPath := filepath.Join(dir, "test_id_rsa")
 	publicKeyPath := privateKeyPath + ".pub"
@@ -112,12 +113,24 @@ func SetUp(t testing.TB) (*App, error) {
 		return nil, err
 	}
 
+	notificationConfig := `{
+  "email_templates_dir_path": "../internal/templates/notifications",
+  "types": {}
+}`
+	err = os.WriteFile(notificationConfigPath, []byte(notificationConfig), 0644)
+	if err != nil {
+		return nil, err
+	}
+
 	viper.Reset()
 	viper.SetConfigFile(configPath)
 	err = viper.ReadInConfig()
 	if err != nil {
 		return nil, err
 	}
+
+	// Set the notification config path for tests
+	viper.Set("notification_config_path", notificationConfigPath)
 
 	configuration, err := internal.LoadConfig()
 	if err != nil {
@@ -148,6 +161,7 @@ func SetUp(t testing.TB) (*App, error) {
 		_ = os.Remove(configPath)
 		_ = os.Remove(dbPath)
 		_ = os.Remove(workflowPath)
+		_ = os.Remove(notificationConfigPath)
 
 		// Reset viper to avoid config leakage between tests
 		viper.Reset()
