@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"kubecloud/app"
 	"kubecloud/internal"
- 	"kubecloud/internal/logger"
+	"kubecloud/internal/logger"
 	"net/http"
 	"os"
 	"os/signal"
