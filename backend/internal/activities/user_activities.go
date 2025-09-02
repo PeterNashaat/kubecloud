@@ -363,7 +363,7 @@ func CreatePaymentIntentStep(currency string, metrics *metrics.Metrics, notifica
 			}
 			err = notificationService.Send(ctx, models.NotificationTypeBilling, payload, fmt.Sprintf("%v", state["user_id"]))
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to send notification billing failed")
+				logger.GetLogger().Error().Err(err).Msg("Failed to send notification billing failed")
 			}
 
 			return fmt.Errorf("error creating payment intent: %w", err)
@@ -486,7 +486,7 @@ func UpdateCreditCardBalanceStep(db models.DB, notificationService *notification
 		}
 		err = notificationService.Send(ctx, models.NotificationTypeBilling, payload, fmt.Sprintf("%d", userID))
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send notification billing succeeded")
+			logger.GetLogger().Error().Err(err).Msg("Failed to send notification billing succeeded")
 		}
 
 		return nil
@@ -543,7 +543,7 @@ func UpdateCreditedBalanceStep(db models.DB, notificationService *notification.N
 		}
 		err = notificationService.Send(ctx, models.NotificationTypeBilling, payload, fmt.Sprintf("%d", userID))
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send notification billing succeeded")
+			logger.GetLogger().Error().Err(err).Msg("Failed to send notification billing succeeded")
 		}
 
 		return nil

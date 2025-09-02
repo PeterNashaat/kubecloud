@@ -641,7 +641,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 	}
 	err = h.notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", c.GetInt("user_id")))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send password changed notification")
+		logger.GetLogger().Error().Err(err).Msg("failed to send password changed notification")
 	}
 
 	Success(c, http.StatusAccepted, "password is updated successfully", nil)
@@ -993,7 +993,7 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	}
 	err := h.notificationService.Send(c, models.NotificationTypeUser, payload, fmt.Sprintf("%d", userID))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send ssh key added notification")
+		logger.GetLogger().Error().Err(err).Msg("failed to send ssh key added notification")
 	}
 
 	Success(c, http.StatusCreated, "SSH key added successfully", sshKey)

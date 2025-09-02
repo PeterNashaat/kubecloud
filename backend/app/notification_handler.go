@@ -165,7 +165,7 @@ func (h *Handler) GetAllNotificationsHandler(c *gin.Context) {
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 404 {object} APIResponse "Notification not found"
 // @Failure 500 {object} APIResponse "Failed to mark notification as read"
-// @Router /notifications/{notification_id}/read [put]
+// @Router /notifications/{notification_id}/read [patch]
 // MarkNotificationReadHandler marks a specific notification as read
 func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -197,7 +197,7 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 // @Success 200 {object} APIResponse{data=object{}} "All notifications marked as read successfully"
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 500 {object} APIResponse "Failed to mark notifications as read"
-// @Router /notifications/read-all [put]
+// @Router /notifications/read-all [patch]
 // MarkAllNotificationsReadHandler marks all notifications as read for a user
 func (h *Handler) MarkAllNotificationsReadHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)
@@ -334,7 +334,7 @@ func (h *Handler) DeleteAllNotificationsHandler(c *gin.Context) {
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 404 {object} APIResponse "Notification not found"
 // @Failure 500 {object} APIResponse "Failed to mark notification as unread"
-// @Router /notifications/{notification_id}/unread [put]
+// @Router /notifications/{notification_id}/unread [patch]
 // MarkNotificationUnreadHandler marks a specific notification as unread
 func (h *Handler) MarkNotificationUnreadHandler(c *gin.Context) {
 	userID, err := getUserIDFromContext(c)

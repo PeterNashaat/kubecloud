@@ -509,7 +509,7 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 
 		err := notificationService.Send(ctx, models.NotificationTypeDeployment, payload, userID, w.UUID)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send notification")
+			logger.GetLogger().Error().Err(err).Msg("Failed to send notification")
 		}
 	})
 	workflow.AfterWorkflowHooks = append(workflow.AfterWorkflowHooks,

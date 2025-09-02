@@ -204,7 +204,7 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
 		config, confErr := getConfig(wf.State)
 		if confErr != nil {
-			log.Error().Msg("Missing or invalid 'config' in workflow state")
+			logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
 			return
 		}
 
@@ -225,7 +225,7 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 			}
 			err := notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to send deployment failure notification")
+				logger.GetLogger().Error().Err(err).Msg("Failed to send deployment failure notification")
 			}
 			return
 		}
@@ -246,7 +246,7 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 
 		err = notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send deployment success notification")
+			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment success notification")
 		}
 	}
 }
@@ -255,7 +255,7 @@ func NotifyDeploymentDeleted(notificationService *notification.NotificationServi
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
 		config, confErr := getConfig(wf.State)
 		if confErr != nil {
-			log.Error().Msg("Missing or invalid 'config' in workflow state")
+			logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
 			return
 		}
 
@@ -283,7 +283,7 @@ func NotifyDeploymentDeleted(notificationService *notification.NotificationServi
 
 		err = notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send deployment deleted notification")
+			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment deleted notification")
 		}
 	}
 }
