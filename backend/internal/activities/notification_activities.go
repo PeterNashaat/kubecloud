@@ -10,7 +10,7 @@ import (
 	"github.com/xmonader/ewf"
 )
 
-func SendNotification(db models.DB, notifiers map[string]notification.Notifier) ewf.StepFn {
+func SendNotification(db models.DB, notifier notification.Notifier) ewf.StepFn {
 	return func(ctx context.Context, wf ewf.State) error {
 		raw, ok := wf["notification"]
 		if !ok {
@@ -28,11 +28,8 @@ func SendNotification(db models.DB, notifiers map[string]notification.Notifier) 
 		if err != nil {
 			return fmt.Errorf("failed to get user by ID (id: %v): %w", userID, err)
 		}
-		for _, notifChan := range notif.Channels {
-			err := notifiers[notifChan].Notify(*notif, user.Email)
-			if err != nil {
-				return fmt.Errorf("failed to send notification (id: %v) to %s: %w", notif.ID, notifChan, err)
-			}
+		if err := notifier.Notify(*notif, user.Email); err != nil {
+			return fmt.Errorf("failed to send notification (id: %v) to %s: %w", notif.ID, notifier.GetType(), err)
 		}
 		return nil
 	}

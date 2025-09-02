@@ -24,7 +24,7 @@ func SetUp(t testing.TB) (*App, error) {
 	configPath := filepath.Join(dir, "config.json")
 	dbPath := filepath.Join(dir, "testing.db")
 	workflowPath := filepath.Join(dir, "workflow_testing.db")
-	notificationConfigPath := filepath.Join(dir, "notification-config.json")
+	notificationConfigPath := "./notification-config.json"
 
 	privateKeyPath := filepath.Join(dir, "test_id_rsa")
 	publicKeyPath := privateKeyPath + ".pub"
@@ -128,9 +128,6 @@ func SetUp(t testing.TB) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Set the notification config path for tests
-	viper.Set("notification_config_path", notificationConfigPath)
 
 	configuration, err := internal.LoadConfig()
 	if err != nil {
