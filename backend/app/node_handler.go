@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	proxyTypes "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
+	"kubecloud/internal/logger"
 )
 
 var (
@@ -73,7 +73,7 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	rentedNodes, rentedNodesCount, err := h.getRentedNodesForUser(c.Request.Context(), userID, true)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
@@ -98,7 +98,7 @@ func (h *Handler) ListNodesHandler(c *gin.Context) {
 
 	twinID, err := h.getTwinIDFromUserID(userID)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
@@ -163,7 +163,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	nodeID64, err := strconv.ParseUint(nodeIDParam, 10, 32)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
@@ -173,7 +173,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
@@ -185,12 +185,12 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	nodes, _, err := h.proxyClient.Nodes(c.Request.Context(), filter, proxyTypes.Limit{})
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
 	if len(nodes) == 0 {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		Error(c, http.StatusNotFound, "No nodes are available for rent.", "")
 		return
 	}
@@ -199,7 +199,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 	// validate user has enough balance for reserving node
 	usdMillicentBalance, err := internal.GetUserBalanceUSDMillicent(h.substrateClient, user.Mnemonic)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 	}
 
@@ -211,7 +211,7 @@ func (h *Handler) ReserveNodeHandler(c *gin.Context) {
 
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowReserveNode)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
@@ -255,7 +255,7 @@ func (h *Handler) ListRentableNodesHandler(c *gin.Context) {
 
 	nodes, count, err := h.proxyClient.Nodes(c.Request.Context(), filter, limit)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
@@ -330,14 +330,14 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		Error(c, http.StatusNotFound, "User is not found", "")
 		return
 	}
 
 	contractID64, err := strconv.ParseUint(contractIDParam, 10, 32)
 	if err != nil {
-		log.Error().Msg("Invalid contract ID or type")
+		logger.GetLogger().Error().Msg("Invalid contract ID or type")
 		InternalServerError(c)
 		return
 	}
@@ -345,7 +345,7 @@ func (h *Handler) UnreserveNodeHandler(c *gin.Context) {
 
 	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUnreserveNode)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
 		return
 	}
