@@ -44,5 +44,6 @@ const (
 	StepDeployNetwork           = "deploy-network"
 	StepFetchKubeconfig         = "fetch_kubeconfig"
 	StepVerifyClusterReady      = "verify-cluster-ready"
-	StepSendNotification        = "send-notification"
+	StepSendEmailNotification   = "send-email-notification"
+	StepSendUINotification      = "send-ui-notification"
 )
