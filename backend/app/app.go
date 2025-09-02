@@ -77,7 +77,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 
 	notificationConfig, err := internal.LoadNotificationConfig(config.NotificationConfigPath)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to load notification config")
+		logger.GetLogger().Error().Err(err).Msg("Failed to load notification config")
 		return nil, fmt.Errorf("failed to load notification config: %w", err)
 	}
 
@@ -332,10 +332,10 @@ func (app *App) registerHandlers() {
 			{
 				notificationGroup.GET("", app.handlers.GetAllNotificationsHandler)
 				notificationGroup.GET("/unread", app.handlers.GetUnreadNotificationsHandler)
-				notificationGroup.PUT("/read-all", app.handlers.MarkAllNotificationsReadHandler)
+				notificationGroup.PATCH("/read-all", app.handlers.MarkAllNotificationsReadHandler)
 				notificationGroup.DELETE("", app.handlers.DeleteAllNotificationsHandler)
-				notificationGroup.PUT("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
-				notificationGroup.PUT("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
+				notificationGroup.PATCH("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
+				notificationGroup.PATCH("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
 				notificationGroup.DELETE("/:notification_id", app.handlers.DeleteNotificationHandler)
 				notificationGroup.GET("/stream", app.notificationService.HandleNotificationSSE)
 			}
