@@ -1,5 +1,4 @@
 {
-  "email_templates_dir_path": "./email-templates",
   "template_types": {
     "deployment": {
       "default": {
