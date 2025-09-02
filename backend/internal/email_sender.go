@@ -1,12 +1,9 @@
 package internal
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/base64"
 	"fmt"
-	"html/template"
-	"kubecloud/models"
 	"mime"
 	"path/filepath"
 	"strings"
@@ -15,10 +12,6 @@ import (
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-)
-
-const (
-	ChannelEmail = "email"
 )
 
 //go:embed templates/reset_password.html
@@ -36,13 +29,9 @@ var notifyPaymentRecordsMail []byte
 //go:embed templates/system_announcement.html
 var systemAnnouncementMail []byte
 
-var emailTpls *template.Template
-
 // MailService struct hods all functionalities of mail service
 type MailService struct {
-	client        *sendgrid.Client
-	defaultSender string
-	templatesDir  string
+	client *sendgrid.Client
 }
 
 type Attachment struct {
@@ -53,9 +42,7 @@ type Attachment struct {
 // NewMailService creates new instance of mail service
 func NewMailService(sendGridKey string, defaultSender string, templatesDir string) MailService {
 	return MailService{
-		client:        sendgrid.NewSendClient(sendGridKey),
-		defaultSender: defaultSender,
-		templatesDir:  templatesDir,
+		client: sendgrid.NewSendClient(sendGridKey),
 	}
 }
 
@@ -63,7 +50,7 @@ func NewMailService(sendGridKey string, defaultSender string, templatesDir strin
 func (service *MailService) SendMail(sender, receiver, subject, body string, attachments ...Attachment) error {
 	from := mail.NewEmail("Mycelium Cloud", sender)
 
-	if !isValidEmail(receiver) {
+	if !IsValidEmail(receiver) {
 		return fmt.Errorf("email %v is not valid", receiver)
 	}
 
@@ -155,55 +142,4 @@ func (service *MailService) SystemAnnouncementMailBody(body string) string {
 	template = strings.ReplaceAll(template, "-body-", body)
 
 	return template
-}
-
-func (service *MailService) InitNotificationTemplates() error {
-	if service.templatesDir == "" {
-		service.templatesDir = "./internal/templates/notifications"
-	}
-
-	tpl, err := template.ParseGlob(filepath.Join(service.templatesDir, "*.html"))
-	if err != nil {
-		return fmt.Errorf("failed to parse notification templates from directory %s: %w", service.templatesDir, err)
-	}
-	emailTpls = tpl
-	return nil
-}
-
-func (service MailService) Notify(notification models.Notification, receiver ...string) error {
-	if len(receiver) < 1 {
-		return fmt.Errorf("at least one email address is required: receiver")
-	}
-	if !isValidEmail(receiver[0]) {
-		return fmt.Errorf("receiver email address must be valid")
-	}
-	from := mail.NewEmail("KubeCloud", service.defaultSender)
-	receiverEmail := mail.NewEmail("KubeCloud User", receiver[0])
-
-	tplName := string(notification.Type)
-
-	var buf bytes.Buffer
-	if err := emailTpls.ExecuteTemplate(&buf, tplName, notification); err != nil {
-		return fmt.Errorf("failed to execute notification template '%s': %w", tplName, err)
-	}
-
-	subject := notification.Payload["subject"]
-	if subject == "" {
-		subject = string(notification.Type) + " Notification"
-	}
-
-	message := mail.NewSingleEmail(from, subject, receiverEmail, "", buf.String())
-	message.Content = []*mail.Content{
-		mail.NewContent("text/html", buf.String()),
-	}
-
-	_, err := service.client.Send(message)
-	if err != nil {
-		return fmt.Errorf("failed to send notification: %w", err)
-	}
-	return err
-}
-
-func (service MailService) GetType() string {
-	return ChannelEmail
 }

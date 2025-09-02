@@ -42,8 +42,8 @@ type Configuration struct {
 
 	Logger LoggerConfig `json:"logger"`
 
-	// Notification configuration
-	NotificationConfigPath string `json:"notification_config_path"`
+	// Notification configuration is loaded from a static path
+	Notification NotificationConfig `json:"-"`
 }
 
 type SSHConfig struct {
@@ -133,7 +133,7 @@ type NotificationTemplateTypeConfig struct {
 }
 
 // LoadNotificationConfig loads notification configuration from a separate file
-func LoadNotificationConfig(configPath string) (NotificationConfig, error) {
+func loadNotificationConfig(configPath string) (NotificationConfig, error) {
 	var notificationConfig NotificationConfig
 
 	if configPath == "" {
@@ -209,6 +209,12 @@ func LoadConfig() (Configuration, error) {
 	config.Logger.LogDir, err = expandPath(config.Logger.LogDir)
 	if err != nil {
 		return Configuration{}, fmt.Errorf("failed to expand log directory path: %w", err)
+	}
+
+	if nCfg, err := loadNotificationConfig("./notification-config.json"); err == nil {
+		config.Notification = nCfg
+	} else {
+		config.Notification = NotificationConfig{}
 	}
 
 	validate := validator.New()
