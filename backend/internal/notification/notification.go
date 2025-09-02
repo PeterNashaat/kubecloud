@@ -101,6 +101,15 @@ func (s *NotificationService) GetNotifiers() map[string]Notifier {
 	return s.notifiers
 }
 
+// HandleNotificationSSE streams notifications via Server-Sent Events (SSE)
+// @Summary Stream notifications
+// @Description Streams user-specific notifications via Server-Sent Events (SSE). Keeps the HTTP connection open and pushes events as they occur.
+// @Tags notifications
+// @Produce text/event-stream
+// @Success 200 {string} string "event stream"
+// @Failure 500 {object} gin.H "SSE notifier not available"
+// @Security UserMiddleware
+// @Router /notifications/stream [get]
 func (s *NotificationService) HandleNotificationSSE(c *gin.Context) {
 	uiNotifier, ok := s.notifiers[ChannelUI]
 	if !ok {
