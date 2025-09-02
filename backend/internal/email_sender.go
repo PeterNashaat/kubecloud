@@ -159,7 +159,7 @@ func (service *MailService) SystemAnnouncementMailBody(body string) string {
 
 func (service *MailService) InitNotificationTemplates() error {
 	if service.templatesDir == "" {
-		service.templatesDir = "templates/notifications"
+		service.templatesDir = "./internal/templates/notifications"
 	}
 
 	tpl, err := template.ParseGlob(filepath.Join(service.templatesDir, "*.html"))

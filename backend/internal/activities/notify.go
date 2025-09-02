@@ -15,6 +15,10 @@ import (
 	"kubecloud/internal/logger"
 )
 
+const (
+	timeFormat = "Mon Jan 2, 2006 at 3:04pm (MST)"
+)
+
 func notifyWorkflowProgress(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
 		config, confErr := getConfig(wf.State)
@@ -240,7 +244,7 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 			"subject":      fmt.Sprintf("%s completed successfully", workflowDesc),
 			"status":       "succeeded",
 			"message":      message,
-			"timestamp":    time.Now().Format(time.RFC3339),
+			"timestamp":    time.Now().Format(timeFormat),
 			"cluster_name": cluster.Name,
 		}
 
@@ -277,7 +281,7 @@ func NotifyDeploymentDeleted(notificationService *notification.NotificationServi
 			"subject":      "Deployment deleted",
 			"status":       "deleted",
 			"message":      message,
-			"timestamp":    time.Now().Format(time.RFC3339),
+			"timestamp":    time.Now().Format(timeFormat),
 			"cluster_name": clusterName,
 		}
 
