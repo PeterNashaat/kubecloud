@@ -34,9 +34,10 @@ type NotificationTemplate struct {
 }
 
 type NotificationServiceInterface interface {
-	Send(ctx context.Context, notificationType string, payload map[string]string, userID string, taskID ...string) error
+	Send(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, taskID ...string) error
+	SendWithOptions(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, opts *SendOptions) error
 	GetNotifiers() map[string]Notifier
-	RegisterTemplate(notificationType models.NotificationType, template NotificationTemplate)
+	RegisterNotifier(notifier Notifier)
 }
 
 type NotificationService struct {
@@ -46,20 +47,24 @@ type NotificationService struct {
 	templates map[models.NotificationType]NotificationTemplate
 }
 
-func NewNotificationService(db models.DB, engine *ewf.Engine, notificationConfig internal.NotificationConfig, notifiers ...Notifier) (*NotificationService, error) {
-	notifiersMap := make(map[string]Notifier)
-	for _, notifier := range notifiers {
-		notifiersMap[notifier.GetType()] = notifier
-	}
+type SendOptions struct {
+	WithPersist bool
+
+	WithChannels []string
+	WithSeverity models.NotificationSeverity
+
+	TaskID string
+}
+
+func NewNotificationService(db models.DB, engine *ewf.Engine, notificationConfig internal.NotificationConfig) (*NotificationService, error) {
 
 	s := &NotificationService{
 		db:        db,
-		notifiers: notifiersMap,
+		notifiers: make(map[string]Notifier),
 		engine:    engine,
 		templates: make(map[models.NotificationType]NotificationTemplate),
 	}
 
-	// Load notification templates from configuration file
 	if err := s.loadTemplatesFromConfigFile(notificationConfig); err != nil {
 		return nil, fmt.Errorf("failed to load notification templates: %w", err)
 	}
@@ -67,7 +72,7 @@ func NewNotificationService(db models.DB, engine *ewf.Engine, notificationConfig
 	return s, nil
 }
 
-func (s *NotificationService) RegisterTemplate(notificationType models.NotificationType, template NotificationTemplate) {
+func (s *NotificationService) registerTemplate(notificationType models.NotificationType, template NotificationTemplate) {
 	s.templates[notificationType] = template
 }
 
@@ -88,7 +93,7 @@ func (s *NotificationService) loadTemplatesFromConfigFile(notificationConfig int
 			}
 		}
 
-		s.RegisterTemplate(notificationType, NotificationTemplate{
+		s.registerTemplate(notificationType, NotificationTemplate{
 			Default:  defaultRule,
 			ByStatus: byStatusRules,
 		})
@@ -97,8 +102,78 @@ func (s *NotificationService) loadTemplatesFromConfigFile(notificationConfig int
 	return nil
 }
 
+func (s *NotificationService) RegisterNotifier(notifier Notifier) {
+	s.notifiers[notifier.GetType()] = notifier
+}
+
 func (s *NotificationService) GetNotifiers() map[string]Notifier {
 	return s.notifiers
+}
+
+// SendOptions holds optional behaviors for sending notifications
+
+func (s *NotificationService) Send(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, taskID ...string) error {
+	var opts *SendOptions
+	if len(taskID) > 0 {
+		opts = &SendOptions{TaskID: taskID[0], WithPersist: true}
+	}
+	return s.SendWithOptions(ctx, notificationType, payload, userID, opts)
+}
+
+func (s *NotificationService) SendWithOptions(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, opts *SendOptions) error {
+
+	if opts == nil {
+		opts = &SendOptions{WithPersist: true}
+	}
+
+	tpl, hasTpl := s.templates[notificationType]
+	var rule ChannelRule
+	if hasTpl {
+		rule = tpl.Default
+		if status, ok := payload["status"]; ok && tpl.ByStatus != nil {
+			if r, exists := tpl.ByStatus[status]; exists {
+				rule = r
+			}
+		}
+	}
+
+	finalChannels := opts.WithChannels
+	if len(finalChannels) == 0 && hasTpl {
+		finalChannels = rule.Channels
+	}
+	if len(finalChannels) == 0 {
+		finalChannels = []string{ChannelUI}
+	}
+
+	finalSeverity := opts.WithSeverity
+	if (finalSeverity == models.NotificationSeverity("")) && hasTpl {
+		finalSeverity = rule.Severity
+	}
+
+	notification := &models.Notification{
+		ID:       uuid.NewString(),
+		UserID:   userID,
+		Type:     notificationType,
+		Channels: append([]string{}, finalChannels...),
+		Severity: finalSeverity,
+		Payload:  payload,
+		TaskID:   opts.TaskID,
+	}
+
+	if opts.WithPersist {
+		if err := s.db.CreateNotification(notification); err != nil {
+			return err
+		}
+	}
+
+	workflow, err := s.engine.NewWorkflow("send-notification")
+	if err != nil {
+		return fmt.Errorf("failed to create workflow: %w", err)
+	}
+	workflow.State["notification"] = notification
+	s.engine.RunAsync(ctx, workflow)
+
+	return nil
 }
 
 // HandleNotificationSSE streams notifications via Server-Sent Events (SSE)
@@ -124,44 +199,4 @@ func (s *NotificationService) HandleNotificationSSE(c *gin.Context) {
 	}
 	sseNotifier.GetSSEManager().HandleSSE(c)
 
-}
-
-func (s *NotificationService) Send(ctx context.Context, notificationType models.NotificationType, payload map[string]string, userID string, taskID ...string) error {
-	tpl, ok := s.templates[notificationType]
-	if !ok {
-		return fmt.Errorf("notification template not found for type: %s", notificationType)
-	}
-
-	rule := tpl.Default
-	if status, ok := payload["status"]; ok && tpl.ByStatus != nil {
-		if r, exists := tpl.ByStatus[status]; exists {
-			rule = r
-		}
-	}
-
-	notification := &models.Notification{
-		ID:       uuid.NewString(),
-		UserID:   userID,
-		Type:     notificationType,
-		Channels: append([]string{}, rule.Channels...),
-		Severity: rule.Severity,
-		Payload:  payload,
-	}
-
-	if len(taskID) > 0 {
-		notification.TaskID = taskID[0]
-	}
-
-	if err := s.db.CreateNotification(notification); err != nil {
-		return err
-	}
-
-	workflow, err := s.engine.NewWorkflow("send-notification")
-	if err != nil {
-		return fmt.Errorf("failed to create workflow: %w", err)
-	}
-	workflow.State["notification"] = notification
-	s.engine.RunAsync(ctx, workflow)
-
-	return nil
 }
