@@ -19,11 +19,12 @@ import (
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 	"github.com/xmonader/ewf"
 
+	"kubecloud/internal/logger"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v82"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"kubecloud/internal/logger"
 
 	// Import the generated docs package
 	_ "kubecloud/docs"
@@ -228,6 +229,7 @@ func (app *App) registerHandlers() {
 		v1.GET("/twins/:twin_id/account", app.handlers.GetAccountIDHandler)
 		v1.GET("/system/maintenance/status", app.handlers.GetMaintenanceModeHandler)
 		v1.GET("/stats", app.handlers.GetStatsHandler)
+		v1.GET("/nodes", app.handlers.ListAllGridNodesHandler)
 
 		adminGroup := v1.Group("")
 		adminGroup.Use(middlewares.AdminMiddleware(app.handlers.tokenManager))
