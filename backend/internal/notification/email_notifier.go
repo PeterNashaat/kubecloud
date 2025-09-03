@@ -19,8 +19,7 @@ type EmailNotifier struct {
 	templatesDir  string
 }
 
-func NewEmailNotifier(sendGridKey, defaultSender, templatesDir string) *EmailNotifier {
-	mailService := internal.NewMailService(sendGridKey, defaultSender, templatesDir)
+func NewEmailNotifier(mailService internal.MailService, defaultSender, templatesDir string) *EmailNotifier {
 	return &EmailNotifier{
 		mailService:   mailService,
 		defaultSender: defaultSender,

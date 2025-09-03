@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"fmt"
+	"kubecloud/internal/metrics"
 	"mime"
 	"path/filepath"
 	"strings"
@@ -31,7 +32,8 @@ var systemAnnouncementMail []byte
 
 // MailService struct hods all functionalities of mail service
 type MailService struct {
-	client *sendgrid.Client
+	client  *sendgrid.Client
+	metrics *metrics.Metrics
 }
 
 type Attachment struct {
@@ -40,9 +42,10 @@ type Attachment struct {
 }
 
 // NewMailService creates new instance of mail service
-func NewMailService(sendGridKey string, defaultSender string, templatesDir string) MailService {
+func NewMailService(sendGridKey string, metrics *metrics.Metrics) MailService {
 	return MailService{
-		client: sendgrid.NewSendClient(sendGridKey),
+		client:  sendgrid.NewSendClient(sendGridKey),
+		metrics: metrics,
 	}
 }
 
@@ -72,7 +75,12 @@ func (service *MailService) SendMail(sender, receiver, subject, body string, att
 
 	_, err := service.client.Send(message)
 
-	return err
+	if err != nil {
+		service.metrics.IncrementEmailFailed()
+		return err
+	}
+	service.metrics.IncrementEmailSent()
+	return nil
 }
 
 // ResetPasswordMailContent gets the email content for reset password

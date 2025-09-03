@@ -75,11 +75,6 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to create user storage: %w", err)
 	}
 
-	// Use notification configuration loaded within main configuration
-	notificationConfig := config.Notification
-
-	mailService := internal.NewMailService(config.MailSender.SendGridKey, config.MailSender.Email, notificationConfig.EmailTemplatesDirPath)
-
 	gridProxy := proxy.NewRetryingClient(proxy.NewClient(config.GridProxyURL))
 
 	manager := substrate.NewManager(config.TFChainURL)
@@ -136,8 +131,12 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to init workflow engine: %w", err)
 	}
 
+	metrics := metrics.NewMetrics()
+	notificationConfig := config.Notification
+	mailService := internal.NewMailService(config.MailSender.SendGridKey, metrics)
+
 	sseNotifier := notification.NewSSENotifier(sseManager)
-	emailNotifier := notification.NewEmailNotifier(config.MailSender.SendGridKey, config.MailSender.Email, notificationConfig.EmailTemplatesDirPath)
+	emailNotifier := notification.NewEmailNotifier(mailService, config.MailSender.Email, notificationConfig.EmailTemplatesDirPath)
 	err = emailNotifier.ParseTemplates()
 	if err != nil {
 		return nil, fmt.Errorf("failed to init notification templates: %w", err)
@@ -191,8 +190,6 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		config.KYCChallengeDomain,
 		nil, // Use default http.Client
 	)
-
-	metrics := metrics.NewMetrics()
 
 	handler := NewHandler(tokenHandler, db, config, mailService, gridProxy,
 		substrateClient, graphqlClient, firesquidClient, redisClient,
