@@ -235,7 +235,7 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 				"message": message,
 				"error":   err.Error(),
 			}
-			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload, models.WithChannels(notification.ChannelEmail))
 			err := notificationService.Send(ctx, notification)
 			if err != nil {
 				logger.GetLogger().Error().Err(err).Msg("Failed to send deployment failure notification")
@@ -257,7 +257,7 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 			"cluster_name": cluster.Name,
 		}
 
-		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload, models.WithChannels(notification.ChannelEmail))
 		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment success notification")

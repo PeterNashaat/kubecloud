@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
-	"time"
 
 	"github.com/xmonader/ewf"
 )
@@ -112,21 +111,6 @@ func (s *NotificationService) Send(ctx context.Context, notification *models.Not
 	if err != nil {
 		return fmt.Errorf("failed to create workflow: %w", err)
 	}
-
-	steps := []ewf.Step{}
-	for _, channel := range notification.Channels {
-		notifier, exists := s.notifiers[channel]
-		if !exists {
-			continue
-		}
-
-		retryPolicy := &ewf.RetryPolicy{MaxAttempts: 3, BackOff: ewf.ConstantBackoff(2 * time.Second)}
-		steps = append(steps, ewf.Step{
-			Name:        notifier.GetStepName(),
-			RetryPolicy: retryPolicy,
-		})
-	}
-	workflow.Steps = steps
 	workflow.State["notification"] = notification
 	s.engine.RunAsync(ctx, workflow)
 	return nil
