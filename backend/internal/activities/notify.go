@@ -3,7 +3,6 @@ package activities
 import (
 	"context"
 	"fmt"
-	"kubecloud/internal"
 	"kubecloud/internal/notification"
 	"kubecloud/internal/statemanager"
 	"kubecloud/models"
@@ -11,15 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmonader/ewf"
 	"kubecloud/internal/logger"
+
+	"github.com/xmonader/ewf"
 )
 
 const (
 	timeFormat = "Mon Jan 2, 2006 at 3:04pm (MST)"
 )
 
-func notifyWorkflowProgress(sse *internal.SSEManager) ewf.AfterWorkflowHook {
+func notifyWorkflowProgress(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
 		config, confErr := getConfig(wf.State)
 		if confErr != nil {
@@ -28,7 +28,7 @@ func notifyWorkflowProgress(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 		}
 
 		workflowDesc := getWorkflowDescription(wf.Name)
-		var notificationData map[string]interface{}
+		var notificationPayload map[string]string
 
 		if err != nil {
 			message := fmt.Sprintf("%s failed", workflowDesc)
@@ -36,46 +36,50 @@ func notifyWorkflowProgress(sse *internal.SSEManager) ewf.AfterWorkflowHook {
 				message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
 			}
 
-			notificationData = map[string]interface{}{
-				"type":    "workflow_update",
+			notificationPayload = map[string]string{
 				"message": message,
-				"data":    map[string]interface{}{"name": wf.Name, "error": err.Error()},
+				"name":    wf.Name,
+				"error":   err.Error(),
+			}
+
+			notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityError))
+			err = notificationService.Send(ctx, notification)
+			if err != nil {
+				logger.GetLogger().Error().Err(err).Msg("Failed to send workflow update notification")
+			}
+			return
+		}
+		cluster, clusterErr := statemanager.GetCluster(wf.State)
+		if clusterErr != nil {
+			notificationPayload = map[string]string{
+				"message": fmt.Sprintf("%s completed successfully", workflowDesc),
+				"name":    wf.Name,
 			}
 		} else {
-			cluster, clusterErr := statemanager.GetCluster(wf.State)
-			if clusterErr != nil {
-				notificationData = map[string]interface{}{
-					"type":    "workflow_update",
-					"message": fmt.Sprintf("%s completed successfully", workflowDesc),
-					"data":    map[string]interface{}{"name": wf.Name, "error": false},
-				}
-			} else {
-				nodeCount := len(cluster.Nodes)
+			nodeCount := len(cluster.Nodes)
 				totalSteps := nodeCount + 2
-				message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
-					workflowDesc, cluster.Name, nodeCount)
+			message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
+				workflowDesc, cluster.Name, nodeCount)
 
-				notificationData = map[string]interface{}{
-					"type":    "workflow_update",
-					"message": message,
-					"data": map[string]interface{}{
-						"name":         wf.Name,
-						"cluster_name": cluster.Name,
-						"node_count":   nodeCount,
-						"total_steps":  totalSteps,
-						"cluster":      cluster,
-						"error":        false,
-					},
-				}
+			notificationPayload = map[string]string{
+				"message":      message,
+				"name":         wf.Name,
+				"cluster_name": cluster.Name,
+				"node_count":   fmt.Sprintf("%d", nodeCount),
+				"total_steps":  fmt.Sprintf("%d", totalSteps),
 			}
 		}
 
-		sse.Notify(config.UserID, "workflow_update", models.NotificationSeverityInfo, notificationData)
+		notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeveritySuccess))
+		err = notificationService.Send(ctx, notification)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to send workflow update notification")
+		}
 	}
 }
 
 // notifyStepProgress sends step progress notifications
-func notifyStepProgress(sse *internal.SSEManager, state ewf.State, workflowName, stepName string, status string, err error, retryCount, maxRetries int) {
+func notifyStepProgress(notificationService *notification.NotificationService, state ewf.State, workflowName, stepName string, status string, err error, retryCount, maxRetries int) {
 	if stepName != StepDeployNetwork && !isDeployStep(stepName) {
 		return
 	}
@@ -114,28 +118,32 @@ func notifyStepProgress(sse *internal.SSEManager, state ewf.State, workflowName,
 		return
 	}
 
-	notificationData := map[string]interface{}{
-		"type":    notificationType,
-		"message": fmt.Sprintf("Deploying cluster %q - %s", clusterName, message),
-		"data": map[string]interface{}{
-			"workflow_name": workflowName,
-			"step_name":     stepName,
-			"cluster_name":  clusterName,
-			"progress": map[string]interface{}{
-				"current": current,
-				"total":   total,
-			},
-		},
+	payload := map[string]string{
+		"message":       fmt.Sprintf("Deploying cluster %q - %s", clusterName, message),
+		"workflow_name": workflowName,
+		"step_name":     stepName,
+		"cluster_name":  clusterName,
+		"current_step":  strconv.Itoa(current),
+		"total_steps":   strconv.Itoa(total),
 	}
-
 	if err != nil {
-		notificationData["data"].(map[string]interface{})["error"] = err.Error()
+		payload["error"] = err.Error()
 	}
 
-	sse.Notify(config.UserID, notificationType, models.NotificationSeverityInfo, notificationData)
+	notification := models.NewNotification(
+		config.UserID,
+		models.NotificationType(notificationType),
+		payload,
+		models.WithNoPersist(),
+		models.WithChannels(notification.ChannelUI),
+	)
+	err = notificationService.Send(context.Background(), notification)
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("Failed to send notification")
+	}
 }
 
-func notifyStepHook(sse *internal.SSEManager) ewf.AfterStepHook {
+func notifyStepHook(notificationService *notification.NotificationService) ewf.AfterStepHook {
 	return func(ctx context.Context, wf *ewf.Workflow, step *ewf.Step, err error) {
 		attemptKey := fmt.Sprintf("step_%s_attempts", step.Name)
 		attempts, _ := wf.State[attemptKey].(int)
@@ -148,13 +156,13 @@ func notifyStepHook(sse *internal.SSEManager) ewf.AfterStepHook {
 		if err != nil {
 			if attempts < maxAttempts {
 				attempts++
-				notifyStepProgress(sse, wf.State, wf.Name, step.Name, "retrying", err, attempts, maxAttempts)
+				notifyStepProgress(notificationService, wf.State, wf.Name, step.Name, "retrying", err, attempts, maxAttempts)
 				wf.State[attemptKey] = attempts
 				return
 			}
-			notifyStepProgress(sse, wf.State, wf.Name, step.Name, "failed", err, 0, 0)
+			notifyStepProgress(notificationService, wf.State, wf.Name, step.Name, "failed", err, 0, 0)
 		} else {
-			notifyStepProgress(sse, wf.State, wf.Name, step.Name, "completed", nil, 0, 0)
+			notifyStepProgress(notificationService, wf.State, wf.Name, step.Name, "completed", nil, 0, 0)
 		}
 	}
 }
@@ -227,7 +235,8 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 				"message": message,
 				"error":   err.Error(),
 			}
-			err := notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
+			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+			err := notificationService.Send(ctx, notification)
 			if err != nil {
 				logger.GetLogger().Error().Err(err).Msg("Failed to send deployment failure notification")
 			}
@@ -248,7 +257,8 @@ func NotifyCreateDeploymentResult(notificationService *notification.Notification
 			"cluster_name": cluster.Name,
 		}
 
-		err = notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
+		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment success notification")
 		}
@@ -285,7 +295,8 @@ func NotifyDeploymentDeleted(notificationService *notification.NotificationServi
 			"cluster_name": clusterName,
 		}
 
-		err = notificationService.Send(ctx, models.NotificationTypeDeployment, notificationPayload, config.UserID, wf.UUID)
+		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment deleted notification")
 		}

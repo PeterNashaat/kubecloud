@@ -218,7 +218,6 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		app.db,
 		app.handlers.mailService,
 		app.handlers.substrateClient,
-		app.sseManager,
 		app.handlers.kycClient,
 		sponsorAddress,
 		sponsorKeyPair,
@@ -336,7 +335,6 @@ func (app *App) registerHandlers() {
 				notificationGroup.PATCH("/:notification_id/read", app.handlers.MarkNotificationReadHandler)
 				notificationGroup.PATCH("/:notification_id/unread", app.handlers.MarkNotificationUnreadHandler)
 				notificationGroup.DELETE("/:notification_id", app.handlers.DeleteNotificationHandler)
-				notificationGroup.GET("/stream", app.notificationService.HandleNotificationSSE)
 			}
 		}
 	}
