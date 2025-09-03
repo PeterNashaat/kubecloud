@@ -59,46 +59,6 @@
           "severity": "success"
         }
       }
-    },
-    "system": {
-      "default": {
-        "channels": ["ui"],
-        "severity": "info"
-      },
-      "by_status": {
-        "maintenance_started": {
-          "channels": ["ui", "email"],
-          "severity": "warning"
-        },
-        "maintenance_completed": {
-          "channels": ["ui", "email"],
-          "severity": "success"
-        },
-        "system_error": {
-          "channels": ["ui", "email"],
-          "severity": "error"
-        }
-      }
-    },
-    "security": {
-      "default": {
-        "channels": ["ui", "email"],
-        "severity": "warning"
-      },
-      "by_status": {
-        "login_attempt": {
-          "channels": ["ui"],
-          "severity": "info"
-        },
-        "suspicious_activity": {
-          "channels": ["ui", "email"],
-          "severity": "error"
-        },
-        "account_locked": {
-          "channels": ["ui", "email"],
-          "severity": "error"
-        }
-      }
     }
   }
 }
