@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -45,6 +46,67 @@ type Notification struct {
 	Status    NotificationStatus   `json:"status" gorm:"default:'unread'"`
 	CreatedAt time.Time            `json:"created_at" gorm:"autoCreateTime"`
 	ReadAt    *time.Time           `json:"read_at,omitempty"`
+
+	// Non-persisted fields
+	Persist bool `json:"-" gorm:"-"`
+}
+
+// NotificationOption is a functional option for configuring notifications
+type NotificationOption func(*Notification)
+
+// NewNotification creates a new notification with the given options
+func NewNotification(userID string, notifType NotificationType, payload map[string]string, options ...NotificationOption) *Notification {
+	n := &Notification{
+		ID:       uuid.NewString(),
+		UserID:   userID,
+		Type:     notifType,
+		Severity: NotificationSeverityInfo,
+		Channels: []string{"ui"},
+		Payload:  payload,
+		Status:   NotificationStatusUnread,
+		Persist:  true,
+	}
+
+	for _, option := range options {
+		option(n)
+	}
+
+	return n
+}
+
+// WithTaskID associates the notification with a task
+func WithTaskID(taskID string) NotificationOption {
+	return func(n *Notification) {
+		n.TaskID = taskID
+	}
+}
+
+// WithSeverity sets the notification severity
+func WithSeverity(severity NotificationSeverity) NotificationOption {
+	return func(n *Notification) {
+		n.Severity = severity
+	}
+}
+
+// WithChannels sets the notification channels
+func WithChannels(channels ...string) NotificationOption {
+	return func(n *Notification) {
+		n.Channels = channels
+	}
+}
+
+// WithNoPersist controls whether to save the notification to database
+func WithNoPersist() NotificationOption {
+	return func(n *Notification) {
+		n.Persist = false
+	}
+}
+
+// WithPayload sets the notification payload
+func WithPayload(payload map[string]string) NotificationOption {
+	return func(n *Notification) {
+		n.Payload = payload
+	}
 }
 
 // CreateNotification creates a new notification

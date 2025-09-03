@@ -18,7 +18,6 @@ func RegisterEWFWorkflows(
 	db models.DB,
 	mail internal.MailService,
 	substrate *substrate.Substrate,
-	sse *internal.SSEManager,
 	kycClient *internal.KYCClient,
 	sponsorAddress string,
 	sponsorKeyPair subkey.KeyPair,
@@ -28,12 +27,12 @@ func RegisterEWFWorkflows(
 	engine.Register(StepSendVerificationEmail, SendVerificationEmailStep(mail, config))
 	engine.Register(StepCreateUser, CreateUserStep(config, db))
 	engine.Register(StepUpdateCode, UpdateCodeStep(db))
-	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config, sse, db))
+	engine.Register(StepSetupTFChain, SetupTFChainStep(substrate, config, notificationService, db))
 	engine.Register(StepCreateStripeCustomer, CreateStripeCustomerStep(db))
-	engine.Register(StepCreateKYCSponsorship, CreateKYCSponsorship(kycClient, sse, sponsorAddress, sponsorKeyPair, db))
+	engine.Register(StepCreateKYCSponsorship, CreateKYCSponsorship(kycClient, notificationService, sponsorAddress, sponsorKeyPair, db))
 	engine.Register(StepSendWelcomeEmail, SendWelcomeEmailStep(mail, config, metrics))
 	engine.Register(StepCreatePaymentIntent, CreatePaymentIntentStep(config.Currency, metrics, notificationService))
-	engine.Register(StepCreatePendingRecord, CreatePendingRecord(substrate, db, config.SystemAccount.Mnemonic, sse))
+	engine.Register(StepCreatePendingRecord, CreatePendingRecord(substrate, db, config.SystemAccount.Mnemonic, notificationService))
 	engine.Register(StepUpdateCreditCardBalance, UpdateCreditCardBalanceStep(db, notificationService))
 	engine.Register(StepCreateIdentity, CreateIdentityStep())
 	engine.Register(StepReserveNode, ReserveNodeStep(db, substrate))
@@ -115,7 +114,7 @@ func RegisterEWFWorkflows(
 	}
 	engine.RegisterTemplate(WorkflowUnreserveNode, &unreserveNodeTemplate)
 
-	registerDeploymentActivities(engine, metrics, db, sse, notificationService, config)
+	registerDeploymentActivities(engine, metrics, db, notificationService, config)
 
 	notificationTemplate := newKubecloudWorkflowTemplate()
 	engine.RegisterTemplate(WorkflowSendNotification, &notificationTemplate)
