@@ -122,13 +122,13 @@ type NotificationConfig struct {
 
 // ChannelRuleConfig represents channel and severity rules for notification template type
 type ChannelRuleConfig struct {
-	Channels []string `json:"channels"`
-	Severity string   `json:"severity"`
+	Channels []string `json:"channels" validate:"required,dive,min=1"`
+	Severity string   `json:"severity" validate:"required,oneof=info error warning success"`
 }
 
 // NotificationTemplateTypeConfig represents a notification template type configuration
 type NotificationTemplateTypeConfig struct {
-	Default  ChannelRuleConfig            `json:"default"`
+	Default  ChannelRuleConfig            `json:"default" validate:"required"`
 	ByStatus map[string]ChannelRuleConfig `json:"by_status"`
 }
 
@@ -161,6 +161,15 @@ func loadNotificationConfig(configPath string) (NotificationConfig, error) {
 
 	if err := decoder.Decode(viper.AllSettings()); err != nil {
 		return NotificationConfig{}, fmt.Errorf("unable to decode notification config: %w", err)
+	}
+
+	v := validator.New()
+	if err := v.Struct(notificationConfig); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			ve := validationErrors[0]
+			return NotificationConfig{}, fmt.Errorf("notification config validation error on field '%s': %s", ve.Namespace(), ve.Tag())
+		}
+		return NotificationConfig{}, fmt.Errorf("invalid notification config: %w", err)
 	}
 
 	return notificationConfig, nil
