@@ -55,7 +55,7 @@ type Notification struct {
 type NotificationOption func(*Notification)
 
 // NewNotification creates a new notification with the given options
-func NewNotification(userID string, notifType NotificationType, payload map[string]string, options ...NotificationOption) *Notification {
+func NewNotification(userID int, notifType NotificationType, payload map[string]string, options ...NotificationOption) *Notification {
 	n := &Notification{
 		ID:       uuid.NewString(),
 		UserID:   userID,

@@ -7,7 +7,6 @@ import (
 	"kubecloud/internal/notification"
 	"kubecloud/models"
 	"slices"
-	"strconv"
 
 	"github.com/xmonader/ewf"
 )
@@ -26,13 +25,9 @@ func SendNotification(db models.DB, notifier notification.Notifier) ewf.StepFn {
 			logger.GetLogger().Info().Msgf("SendNotification: step skipped for channel %s (not in notification channels)", notifier.GetType())
 			return nil
 		}
-		userID, err := strconv.Atoi(notif.UserID)
+		user, err := db.GetUserByID(notif.UserID)
 		if err != nil {
-			return fmt.Errorf("invalid user ID: %v", notif.UserID)
-		}
-		user, err := db.GetUserByID(userID)
-		if err != nil {
-			return fmt.Errorf("failed to get user by ID (id: %v): %w", userID, err)
+			return fmt.Errorf("failed to get user by ID (id: %v): %w", notif.UserID, err)
 		}
 		if err := notifier.Notify(*notif, user.Email); err != nil {
 			return fmt.Errorf("failed to send notification (id: %v) to %s: %w", notif.ID, notifier.GetType(), err)

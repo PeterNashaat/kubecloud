@@ -154,7 +154,7 @@ func SetupTFChainStep(client *substrate.Substrate, config internal.Configuration
 		payload := notification.MergePayload(notification.CommonPayload{
 			Message: "Registering user is in progress",
 		}, map[string]string{})
-		notification := models.NewNotification(fmt.Sprintf("%d", userID), "user_registration", payload, models.WithNoPersist())
+		notification := models.NewNotification(userID, "user_registration", payload, models.WithNoPersist())
 		err := notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send notification registering user is in progress")
@@ -271,7 +271,7 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, notificationService *no
 		payload := notification.MergePayload(notification.CommonPayload{
 			Message: "Account verification is in progress",
 		}, map[string]string{})
-		notification := models.NewNotification(fmt.Sprintf("%d", userID), "user_registration", payload, models.WithNoPersist())
+		notification := models.NewNotification(userID, "user_registration", payload, models.WithNoPersist())
 		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send notification account verification is in progress")
@@ -374,11 +374,15 @@ func CreatePaymentIntentStep(currency string, metrics *metrics.Metrics, notifica
 			}, map[string]string{
 				"amount": fmt.Sprintf("%.2f", internal.FromUSDMilliCentToUSD(amount)),
 			})
-			userID, ok := state["user_id"]
+			userIDVal, ok := state["user_id"]
 			if !ok {
 				logger.GetLogger().Error().Msg("missing 'user_id' in state")
 			}
-			notification := models.NewNotification(fmt.Sprintf("%v", userID), models.NotificationTypeBilling, payload)
+			userID, ok := userIDVal.(int)
+			if !ok {
+				return fmt.Errorf("'user_id' in state is not an int")
+			}
+			notification := models.NewNotification(userID, models.NotificationTypeBilling, payload)
 			err = notificationService.Send(ctx, notification)
 			if err != nil {
 				logger.GetLogger().Error().Err(err).Msg("Failed to send notification billing failed")
@@ -453,7 +457,7 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 			notificationData := notification.MergePayload(notification.CommonPayload{
 				Message: fmt.Sprintf("Voucher redeemed successfully for %.2f$", amountUSD),
 			}, map[string]string{})
-			notification := models.NewNotification(fmt.Sprintf("%d", userID), models.NotificationTypeBilling, notificationData, models.WithNoPersist(), models.WithSeverity(models.NotificationSeveritySuccess))
+			notification := models.NewNotification(userID, models.NotificationTypeBilling, notificationData, models.WithNoPersist(), models.WithSeverity(models.NotificationSeveritySuccess))
 			err = notificationService.Send(ctx, notification)
 			if err != nil {
 				logger.GetLogger().Error().Err(err).Msg("Failed to send notification voucher redeemed successfully")
@@ -507,7 +511,7 @@ func UpdateCreditCardBalanceStep(db models.DB, notificationService *notification
 			"balance": fmt.Sprintf("%.2f", newBalanceUSD),
 			"amount":  fmt.Sprintf("%.2f", amountUSD),
 		})
-		notification := models.NewNotification(fmt.Sprintf("%d", userID), models.NotificationTypeBilling, payload)
+		notification := models.NewNotification(userID, models.NotificationTypeBilling, payload)
 		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send notification billing succeeded")
@@ -567,7 +571,7 @@ func UpdateCreditedBalanceStep(db models.DB, notificationService *notification.N
 				"amount":  fmt.Sprintf("%.2f", amountUSD),
 				"balance": fmt.Sprintf("%.2f", newBalanceUSD),
 			})
-		notification := models.NewNotification(fmt.Sprintf("%d", userID), models.NotificationTypeBilling, payload)
+		notification := models.NewNotification(userID, models.NotificationTypeBilling, payload)
 		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send notification billing succeeded")
