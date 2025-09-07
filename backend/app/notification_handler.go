@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -162,6 +163,7 @@ func (h *Handler) GetAllNotificationsHandler(c *gin.Context) {
 // @Produce json
 // @Param notification_id path string true "Notification ID"
 // @Success 200 {object} APIResponse{data=object{}} "Notification marked as read successfully"
+// @Failure 400 {object} APIResponse "Invalid notification ID"
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 404 {object} APIResponse "Notification not found"
 // @Failure 500 {object} APIResponse "Failed to mark notification as read"
@@ -175,6 +177,10 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 	}
 
 	notificationIDStr := c.Param("notification_id")
+	if _, parseErr := uuid.Parse(notificationIDStr); parseErr != nil {
+		Error(c, http.StatusBadRequest, "Invalid notification ID", "notification_id must be a valid UUID")
+		return
+	}
 
 	err = h.db.MarkNotificationAsRead(notificationIDStr, userID)
 	if err != nil {
@@ -195,6 +201,7 @@ func (h *Handler) MarkNotificationReadHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} APIResponse{data=object{}} "All notifications marked as read successfully"
+// @Failure 400 {object} APIResponse "Invalid notification ID"
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 500 {object} APIResponse "Failed to mark notifications as read"
 // @Router /notifications/read-all [patch]
@@ -222,6 +229,7 @@ func (h *Handler) MarkAllNotificationsReadHandler(c *gin.Context) {
 // @Produce json
 // @Param notification_id path string true "Notification ID"
 // @Success 200 {object} APIResponse{data=object{}} "Notification deleted successfully"
+// @Failure 400 {object} APIResponse "Invalid notification ID"
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 404 {object} APIResponse "Notification not found"
 // @Failure 500 {object} APIResponse "Failed to delete notification"
@@ -235,6 +243,10 @@ func (h *Handler) DeleteNotificationHandler(c *gin.Context) {
 	}
 
 	notificationIDStr := c.Param("notification_id")
+	if _, parseErr := uuid.Parse(notificationIDStr); parseErr != nil {
+		Error(c, http.StatusBadRequest, "Invalid notification ID", "notification_id must be a valid UUID")
+		return
+	}
 
 	err = h.db.DeleteNotification(notificationIDStr, userID)
 	if err != nil {
@@ -331,6 +343,7 @@ func (h *Handler) DeleteAllNotificationsHandler(c *gin.Context) {
 // @Produce json
 // @Param notification_id path string true "Notification ID"
 // @Success 200 {object} APIResponse{data=object{}} "Notification marked as unread successfully"
+// @Failure 400 {object} APIResponse "Invalid notification ID"
 // @Failure 401 {object} APIResponse "Authentication required"
 // @Failure 404 {object} APIResponse "Notification not found"
 // @Failure 500 {object} APIResponse "Failed to mark notification as unread"
@@ -344,6 +357,10 @@ func (h *Handler) MarkNotificationUnreadHandler(c *gin.Context) {
 	}
 
 	notificationIDStr := c.Param("notification_id")
+	if _, parseErr := uuid.Parse(notificationIDStr); parseErr != nil {
+		Error(c, http.StatusBadRequest, "Invalid notification ID", "notification_id must be a valid UUID")
+		return
+	}
 
 	err = h.db.MarkNotificationAsUnread(notificationIDStr, userID)
 	if err != nil {
