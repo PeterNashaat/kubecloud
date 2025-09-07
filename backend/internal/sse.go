@@ -3,15 +3,15 @@ package internal
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"kubecloud/models"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"kubecloud/internal/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Notification types

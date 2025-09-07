@@ -310,7 +310,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		payload := notification.CommonPayload{
 			Message: "User email is verified",
 		}
-		notification := models.NewNotification(fmt.Sprintf("%d", user.ID), "user_registration", notification.MergePayload(payload, map[string]string{}), models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityInfo))
+		notification := models.NewNotification(user.ID, "user_registration", notification.MergePayload(payload, map[string]string{}), models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityInfo))
 		err = h.notificationService.Send(context.Background(), notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("failed to send user registration notification")
@@ -646,7 +646,7 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 		Message: "Your account password has been successfully updated.",
 	}
 
-	notification := models.NewNotification(fmt.Sprintf("%d", c.GetInt("user_id")), models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}))
+	notification := models.NewNotification(c.GetInt("user_id"), models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}))
 	err = h.notificationService.Send(c, notification)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to send password changed notification")
@@ -999,7 +999,7 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 		Subject: "New SSH key added",
 		Message: fmt.Sprintf("SSH key '%s' was added to your account.", sshKey.Name),
 	}
-	notification := models.NewNotification(fmt.Sprintf("%d", userID), models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}))
+	notification := models.NewNotification(userID, models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}))
 	err := h.notificationService.Send(c, notification)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to send ssh key added notification")

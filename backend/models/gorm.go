@@ -434,7 +434,7 @@ func migrateNotifications(db *gorm.DB) error {
 
 	testNotification := &Notification{
 		ID:        "test-migration-id",
-		UserID:    "test-user",
+		UserID:    1,
 		Type:      NotificationTypeDeployment,
 		Severity:  NotificationSeverityInfo,
 		Channels:  []string{"ui"},
