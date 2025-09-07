@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"kubecloud/internal/logger"
 	"strings"
 
 	"github.com/go-playground/validator"
@@ -42,8 +43,9 @@ type Configuration struct {
 
 	Logger LoggerConfig `json:"logger"`
 
-	// Notification configuration is loaded from a static path
-	Notification NotificationConfig `json:"-"`
+	// Notification configuration
+	NotificationConfigPath string             `json:"notification_config_path"`
+	Notification           NotificationConfig `json:"-"`
 }
 
 type SSHConfig struct {
@@ -220,9 +222,9 @@ func LoadConfig() (Configuration, error) {
 		return Configuration{}, fmt.Errorf("failed to expand log directory path: %w", err)
 	}
 
-	if nCfg, err := loadNotificationConfig("./notification-config.json"); err == nil {
-		config.Notification = nCfg
-	} else {
+	config.Notification, err = loadNotificationConfig(config.NotificationConfigPath)
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("Failed to load notification config")
 		config.Notification = NotificationConfig{}
 	}
 
