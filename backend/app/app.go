@@ -11,7 +11,9 @@ import (
 	"kubecloud/models"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -33,17 +35,18 @@ import (
 
 // App holds all configurations for the app
 type App struct {
-	router              *gin.Engine
-	httpServer          *http.Server
-	config              internal.Configuration
-	handlers            Handler
-	db                  models.DB
-	redis               *internal.RedisClient
-	sseManager          *internal.SSEManager
-	notificationService *notification.NotificationService
-	gridClient          deployer.TFPluginClient
-	appCancel           context.CancelFunc
-	metrics             *metrics.Metrics
+	router                   *gin.Engine
+	httpServer               *http.Server
+	config                   internal.Configuration
+	handlers                 Handler
+	db                       models.DB
+	redis                    *internal.RedisClient
+	sseManager               *internal.SSEManager
+	notificationService      *notification.NotificationService
+	gridClient               deployer.TFPluginClient
+	appCancel                context.CancelFunc
+	metrics                  *metrics.Metrics
+	notificationReloaderStop func()
 }
 
 // NewApp create new instance of the app with all configs
@@ -151,6 +154,8 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to validate notification configs channels against registered notifiers: %w", err)
 	}
 
+	stopNotificationReloader := startNotificationReloader(notificationService)
+
 	// Create an app-level context for coordinating shutdown
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
 	if err != nil {
@@ -200,16 +205,17 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress, metrics, notificationService)
 
 	app := &App{
-		router:              router,
-		config:              config,
-		handlers:            *handler,
-		redis:               redisClient,
-		db:                  db,
-		sseManager:          sseManager,
-		notificationService: notificationService,
-		appCancel:           appCancel,
-		gridClient:          gridClient,
-		metrics:             metrics,
+		router:                   router,
+		config:                   config,
+		handlers:                 *handler,
+		redis:                    redisClient,
+		db:                       db,
+		sseManager:               sseManager,
+		notificationService:      notificationService,
+		appCancel:                appCancel,
+		gridClient:               gridClient,
+		metrics:                  metrics,
+		notificationReloaderStop: stopNotificationReloader,
 	}
 
 	activities.RegisterEWFWorkflows(
@@ -373,6 +379,10 @@ func (app *App) Shutdown(ctx context.Context) error {
 	if app.appCancel != nil {
 		app.appCancel()
 	}
+	//stop notification reload
+	if app.notificationReloaderStop != nil {
+		app.notificationReloaderStop()
+	}
 
 	if app.httpServer != nil {
 		if err := app.httpServer.Shutdown(ctx); err != nil {
@@ -403,4 +413,37 @@ func (app *App) Shutdown(ctx context.Context) error {
 	app.gridClient.Close()
 
 	return nil
+}
+
+func startNotificationReloader(svc *notification.NotificationService) (stop func()) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGHUP)
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ch:
+				cfg, err := internal.LoadConfig()
+				if err != nil {
+					logger.GetLogger().Error().Err(err).Msg("failed to load notification config")
+					continue
+				}
+				err = svc.ReloadNotificationConfig(cfg.Notification)
+				if err != nil {
+					logger.GetLogger().Error().Err(err).Msg("failed to reload notification config")
+					continue
+				}
+				logger.GetLogger().Info().Msg("notification config reloaded")
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	return func() {
+		signal.Stop(ch)
+		close(done)
+		close(ch)
+	}
 }

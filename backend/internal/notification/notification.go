@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/models"
+	"sync"
 
 	"github.com/xmonader/ewf"
 )
@@ -70,6 +71,7 @@ type NotificationService struct {
 	notifiers map[string]Notifier
 	engine    *ewf.Engine
 	templates map[models.NotificationType]NotificationTemplate
+	mu        sync.RWMutex
 }
 
 func NewNotificationService(db models.DB, engine *ewf.Engine, notificationConfig internal.NotificationConfig) (*NotificationService, error) {
@@ -81,18 +83,17 @@ func NewNotificationService(db models.DB, engine *ewf.Engine, notificationConfig
 		templates: make(map[models.NotificationType]NotificationTemplate),
 	}
 
-	if err := s.loadTemplatesFromConfigFile(notificationConfig); err != nil {
+	if err := s.LoadTemplatesFromConfigFile(notificationConfig); err != nil {
 		return nil, fmt.Errorf("failed to load notification templates: %w", err)
 	}
 
 	return s, nil
 }
 
-func (s *NotificationService) registerTemplate(notificationType models.NotificationType, template NotificationTemplate) {
-	s.templates[notificationType] = template
-}
+// buildTemplatesFromConfig creates a templates map from notification config
+func (s *NotificationService) buildTemplatesFromConfig(notificationConfig internal.NotificationConfig) map[models.NotificationType]NotificationTemplate {
+	templates := make(map[models.NotificationType]NotificationTemplate)
 
-func (s *NotificationService) loadTemplatesFromConfigFile(notificationConfig internal.NotificationConfig) error {
 	for templateName, templateConfig := range notificationConfig.TemplateTypes {
 		notificationType := models.NotificationType(templateName)
 
@@ -108,13 +109,22 @@ func (s *NotificationService) loadTemplatesFromConfigFile(notificationConfig int
 				Severity: models.NotificationSeverity(ruleConfig.Severity),
 			}
 		}
-		notificationTemplate := NotificationTemplate{
+
+		templates[notificationType] = NotificationTemplate{
 			Default:  defaultRule,
 			ByStatus: byStatusRules,
 		}
-		s.registerTemplate(notificationType, notificationTemplate)
 	}
 
+	return templates
+}
+
+func (s *NotificationService) LoadTemplatesFromConfigFile(notificationConfig internal.NotificationConfig) error {
+	templates := s.buildTemplatesFromConfig(notificationConfig)
+
+	s.mu.Lock()
+	s.templates = templates
+	s.mu.Unlock()
 	return nil
 }
 
@@ -146,8 +156,24 @@ func (s *NotificationService) Send(ctx context.Context, notification *models.Not
 	return nil
 }
 
+func (s *NotificationService) ReloadNotificationConfig(cfg internal.NotificationConfig) error {
+	candidate := s.buildTemplatesFromConfig(cfg)
+
+	err := s.ValidateConfigsChannelsAgainstRegistered(candidate)
+	if err != nil {
+		return fmt.Errorf("failed to validate notification config: %w", err)
+	}
+
+	s.mu.Lock()
+	s.templates = candidate
+	s.mu.Unlock()
+	return nil
+}
+
 func (s *NotificationService) applyTemplateFallbacks(notification *models.Notification) {
+	s.mu.RLock()
 	template, hasTemplate := s.templates[notification.Type]
+	s.mu.RUnlock()
 	if !hasTemplate {
 		if len(notification.Channels) == 0 {
 			notification.Channels = []string{ChannelUI}
@@ -180,12 +206,22 @@ func (s *NotificationService) applyTemplateFallbacks(notification *models.Notifi
 	}
 }
 
-func (s *NotificationService) ValidateConfigsChannelsAgainstRegistered() error {
+func (s *NotificationService) ValidateConfigsChannelsAgainstRegistered(templates ...map[models.NotificationType]NotificationTemplate) error {
 	if len(s.notifiers) == 0 {
 		return fmt.Errorf("no notifiers registered")
 	}
 
-	for tName, tpl := range s.templates {
+	// Use provided templates or fall back to current templates
+	var templatesMap map[models.NotificationType]NotificationTemplate
+	if len(templates) > 0 && templates[0] != nil {
+		templatesMap = templates[0]
+	} else {
+		s.mu.RLock()
+		templatesMap = s.templates
+		s.mu.RUnlock()
+	}
+
+	for tName, tpl := range templatesMap {
 		for _, ch := range tpl.Default.Channels {
 			if _, ok := s.notifiers[ch]; !ok {
 				return fmt.Errorf("channel %s in template %s is not registered", ch, tName)

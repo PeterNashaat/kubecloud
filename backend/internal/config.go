@@ -139,11 +139,11 @@ func loadNotificationConfig(configPath string) (NotificationConfig, error) {
 		return NotificationConfig{}, fmt.Errorf("notification config path is required")
 	}
 
-	// Use viper to load the notification config file
-	viper.SetConfigFile(configPath)
-	viper.SetConfigType("json")
+	notificationViper := viper.New()
+	notificationViper.SetConfigFile(configPath)
+	notificationViper.SetConfigType("json")
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := notificationViper.ReadInConfig(); err != nil {
 		return NotificationConfig{}, fmt.Errorf("failed to read notification config file: %w", err)
 	}
 
@@ -158,7 +158,7 @@ func loadNotificationConfig(configPath string) (NotificationConfig, error) {
 		return NotificationConfig{}, fmt.Errorf("failed to create decoder: %w", err)
 	}
 
-	if err := decoder.Decode(viper.AllSettings()); err != nil {
+	if err := decoder.Decode(notificationViper.AllSettings()); err != nil {
 		return NotificationConfig{}, fmt.Errorf("unable to decode notification config: %w", err)
 	}
 
