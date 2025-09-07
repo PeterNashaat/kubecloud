@@ -480,6 +480,440 @@ const docTemplate = `{
                 }
             }
         },
+        "/notifications": {
+            "get": {
+                "description": "Retrieves all user notifications with pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Get all notifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of notifications to return (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of notifications to skip (default: 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notifications retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer"
+                                                },
+                                                "limit": {
+                                                    "type": "integer"
+                                                },
+                                                "notifications": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/app.NotificationResponse"
+                                                    }
+                                                },
+                                                "offset": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve notifications",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes all notifications for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Delete all notifications",
+                "responses": {
+                    "200": {
+                        "description": "All notifications deleted successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete notifications",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/read-all": {
+            "patch": {
+                "description": "Marks all notifications as read for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark all notifications as read",
+                "responses": {
+                    "200": {
+                        "description": "All notifications marked as read successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to mark notifications as read",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/unread": {
+            "get": {
+                "description": "Retrieves only unread notifications for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Get unread notifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Unread notifications retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer"
+                                                },
+                                                "limit": {
+                                                    "type": "integer"
+                                                },
+                                                "notifications": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/app.NotificationResponse"
+                                                    }
+                                                },
+                                                "offset": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve unread notifications",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{notification_id}": {
+            "delete": {
+                "description": "Deletes a specific notification for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Delete a specific notification",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "notification_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification deleted successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Notification not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete notification",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{notification_id}/read": {
+            "patch": {
+                "description": "Marks a specific notification as read for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark a specific notification as read",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "notification_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification marked as read successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Notification not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to mark notification as read",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{notification_id}/unread": {
+            "patch": {
+                "description": "Marks a specific notification as unread for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark a specific notification as unread",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "notification_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification marked as unread successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Notification not found",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to mark notification as unread",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/pending-records": {
             "get": {
                 "security": [
@@ -2518,10 +2952,156 @@ const docTemplate = `{
         "app.NodesWithDiscount": {
             "type": "object",
             "properties": {
+                "certificationType": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "cpu_benchmark": {
+                    "$ref": "#/definitions/types.CpuBenchmark"
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "dedicated": {
+                    "type": "boolean"
+                },
                 "discount_price": {
                     "type": "number"
                 },
-                "node": {}
+                "dmi": {
+                    "$ref": "#/definitions/types.Dmi"
+                },
+                "extraFee": {
+                    "type": "integer"
+                },
+                "farmId": {
+                    "type": "integer"
+                },
+                "farmName": {
+                    "type": "string"
+                },
+                "farm_free_ips": {
+                    "type": "integer"
+                },
+                "farmingPolicyId": {
+                    "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gpus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.NodeGPU"
+                    }
+                },
+                "gridVersion": {
+                    "type": "integer"
+                },
+                "healthy": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "inDedicatedFarm": {
+                    "type": "boolean"
+                },
+                "location": {
+                    "$ref": "#/definitions/types.Location"
+                },
+                "nodeId": {
+                    "type": "integer"
+                },
+                "num_gpu": {
+                    "type": "integer"
+                },
+                "power": {
+                    "$ref": "#/definitions/types.NodePower"
+                },
+                "price_usd": {
+                    "type": "number"
+                },
+                "publicConfig": {
+                    "$ref": "#/definitions/types.PublicConfig"
+                },
+                "rentContractId": {
+                    "type": "integer"
+                },
+                "rentable": {
+                    "type": "boolean"
+                },
+                "rented": {
+                    "type": "boolean"
+                },
+                "rentedByTwinId": {
+                    "type": "integer"
+                },
+                "serialNumber": {
+                    "type": "string"
+                },
+                "speed": {
+                    "$ref": "#/definitions/types.Speed"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_resources": {
+                    "$ref": "#/definitions/types.Capacity"
+                },
+                "twinId": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "integer"
+                },
+                "uptime": {
+                    "type": "integer"
+                },
+                "used_resources": {
+                    "$ref": "#/definitions/types.Capacity"
+                }
+            }
+        },
+        "app.NotificationResponse": {
+            "description": "A notification response",
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "read_at": {
+                    "type": "string"
+                },
+                "severity": {
+                    "$ref": "#/definitions/models.NotificationSeverity"
+                },
+                "status": {
+                    "$ref": "#/definitions/models.NotificationStatus"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/models.NotificationType"
+                }
             }
         },
         "app.PendingRecordsResponse": {
@@ -2867,6 +3447,22 @@ const docTemplate = `{
                 }
             }
         },
+        "gridtypes.Unit": {
+            "type": "integer",
+            "format": "int64",
+            "enum": [
+                1024,
+                1048576,
+                1073741824,
+                1099511627776
+            ],
+            "x-enum-varnames": [
+                "Kilobyte",
+                "Megabyte",
+                "Gigabyte",
+                "Terabyte"
+            ]
+        },
         "internal.TokenPair": {
             "type": "object",
             "properties": {
@@ -2934,6 +3530,47 @@ const docTemplate = `{
                 }
             }
         },
+        "models.NotificationSeverity": {
+            "type": "string",
+            "enum": [
+                "info",
+                "error",
+                "warning",
+                "success"
+            ],
+            "x-enum-varnames": [
+                "NotificationSeverityInfo",
+                "NotificationSeverityError",
+                "NotificationSeverityWarning",
+                "NotificationSeveritySuccess"
+            ]
+        },
+        "models.NotificationStatus": {
+            "type": "string",
+            "enum": [
+                "unread",
+                "read"
+            ],
+            "x-enum-varnames": [
+                "NotificationStatusUnread",
+                "NotificationStatusRead"
+            ]
+        },
+        "models.NotificationType": {
+            "type": "string",
+            "enum": [
+                "deployment",
+                "billing",
+                "user",
+                "connected"
+            ],
+            "x-enum-varnames": [
+                "NotificationTypeDeployment",
+                "NotificationTypeBilling",
+                "NotificationTypeUser",
+                "NotificationTypeConnected"
+            ]
+        },
         "models.SSHKey": {
             "type": "object",
             "required": [
@@ -2991,6 +3628,236 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "types.BIOS": {
+            "type": "object",
+            "properties": {
+                "vendor": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.Baseboard": {
+            "type": "object",
+            "properties": {
+                "manufacturer": {
+                    "type": "string"
+                },
+                "product_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.Capacity": {
+            "type": "object",
+            "properties": {
+                "cru": {
+                    "type": "integer"
+                },
+                "hru": {
+                    "$ref": "#/definitions/gridtypes.Unit"
+                },
+                "mru": {
+                    "$ref": "#/definitions/gridtypes.Unit"
+                },
+                "sru": {
+                    "$ref": "#/definitions/gridtypes.Unit"
+                }
+            }
+        },
+        "types.CpuBenchmark": {
+            "type": "object",
+            "properties": {
+                "multi": {
+                    "type": "number"
+                },
+                "node_twin_id": {
+                    "type": "integer"
+                },
+                "single": {
+                    "type": "number"
+                },
+                "threads": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "integer"
+                },
+                "workloads": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.Dmi": {
+            "type": "object",
+            "properties": {
+                "baseboard": {
+                    "$ref": "#/definitions/types.Baseboard"
+                },
+                "bios": {
+                    "$ref": "#/definitions/types.BIOS"
+                },
+                "memory": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Memory"
+                    }
+                },
+                "node_twin_id": {
+                    "type": "integer"
+                },
+                "processor": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Processor"
+                    }
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.Location": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "region": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.Memory": {
+            "type": "object",
+            "properties": {
+                "manufacturer": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.NodeGPU": {
+            "type": "object",
+            "properties": {
+                "contract": {
+                    "type": "integer"
+                },
+                "device": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "node_twin_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "integer"
+                },
+                "vendor": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.NodePower": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.Processor": {
+            "type": "object",
+            "properties": {
+                "thread_count": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.PublicConfig": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "gw4": {
+                    "type": "string"
+                },
+                "gw6": {
+                    "type": "string"
+                },
+                "ipv4": {
+                    "type": "string"
+                },
+                "ipv6": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.Speed": {
+            "type": "object",
+            "properties": {
+                "download": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "node_twin_id": {
+                    "type": "integer"
+                },
+                "tcp_download_ipv6": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "tcp_upload_ipv6": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "udp_download_ipv4": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "udp_download_ipv6": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "udp_upload_ipv4": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "udp_upload_ipv6": {
+                    "description": "in bit/sec",
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "integer"
+                },
+                "upload": {
+                    "description": "in bit/sec let's suppose default is ipv4/tcp",
                     "type": "number"
                 }
             }
