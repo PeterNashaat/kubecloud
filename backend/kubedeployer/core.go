@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"kubecloud/internal/logger"
+
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
-	"kubecloud/internal/logger"
 )
 
 func (c *Cluster) GetLeaderNode() (Node, error) {
@@ -155,8 +156,18 @@ func (c *Client) DeployNetwork(ctx context.Context, cluster *Cluster) error {
 	return nil
 }
 
-func (c *Client) CancelCluster(ctx context.Context, projectName string) error {
-	if err := c.GridClient.CancelByProjectName(projectName); err != nil {
+func (c *Client) CancelCluster(ctx context.Context, cluster Cluster) error {
+	clusterContracts, err := cluster.getAllClusterContracts()
+	if err != nil {
+		return fmt.Errorf("failed to get cluster contract IDs: %v", err)
+	}
+
+	if len(clusterContracts) == 0 {
+		logger.GetLogger().Debug().Msgf("No contracts to cancel for cluster %s", cluster.Name)
+		return nil
+	}
+
+	if err := c.GridClient.BatchCancelContract(clusterContracts); err != nil {
 		return fmt.Errorf("failed to cancel deployment contracts by project name: %v", err)
 	}
 
