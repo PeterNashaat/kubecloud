@@ -1,18 +1,55 @@
 package app
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
+
+	"kubecloud/internal/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
-	"kubecloud/internal/logger"
 )
+
+type StatsSummary struct {
+	Capacity string `json:"capacity"`
+	SSD      string `json:"ssd"`
+	Cores    uint32 `json:"cores"`
+}
 
 type Stats struct {
 	TotalUsers    uint32 `json:"total_users"`
 	TotalClusters uint32 `json:"total_clusters"`
 	UpNodes       uint32 `json:"up_nodes"`
 	Countries     uint32 `json:"countries"`
+	Cores         uint32 `json:"cores"`
+	Capacity      string `json:"capacity"`
+	SSD           string `json:"ssd"`
+}
+
+// fetchStatsSummary fetches the stats summary from the external API
+func (h *Handler) fetchStatsSummary() (*StatsSummary, error) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get(fmt.Sprintf("%s/api/stats-summary", h.config.StatsSummaryURL))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch stats summary: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("stats summary API returned status %d", resp.StatusCode)
+	}
+
+	var statsSummary StatsSummary
+	if err := json.NewDecoder(resp.Body).Decode(&statsSummary); err != nil {
+		return nil, fmt.Errorf("failed to decode stats summary response: %w", err)
+	}
+
+	return &statsSummary, nil
 }
 
 // @Summary Get system statistics
@@ -48,10 +85,23 @@ func (h *Handler) GetStatsHandler(c *gin.Context) {
 		return
 	}
 
+	statsSummary, err := h.fetchStatsSummary()
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("failed to retrieve stats summary")
+		statsSummary = &StatsSummary{
+			Capacity: "0",
+			SSD:      "0",
+			Cores:    0,
+		}
+	}
+
 	c.JSON(http.StatusOK, Stats{
 		TotalUsers:    uint32(totalUsers),
 		TotalClusters: uint32(totalClusters),
 		UpNodes:       uint32(stats.Nodes),
 		Countries:     uint32(stats.Countries),
+		Cores:         statsSummary.Cores,
+		Capacity:      statsSummary.Capacity,
+		SSD:           statsSummary.SSD,
 	})
 }
