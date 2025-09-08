@@ -12,12 +12,6 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/types"
 )
 
-type StatsSummary struct {
-	Capacity string `json:"capacity"`
-	SSD      string `json:"ssd"`
-	Cores    uint32 `json:"cores"`
-}
-
 type Stats struct {
 	TotalUsers    uint32 `json:"total_users"`
 	TotalClusters uint32 `json:"total_clusters"`
@@ -29,27 +23,27 @@ type Stats struct {
 }
 
 // fetchStatsSummary fetches the stats summary from the external API
-func (h *Handler) fetchStatsSummary() (*StatsSummary, error) {
+func (h *Handler) fetchStatsSummary() (Stats, error) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
 	resp, err := client.Get(fmt.Sprintf("%s/api/stats-summary", h.config.StatsSummaryURL))
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch stats summary: %w", err)
+		return Stats{}, fmt.Errorf("failed to fetch stats summary: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("stats summary API returned status %d", resp.StatusCode)
+		return Stats{}, fmt.Errorf("stats summary API returned status %d", resp.StatusCode)
 	}
 
-	var statsSummary StatsSummary
+	var statsSummary Stats
 	if err := json.NewDecoder(resp.Body).Decode(&statsSummary); err != nil {
-		return nil, fmt.Errorf("failed to decode stats summary response: %w", err)
+		return Stats{}, fmt.Errorf("failed to decode stats summary response: %w", err)
 	}
 
-	return &statsSummary, nil
+	return statsSummary, nil
 }
 
 // @Summary Get system statistics
@@ -88,7 +82,7 @@ func (h *Handler) GetStatsHandler(c *gin.Context) {
 	statsSummary, err := h.fetchStatsSummary()
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to retrieve stats summary")
-		statsSummary = &StatsSummary{
+		statsSummary = Stats{
 			Capacity: "0",
 			SSD:      "0",
 			Cores:    0,
