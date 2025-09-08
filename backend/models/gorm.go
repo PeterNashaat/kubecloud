@@ -2,8 +2,8 @@ package models
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -449,7 +449,7 @@ func migrateNotifications(db *gorm.DB) error {
 		return nil
 	}
 
-	if !errors.Is(err, gorm.ErrInvalidData) {
+	if !strings.Contains(err.Error(), "datatype mismatch") {
 		return fmt.Errorf("failed to create test notification during migration: %w", err)
 	}
 
