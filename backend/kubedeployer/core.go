@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"kubecloud/internal/logger"
+
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/workloads"
-	"kubecloud/internal/logger"
 )
 
 func (c *Cluster) GetLeaderNode() (Node, error) {
@@ -192,10 +193,11 @@ func (c *Client) RemoveNode(ctx context.Context, cluster *Cluster, nodeName stri
 	if networkContractID, exists := networkWorkload.NodeDeploymentID[nodeToRemove.NodeID]; exists && networkContractID != 0 {
 		networkStillInUse := false
 		for _, otherNode := range cluster.Nodes {
-			if otherNode.NodeID == nodeToRemove.NodeID {
+			if otherNode.Name == nodeToRemove.Name { // skip self
 				continue
 			}
-			if otherNetworkContractID, otherExists := networkWorkload.NodeDeploymentID[otherNode.NodeID]; otherExists && otherNetworkContractID != 0 {
+
+			if otherNode.NodeID == nodeToRemove.NodeID { // multiple vms on same node
 				networkStillInUse = true
 				break
 			}
@@ -206,6 +208,7 @@ func (c *Client) RemoveNode(ctx context.Context, cluster *Cluster, nodeName stri
 		}
 	}
 
+	// Remove from Grid
 	if len(contractsToCancel) > 0 {
 		logger.GetLogger().Debug().Msgf("Removing node %s with contracts: %v", nodeToRemove.Name, contractsToCancel)
 		if err := c.GridClient.BatchCancelContract(contractsToCancel); err != nil {
@@ -213,7 +216,7 @@ func (c *Client) RemoveNode(ctx context.Context, cluster *Cluster, nodeName stri
 		}
 	}
 
-	// Update cluster state
+	// Remove from database
 	updatedNodes := make([]Node, 0, len(cluster.Nodes)-1)
 	updatedNodes = append(updatedNodes, cluster.Nodes[:nodeIndex]...)
 	updatedNodes = append(updatedNodes, cluster.Nodes[nodeIndex+1:]...)
@@ -254,6 +257,7 @@ func (c *Client) RemoveNode(ctx context.Context, cluster *Cluster, nodeName stri
 		if networkWasCanceled {
 			logger.GetLogger().Debug().Uint32("node_id", nodeToRemove.NodeID).Msg("Cleaned up network workload data for canceled network contract")
 		}
+
 	}
 
 	return nil
