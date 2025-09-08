@@ -24,7 +24,6 @@ type Configuration struct {
 	ActivationServiceURL                 string             `json:"activation_service_url" validate:"required"`
 	GraphqlURL                           string             `json:"graphql_url" validate:"required"`
 	FiresquidURL                         string             `json:"firesquid_url" validate:"required"`
-	StatsSummaryURL                      string             `json:"stats_summary_url" validate:"required,url"`
 	SystemAccount                        GridAccount        `json:"system_account"`
 	Redis                                Redis              `json:"redis" validate:"required,dive"`
 	DeployerWorkersNum                   int                `json:"deployer_workers_num" default:"1"`
