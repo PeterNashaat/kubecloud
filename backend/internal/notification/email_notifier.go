@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"kubecloud/internal"
 	"kubecloud/models"
+	"os"
 	"path/filepath"
 
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -37,7 +38,12 @@ func (n *EmailNotifier) GetStepName() string {
 
 func (n *EmailNotifier) ParseTemplates() error {
 	if n.templatesDir == "" {
-		n.templatesDir = "./internal/templates/notifications"
+
+		n.templatesDir = os.Getenv("TEMPLATE_DIR")
+		if n.templatesDir == "" {
+
+			n.templatesDir = "./internal/templates/notifications"
+		}
 	}
 
 	tpl, err := template.ParseGlob(filepath.Join(n.templatesDir, "*.html"))
