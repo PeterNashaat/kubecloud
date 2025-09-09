@@ -157,24 +157,6 @@ export class UserService {
     })
   }
 
-  // Fetch all grid nodes from the new public endpoint (no auth required)
-  async listAllGridNodes(filters?: { healthy?: boolean; size?: number; page?: number }) {
-    const queryParams = new URLSearchParams()
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          queryParams.append(key, String(value))
-        }
-      })
-    }
-
-    const endpoint = `/v1/nodes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return api.get<NodesResponse>(endpoint, {
-      requiresAuth: false,
-      showNotifications: false // Don't show notifications for node listing
-    })
-  }
-
   // Reserve a node
   async reserveNode(nodeId: number, data: ReserveNodeRequest = {}) {
     const response = await api.post<ApiResponse<ReserveNodeResponse>>(`/v1/user/nodes/${nodeId}`, data, { requiresAuth: true, showNotifications: true })

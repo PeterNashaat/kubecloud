@@ -21,7 +21,6 @@ const processedGlobeData = computed(() => {
     if (result.nodes.length > 0) {
       return result
     }
-    console.log('No valid coordinates found in grid nodes')
     return { nodes: [], labels: [] }
   } catch (error) {
     console.error('Error processing globe nodes:', error)
@@ -59,9 +58,7 @@ onMounted(async () => {
   window.addEventListener('resize', updateGlobeSize)
   await fetchStats()
   try {
-    console.log('Fetching grid nodes for globe...')
-    await fetchGridNodes({ healthy: true, size: 1000 }) // Fetch more nodes for better globe coverage
-    console.log('Grid nodes fetched successfully')
+    await fetchGridNodes({ healthy: true, size: 1000 })
   } catch (error) {
     console.error('Failed to fetch nodes for globe:', error)
   }

@@ -4,7 +4,6 @@
     class="globe-canvas"
     :style="{ width: width + 'px', height: height + 'px', maxWidth: '100%' }"
   >
-    <div ref="tooltipEl" class="globe-tooltip" style="display:none;"></div>
 
     <slot />
   </div>
@@ -35,7 +34,6 @@ const props = defineProps({
 const emit = defineEmits(['node-click', 'node-hover', 'arc-hover'])
 
 const globeContainer = ref<HTMLElement | null>(null)
-const tooltipEl = ref<HTMLElement | null>(null)
 let renderer: THREE.WebGLRenderer | null = null
 let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
@@ -98,27 +96,9 @@ function animate() {
         colors.setY(index, 1.0)
         colors.setZ(index, 1.0)
         emit('node-hover', index)
-        if (tooltipEl.value) {
-          const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute
-          const vx = posAttr.getX(index)
-          const vy = posAttr.getY(index)
-          const vz = posAttr.getZ(index)
-          const vector = new THREE.Vector3(vx, vy, vz)
-          vector.project(camera!)
-          const rect = globeContainer.value.getBoundingClientRect()
-          const sx = (vector.x * 0.5 + 0.5) * rect.width
-          const sy = (-vector.y * 0.5 + 0.5) * rect.height
-          const el = tooltipEl.value
-          el.style.display = 'block'
-          el.style.left = `${sx + 6}px`
-          el.style.top = `${sy - 8}px`
-          const label = nodeLabels[index] ? nodeLabels[index] : `Node ${index + 1}`
-          el.innerText = `Node ID: ${label}`
-        }
       }
     } else {
       INTERSECTED = null
-      if (tooltipEl.value) tooltipEl.value.style.display = 'none'
     }
     if (colors) colors.needsUpdate = true
   }
@@ -156,7 +136,6 @@ function onPointerMove(event: MouseEvent) {
 }
 function onPointerLeave() {
   INTERSECTED = null
-  if (tooltipEl.value) tooltipEl.value.style.display = 'none'
 }
 function onPointerClick() {
   if (INTERSECTED !== null && pointCloud) {
@@ -266,18 +245,6 @@ watch(() => props.nodes, (newNodes, oldNodes) => {
 }
 .globe-canvas:active {
   cursor: grabbing;
-}
-.globe-tooltip {
-  position: absolute;
-  padding: 6px 8px;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(96, 165, 250, 0.4);
-  color: #e5f0ff;
-  font-size: 12px;
-  border-radius: 6px;
-  pointer-events: none;
-  transform: translate(-50%, -100%);
-  white-space: nowrap;
 }
 @media (max-width: 600px) {
   .globe-canvas {
