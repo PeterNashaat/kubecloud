@@ -406,3 +406,8 @@ func (s *GormDB) CountAllClusters() (int64, error) {
 	err := s.db.Model(&Cluster{}).Count(&count).Error
 	return count, err
 }
+
+func (s *GormDB) ListAllClusters() ([]Cluster, error) {
+	var clusters []Cluster
+	return clusters, s.db.Find(&clusters).Error
+}

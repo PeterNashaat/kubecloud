@@ -578,7 +578,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepRemoveNode, RemoveDeploymentNodeStep())
 	engine.Register(StepStoreDeployment, StoreDeploymentStep(db, metrics))
 	engine.Register(StepFetchKubeconfig, FetchKubeconfigStep(config.SSH.PrivateKeyPath))
-	engine.Register(StepVerifyClusterReady, VerifyClusterReadyStep())
+	engine.Register(StepVerifyClusterReady, VerifyClusterReadyStep(sse))
 	engine.Register(StepRemoveClusterFromDB, RemoveClusterFromDBStep(db))
 	engine.Register(StepGatherAllContractIDs, GatherAllContractIDsStep(db))
 	engine.Register(StepBatchCancelContracts, BatchCancelContractsStep())
@@ -619,6 +619,13 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: StepRemoveCluster, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(WorkflowRollbackFailedDeployment, &rollbackWFTemplate)
+
+	trackClusterHealthWFTemplate := createDeployerWorkflowTemplate(sse, engine, metrics)
+	trackClusterHealthWFTemplate.Steps = []ewf.Step{
+		{Name: StepFetchKubeconfig, RetryPolicy: standardRetryPolicy},
+		{Name: StepVerifyClusterReady, RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate(WorkflowTrackClusterHealth, &trackClusterHealthWFTemplate)
 }
 
 func getFromState[T any](state ewf.State, key string) (T, error) {
@@ -690,8 +697,13 @@ func FetchKubeconfigStep(privateKeyPath string) ewf.StepFn {
 	}
 }
 
-func VerifyClusterReadyStep() ewf.StepFn {
+func VerifyClusterReadyStep(sse *internal.SSEManager) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		config, err := getConfig(state)
+		if err != nil {
+			return fmt.Errorf("failed to get config from state: %w", err)
+		}
+
 		cluster, err := statemanager.GetCluster(state)
 		if err != nil {
 			return fmt.Errorf("failed to get cluster: %w", err)
@@ -726,6 +738,12 @@ func VerifyClusterReadyStep() ewf.StepFn {
 				}
 			}
 			if !ready {
+				sse.Notify(config.UserID, "error", map[string]interface{}{
+					"type":         "cluster_not_ready",
+					"node_name":    n.Name,
+					"cluster_name": cluster.Name,
+					"message":      fmt.Sprintf("Node %s is not ready in cluster %s", n.Name, cluster.Name),
+				})
 				return fmt.Errorf("node %s is not ready", n.Name)
 			}
 		}

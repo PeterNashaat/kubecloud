@@ -327,6 +327,7 @@ func (app *App) StartBackgroundWorkers() {
 	go app.handlers.MonthlyInvoicesHandler()
 	go app.handlers.TrackUserDebt(app.gridClient)
 	go app.handlers.MonitorSystemBalanceAndHandleSettlement()
+	go app.handlers.TrackClusterHealth()
 }
 
 // Run starts the server

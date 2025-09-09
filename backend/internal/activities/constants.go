@@ -14,6 +14,7 @@ const (
 	WorkflowRemoveNode               = "remove-node"
 	WorkflowDeleteAllClusters        = "delete-all-clusters"
 	WorkflowRollbackFailedDeployment = "rollback-failed-deployment"
+	WorkflowTrackClusterHealth       = "track-cluster-health"
 
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"
