@@ -446,6 +446,7 @@ const features = [
   gap: 1.5rem;
   opacity: 0.85;
   flex-wrap: wrap;
+  margin-bottom: 2rem;
 }
 .stat-card {
   background: rgba(59, 130, 246, 0.05);

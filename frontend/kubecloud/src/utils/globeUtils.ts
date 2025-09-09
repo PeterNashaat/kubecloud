@@ -98,7 +98,7 @@ export function calculateOptimalStride(width: number, height: number): number {
  */
 export function latLngToSphere(lat: number, lng: number, radius: number = GLOBE_RADIUS): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180)
-  const theta = (lng + 180) * (Math.PI / 180)
+  const theta = (-lng) * (Math.PI / 180)
   const x = radius * Math.sin(phi) * Math.cos(theta)
   const y = radius * Math.cos(phi)
   const z = radius * Math.sin(phi) * Math.sin(theta)
@@ -356,25 +356,20 @@ export function createNodePoints(nodes: [number, number][]): {
   const colors = new Float32Array(nodes.length * 3)
   const baseColors = new Float32Array(nodes.length * 3)
 
+  // Always use hero accent blue for node color
+  const colorObj = { r: 0.376, g: 0.647, b: 0.980 } // #60a5fa
   for (let i = 0; i < nodes.length; i++) {
     const [lat, lng] = nodes[i]
     const pos = latLngToSphere(lat, lng)
     positions[i * 3] = pos.x
     positions[i * 3 + 1] = pos.y
     positions[i * 3 + 2] = pos.z
-
-    // Simple warm orange color for nodes
-    const brightness = 0.9 + 0.1 * (pos.y / GLOBE_RADIUS)
-    const r = GLOBE_COLORS.NODE_BASE.r * brightness
-    const g = GLOBE_COLORS.NODE_BASE.g * brightness
-    const b = GLOBE_COLORS.NODE_BASE.b * brightness
-
-    colors[i * 3] = r
-    colors[i * 3 + 1] = g
-    colors[i * 3 + 2] = b
-    baseColors[i * 3] = r
-    baseColors[i * 3 + 1] = g
-    baseColors[i * 3 + 2] = b
+    colors[i * 3] = colorObj.r
+    colors[i * 3 + 1] = colorObj.g
+    colors[i * 3 + 2] = colorObj.b
+    baseColors[i * 3] = colorObj.r
+    baseColors[i * 3 + 1] = colorObj.g
+    baseColors[i * 3 + 2] = colorObj.b
   }
 
   return { positions, colors, baseColors, count: nodes.length }
@@ -446,7 +441,7 @@ export async function createGlobeScene(options: GlobeSceneOptions): Promise<Glob
       nodeLabels = validNodes.map(([lat, lng]) => `(${lat.toFixed(2)}, ${lng.toFixed(2)})`)
     }
 
-    const nodeData = createNodePoints(validNodes)
+  const nodeData = createNodePoints(validNodes)
     const nodeGeometry = new THREE.BufferGeometry()
     nodeGeometry.setAttribute('position', new THREE.BufferAttribute(nodeData.positions, 3))
     nodeGeometry.setAttribute('color', new THREE.BufferAttribute(nodeData.colors, 3))
