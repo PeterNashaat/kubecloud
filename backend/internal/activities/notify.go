@@ -60,7 +60,7 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 
 		} else {
 			nodeCount := len(cluster.Nodes)
-				totalSteps := nodeCount + 2
+			totalSteps := nodeCount + 2
 			message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
 				workflowDesc, cluster.Name, nodeCount)
 
@@ -71,7 +71,7 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 				"cluster_name": cluster.Name,
 				"node_count":   fmt.Sprintf("%d", nodeCount),
 				"total_steps":  fmt.Sprintf("%d", totalSteps),
-			}
+			})
 		}
 
 		notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeveritySuccess))
