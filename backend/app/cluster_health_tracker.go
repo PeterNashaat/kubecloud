@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	ClusterHealthCheckInterval   = 6 * time.Second
-	HealthCheckTimeoutPerCluster = 5 * time.Minute
+	ClusterHealthCheckInterval = 6 * time.Hour
 )
 
 func (h *Handler) TrackClusterHealth() {
@@ -32,33 +31,29 @@ func (h *Handler) TrackClusterHealth() {
 		}
 
 		for _, cluster := range clusters {
-			func() {
-				timeoutCtx, cancel := context.WithTimeout(context.Background(), HealthCheckTimeoutPerCluster)
-				defer cancel()
 
-				wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowTrackClusterHealth)
-				if err != nil {
-					logger.GetLogger().Error().
-						Err(err).
-						Msg("Failed to create health tracking workflow")
-					return
-				}
-				cl, err := cluster.GetClusterResult()
-				if err != nil {
-					logger.GetLogger().Error().
-						Err(err).
-						Msg("Failed to get cluster result during health tracking")
-					return
-				}
-				wf.State = ewf.State{
-					"cluster": cl,
-					"config": map[string]interface{}{
-						"user_id": cluster.UserID,
-					},
-				}
+			wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowTrackClusterHealth)
+			if err != nil {
+				logger.GetLogger().Error().
+					Err(err).
+					Msg("Failed to create health tracking workflow")
+				continue
+			}
+			cl, err := cluster.GetClusterResult()
+			if err != nil {
+				logger.GetLogger().Error().
+					Err(err).
+					Msg("Failed to get cluster result during health tracking")
+				continue
+			}
+			wf.State = ewf.State{
+				"cluster": cl,
+				"config": map[string]interface{}{
+					"user_id": cluster.UserID,
+				},
+			}
 
-				h.ewfEngine.RunAsync(timeoutCtx, wf)
-			}()
+			h.ewfEngine.RunAsync(context.Background(), wf)
 		}
 
 	}

@@ -692,10 +692,6 @@ func FetchKubeconfigStep(privateKeyPath string) ewf.StepFn {
 
 func VerifyClusterReadyStep(sse *internal.SSEManager) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		config, err := getConfig(state)
-		if err != nil {
-			return fmt.Errorf("failed to get config from state: %w", err)
-		}
 
 		cluster, err := statemanager.GetCluster(state)
 		if err != nil {
@@ -731,12 +727,6 @@ func VerifyClusterReadyStep(sse *internal.SSEManager) ewf.StepFn {
 				}
 			}
 			if !ready {
-				sse.Notify(config.UserID, "error", map[string]interface{}{
-					"type":         "cluster_not_ready",
-					"node_name":    n.Name,
-					"cluster_name": cluster.Name,
-					"message":      fmt.Sprintf("Node %s is not ready in cluster %s", n.Name, cluster.Name),
-				})
 				return fmt.Errorf("node %s is not ready", n.Name)
 			}
 		}
