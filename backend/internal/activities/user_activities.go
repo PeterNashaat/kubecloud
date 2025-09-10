@@ -8,11 +8,11 @@ import (
 	"kubecloud/models"
 	"strings"
 
-	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/vedhavyas/go-subkey"
 	"github.com/xmonader/ewf"
 	"gorm.io/gorm"
+	"kubecloud/internal/logger"
 )
 
 func CreateUserStep(config internal.Configuration, db models.DB) ewf.StepFn {
@@ -150,7 +150,7 @@ func SetupTFChainStep(client *substrate.Substrate, config internal.Configuration
 			return fmt.Errorf("'user_id' in state is not an int")
 		}
 
-		sse.Notify(fmt.Sprintf("%d", userID), "user_registration", "Registering user is in progress")
+		sse.Notify(userID, "user_registration", "Registering user is in progress")
 
 		existingUser, err := db.GetUserByID(userID)
 		if err != nil {
@@ -262,18 +262,18 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, sse *internal.SSEManage
 			return fmt.Errorf("'mnemonic' in state is not a string")
 		}
 
-		sse.Notify(fmt.Sprintf("%d", userID), "user_registration", "Account verification is in progress")
+		sse.Notify(userID, "user_registration", "Account verification is in progress")
 
 		// Set user.AccountAddress from mnemonic
 		sponseeKeyPair, err := internal.KeyPairFromMnemonic(mnemonic)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to create keypair for SS58 address")
+			logger.GetLogger().Error().Err(err).Msg("failed to create keypair for SS58 address")
 			return err
 		}
 
 		sponseeAddress, err := internal.AccountAddressFromKeypair(sponseeKeyPair)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to get SS58 address")
+			logger.GetLogger().Error().Err(err).Msg("failed to get SS58 address")
 			return err
 		}
 
@@ -404,7 +404,7 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 
 		requestedTFTs, err := internal.FromUSDMillicentToTFT(substrateClient, amount)
 		if err != nil {
-			log.Error().Err(err).Msg("error converting usd")
+			logger.GetLogger().Error().Err(err).Msg("error converting usd")
 			return err
 		}
 
@@ -414,7 +414,7 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 			TFTAmount:    requestedTFTs,
 			TransferMode: transferMode,
 		}); err != nil {
-			log.Error().Err(err).Send()
+			logger.GetLogger().Error().Err(err).Send()
 			return err
 		}
 
@@ -422,7 +422,7 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 			notificationData := map[string]interface{}{
 				"message": fmt.Sprintf("Voucher redeemed successfully for %.2f$", amountUSD),
 			}
-			sse.Notify(fmt.Sprintf("%d", userID), internal.Success, notificationData)
+			sse.Notify(userID, internal.Success, notificationData)
 		}
 
 		return nil

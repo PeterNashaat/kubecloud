@@ -4,16 +4,16 @@
     <div class="auth-content">
       <div class="auth-header">
         <h1 class="auth-title">Create Account</h1>
-        <p class="auth-subtitle">Join KubeCloud and start your journey</p>
+        <p class="auth-subtitle">Join Mycelium Cloud and start your journey</p>
       </div>
       <v-form @submit.prevent="handleSignUp" class="auth-form" v-model="isFormValid">
         <v-text-field
           v-model="form.name"
-          label="Name"
+          label="Username"
           prepend-inner-icon="mdi-account"
           variant="outlined"
           class="auth-field"
-          :rules="[RULES.name]"
+          :rules="[RULES.username]"
           required
         />
         <v-text-field
@@ -83,6 +83,12 @@
           Sign In
         </v-btn>
       </div>
+      <router-link
+        to="/"
+        class="d-block text-white back-home-link"
+      >
+        Back to Home
+      </router-link>
     </div>
   </div>
 </template>
@@ -268,5 +274,13 @@ const handleSignUp = async () => {
 .requirements-list {
   list-style-type: disc;
   padding-left: var(--space-4);
+}
+
+.back-home-link {
+  margin-top: 1rem;
+  text-decoration: none;
+}
+.back-home-link:hover {
+  text-decoration: underline;
 }
 </style>

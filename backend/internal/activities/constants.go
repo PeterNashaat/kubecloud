@@ -2,17 +2,18 @@ package activities
 
 const (
 	// Workflow names
-	WorkflowChargeBalance      = "charge-balance"
-	WorkflowAdminCreditBalance = "admin-credit-balance"
-	WorkflowUserRegistration   = "user-registration"
-	WorkflowUserVerification   = "user-verification"
-	WorkflowRedeemVoucher      = "redeem-voucher"
-	WorkflowReserveNode        = "reserve-node"
-	WorkflowUnreserveNode      = "unreserve-node"
-	WorkflowDeleteCluster      = "delete-cluster"
-	WorkflowAddNode            = "add-node"
-	WorkflowRemoveNode         = "remove-node"
-	WorkflowDeleteAllClusters  = "delete-all-clusters"
+	WorkflowChargeBalance            = "charge-balance"
+	WorkflowAdminCreditBalance       = "admin-credit-balance"
+	WorkflowUserRegistration         = "user-registration"
+	WorkflowUserVerification         = "user-verification"
+	WorkflowRedeemVoucher            = "redeem-voucher"
+	WorkflowReserveNode              = "reserve-node"
+	WorkflowUnreserveNode            = "unreserve-node"
+	WorkflowDeleteCluster            = "delete-cluster"
+	WorkflowAddNode                  = "add-node"
+	WorkflowRemoveNode               = "remove-node"
+	WorkflowDeleteAllClusters        = "delete-all-clusters"
+	WorkflowRollbackFailedDeployment = "rollback-failed-deployment"
 
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"
@@ -40,4 +41,6 @@ const (
 	StepDeleteAllUserClusters   = "delete-all-user-clusters"
 	StepDeployNode              = "deploy-node"
 	StepDeployNetwork           = "deploy-network"
+	StepFetchKubeconfig         = "fetch_kubeconfig"
+	StepVerifyClusterReady      = "verify-cluster-ready"
 )

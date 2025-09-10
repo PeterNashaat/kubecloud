@@ -5,7 +5,7 @@
       <div class="hero-content container-padding">
         <div class="hero-text text-center">
           <h1 class="hero-title">Use Cases</h1>
-          <p class="section-subtitle">Explore how KubeCloud empowers different industries and teams.</p>
+          <p class="section-subtitle">Explore how Mycelium Cloud empowers different industries and teams.</p>
         </div>
       </div>
     </section>
@@ -169,11 +169,6 @@ onMounted(() => {
   font-weight: 500;
   border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.3s ease;
-}
-
-.feature-tag:hover {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.05);
 }
 
 @media (max-width: 900px) {

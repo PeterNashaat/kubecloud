@@ -1,10 +1,10 @@
 <template>
-  <v-app class="kubecloud-app">
+  <v-app class="mycelium-cloud-app">
     <NavBar v-if="!isAuthPage" />
     <v-main class="app-main">
       <RouterView />
     </v-main>
-    
+
     <AppFooter v-if="!isAuthPage" />
     <NotificationToast />
   </v-app>
@@ -26,14 +26,16 @@ const notificationStore = useNotificationStore()
 const maintenanceStore = useMaintenanceStore()
 
 // Global error handling
-onErrorCaptured((error: Error) => {
+onErrorCaptured((error: Error & { silent?: boolean }) => {
   console.error('Global error caught:', error)
 
   // Show error as toast notification
-  notificationStore.error(
-    'Something went wrong',
-    error.message || 'An unexpected error occurred. Please try refreshing the page.'
-  )
+  if (!error.silent) {
+    notificationStore.error(
+      'Something went wrong',
+      error.message || 'An unexpected error occurred. Please try refreshing the page.',
+    )
+  }
 
   // Prevent error from propagating and breaking the app
   return false
@@ -54,7 +56,7 @@ onMounted(async () => {
     }
     userStore.initializeAuth()
     useSseEvents()
-    
+
     // Initialize notifications after auth is ready
     const initializeNotifications = async () => {
       if (userStore.user && userStore.user.id) {
@@ -65,7 +67,7 @@ onMounted(async () => {
         }
       }
     }
-    
+
     // Initialize notifications after a short delay to ensure auth is ready
     setTimeout(initializeNotifications, 500)
   } catch (error) {
@@ -75,10 +77,12 @@ onMounted(async () => {
   // Global error handlers for unhandled errors
   window.addEventListener('error', (event) => {
     console.error('Unhandled error:', event.error)
-    notificationStore.error(
-      'Unexpected Error',
-      event.error?.message || 'An unexpected error occurred'
-    )
+    if (!event.error?.silent) {
+      notificationStore.error(
+        'Unexpected Error',
+        event.error?.message || 'An unexpected error occurred',
+      )
+    }
   })
 })
 
@@ -90,7 +94,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.kubecloud-app {
+.mycelium-cloud-app {
   min-height: 100vh;
   background: var(--color-bg);
   color: var(--color-text);

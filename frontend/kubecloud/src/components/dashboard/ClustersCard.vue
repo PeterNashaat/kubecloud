@@ -5,10 +5,17 @@
         <h3 class="text-h5 font-weight-bold mb-1">Kubernetes Clusters</h3>
         <p class="text-body-2 text-medium-emphasis">Manage your cloud-native infrastructure</p>
       </div>
-      <v-btn :disabled="isLoading || !haveEnoughBalance"  variant="outlined" class="mr-2" @click="goToDeployCluster">
-        <v-icon icon="mdi-plus" size="16" class="mr-1"></v-icon>
-        New Cluster
-      </v-btn>
+      <v-tooltip location="top" :disabled="haveEnoughBalance">
+        <template #activator="{ props }">
+          <div v-bind="props">
+            <v-btn :disabled="isLoading || !haveEnoughBalance"  variant="outlined" class="mr-2" @click="goToDeployCluster">
+              <v-icon icon="mdi-plus" size="16" class="mr-1"></v-icon>
+              New Cluster
+            </v-btn>
+          </div>
+        </template>
+        <span>Insufficient balance. Minimum 5 TFT required to create a cluster.</span>
+      </v-tooltip>
       <v-btn
         v-if="filteredClusters.length > 0 && !isLoading"
         variant="outlined"
@@ -41,7 +48,7 @@
       <v-divider class="mb-4" />
       <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
       <v-progress-linear v-if="isLoading" indeterminate color="primary" class="mb-4" />
-      <div v-else-if="!haveEnoughBalance" class="text-center text-medium-emphasis mt-12">
+      <div v-else-if="!haveEnoughBalance && !isLoading && filteredClusters.length === 0" class="text-center text-medium-emphasis mt-12">
         <v-icon icon="mdi-currency-usd-off" size="48" class="mb-2" color="grey" />
         <div>You don't have enough balance to create a cluster <br/> You must have at least <span class="text-primary">$5</span> to create a cluster</div>
         <v-btn variant="outlined" class="btn btn-outline mt-3" @click="goToFund">
@@ -77,12 +84,11 @@
               <v-tooltip location="top">
                 <template #activator="{ props }">
                   <v-btn icon size="small" class="mr-1" v-bind="props" @click="viewCluster(cluster.cluster.name)" :disabled="deletingAll">
-                    <v-icon icon="mdi-cog" />
+                    <v-icon icon="mdi-eye" />
                   </v-btn>
                 </template>
-                <span>Edit cluster</span>
+                <span>View cluster</span>
               </v-tooltip>
-
               <v-tooltip location="top">
                 <template #activator="{ props }">
                   <v-btn icon size="small" class="mr-1" v-bind="props" @click="download(cluster.cluster.name)" :loading="downloading === cluster.cluster.name" :disabled="downloading === cluster.cluster.name || deletingAll">
@@ -91,7 +97,14 @@
                 </template>
                 <span>Download kubeconfig file</span>
               </v-tooltip>
-
+              <v-tooltip location="top">
+                <template #activator="{ props }">
+                  <v-btn icon size="small" class="mr-1" v-bind="props" @click="openAddNodeDialog(cluster)" :disabled="deletingAll">
+                    <v-icon icon="mdi-plus" />
+                  </v-btn>
+                </template>
+                <span>Add node</span>
+              </v-tooltip>
               <v-tooltip location="top">
                 <template #activator="{ props }">
                   <v-btn icon size="small" class="ml-1" color="error" v-bind="props" @click="deleteCluster(cluster.cluster.name)" :disabled="deletingAll">
@@ -145,17 +158,26 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Edit Cluster Nodes Modal -->
+    <component :is="EditClusterNodesDialog"
+      v-if="selectedCluster"
+      v-model="editClusterNodesDialog"
+      :cluster="selectedCluster"
+      @update:modelValue="editClusterNodesDialog = $event"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClusterStore } from '../../stores/clusters'
 import { useNotificationStore } from '../../stores/notifications'
 import { useKubeconfig } from '../../composables/useKubeconfig'
-import { useNodeManagement } from '@/composables/useNodeManagement'
 import { useUserStore } from '@/stores/user'
+
+const EditClusterNodesDialog = defineAsyncComponent(() => import('./EditClusterNodesDialog.vue'))
 
 const router = useRouter()
 const clusterStore = useClusterStore()
@@ -169,6 +191,14 @@ const deletingAll = ref(false)
 const emit = defineEmits(['navigateToFund'])
 const { download, downloading } = useKubeconfig()
 
+const editClusterNodesDialog = ref(false)
+const selectedCluster = ref<any>(null)
+
+const openAddNodeDialog = (cluster: any) => {
+  selectedCluster.value = cluster
+  editClusterNodesDialog.value = true
+}
+
 const search = ref('')
 const sortBy = ref('createdAt')
 const page = ref(1)
@@ -180,11 +210,11 @@ const sortOptions = [
   { value: 'nodes', title: 'Nodes' },
 ]
 
-const userStore = useUserStore()
+  const userStore = useUserStore()
 
-const haveEnoughBalance = computed(() => {
-  return userStore.netBalance >= 5
-})
+  const haveEnoughBalance = computed(() => {
+    return userStore.netBalance >= 5
+  })
 
 const error = computed(() => clusterStore.error)
 const isLoading = computed(() => clusterStore.isLoading || userStore.isLoading)
@@ -222,9 +252,11 @@ const paginatedClusters = computed(() => {
   return filteredClusters.value.slice(start, start + pageSize)
 })
 
+
 const viewCluster = (projectName: string) => {
   router.push(`/clusters/${projectName}`)
 }
+
 
 function deleteCluster(projectName: string) {
   clusterToDelete.value = projectName

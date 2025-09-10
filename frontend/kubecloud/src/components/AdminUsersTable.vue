@@ -28,7 +28,6 @@
         :page="currentPage"
         @update:page="$emit('update:currentPage', $event)"
         class="admin-table"
-        hide-default-footer
         density="comfortable"
       >
         <template #item.balance="{ item }">
@@ -48,16 +47,6 @@
         </template>
       </v-data-table>
     </div>
-    <div class="pagination-container">
-      <v-pagination
-        v-model="currentPageLocal"
-        :length="totalPages"
-        color="primary"
-        circle
-        size="small"
-        @update:modelValue="$emit('update:currentPage', currentPageLocal)"
-      />
-    </div>
   </div>
 </template>
 
@@ -69,14 +58,11 @@ const props = defineProps({
   users: Array as () => User[],
   searchQuery: String,
   currentPage: Number,
-  pageSize: Number,
-  totalPages: Number
+  pageSize: Number
 })
 const emit = defineEmits(['update:searchQuery', 'update:currentPage', 'deleteUser', 'creditUser'])
 
 const searchQueryLocal = ref(props.searchQuery)
-const currentPageLocal = ref(props.currentPage)
 
 watch(() => props.searchQuery, (val) => { searchQueryLocal.value = val })
-watch(() => props.currentPage, (val) => { currentPageLocal.value = val })
 </script>

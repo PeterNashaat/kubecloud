@@ -5,7 +5,7 @@
       <div class="hero-content container-padding">
         <div class="hero-text text-center">
           <h1 class="hero-title">Documentation</h1>
-          <p class="section-subtitle">Find guides, API references, and tutorials to get the most out of KubeCloud.</p>
+          <p class="section-subtitle">Find guides, API references, and tutorials to get the most out of Mycelium Cloud.</p>
         </div>
       </div>
     </section>
@@ -140,9 +140,10 @@ onMounted(() => {
 
 .doc-card {
   text-align: center;
-  height: 100%;
+  height: 340px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
 }
 
 .doc-card * {
@@ -191,7 +192,7 @@ onMounted(() => {
 
 .doc-link {
   margin-top: auto;
-  margin-top: 2rem;
+  align-self: center;
 }
 
 @media (max-width: 900px) {

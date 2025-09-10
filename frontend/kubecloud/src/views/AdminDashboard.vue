@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent, type Ref } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent, type Ref, watch } from 'vue'
 import { adminService, type User, type Voucher, type GenerateVouchersRequest, type Invoice } from '../utils/adminService'
 import { statsService, type SystemStats} from '../utils/statsService'
 import AdminUsersTable from '../components/AdminUsersTable.vue'
@@ -18,7 +18,9 @@ const systemStats = ref<SystemStats>({
   total_users: 0,
   total_clusters: 0,
   up_nodes: 0,
-  countries: 0
+  countries: 0,
+  cores: 0,
+  ssd: 0
 })
 const statsLoaded = ref(false)
 const adminStats = computed(() => [
@@ -40,11 +42,9 @@ const filteredUsers = computed(() => {
     u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
   )
 })
-const paginatedUsers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredUsers.value.slice(start, start + pageSize)
+watch(searchQuery, () => {
+  currentPage.value = 1
 })
-const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize))
 
 function deleteUser(userId: number) {
     adminService.deleteUser(userId)
@@ -61,7 +61,7 @@ async function loadUsers() {
 }
 
 function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) currentPage.value = page
+  currentPage.value = page
 }
 
 // Voucher generation form state
@@ -146,11 +146,10 @@ async function loadStats() {
           </div>
           <AdminUsersTable
             v-else-if="selected === 'users'"
-            :users="paginatedUsers"
+            :users="filteredUsers"
             :searchQuery="searchQuery"
             :currentPage="currentPage"
             :pageSize="pageSize"
-            :totalPages="totalPages"
             @update:searchQuery="searchQuery = $event"
             @update:currentPage="goToPage($event)"
             @deleteUser="deleteUser"

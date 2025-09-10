@@ -18,7 +18,7 @@
     <section class="hero-section">
       <div class="hero-content container-padding">
         <div class="hero-text text-center">
-          <h1 class="hero-title kubecloud-gradient kubecloud-glow-blue">
+          <h1 class="hero-title">
             Reserve Your Node
           </h1>
           <p class="hero-description">
@@ -91,7 +91,7 @@
             <v-card class="reservation-card">
               <div class="nodes-header" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
                 <div style="display: flex; align-items: center; gap: 1.2rem;">
-                  <h2 class="card-title kubecloud-gradient kubecloud-glow-blue">
+                  <h2 class="card-title">
                     Available Nodes
                   </h2>
                   <div class="nodes-count">
@@ -174,16 +174,18 @@ import { useRouter } from 'vue-router'
 import { useNodes, type NodeFilters } from '../composables/useNodes'
 import { userService } from '../utils/userService'
 import { useUserStore } from '../stores/user'
+import { useNotificationStore } from '../stores/notifications'
 import { useNormalizedNodes } from '../composables/useNormalizedNodes'
 import { useNodeFilters } from '../composables/useNodeFilters'
 import NodeFilterPanel from '../components/NodeFilterPanel.vue'
 import NodeCard from '../components/NodeCard.vue'
+import type { NormalizedNode } from "@/types/normalizedNode"
 
 const router = useRouter()
 const userStore = useUserStore()
 const isAuthenticated = computed(() => userStore.isLoggedIn)
 
-const { nodes, total, loading, fetchNodes } = useNodes()
+const { nodes, loading, fetchNodes } = useNodes()
 const normalizedNodes = useNormalizedNodes(() => nodes.value)
 const {
   filters,
@@ -218,19 +220,38 @@ onMounted(() => {
   })
 })
 
-const reserveNode = async (nodeId: number) => {
+const reserveNode = async (node: NormalizedNode) => {
   if (!isAuthenticated.value) {
     router.push('/sign-in')
     return
   }
-  reservingNodeId.value = nodeId
+  reservingNodeId.value = node.nodeId
   try {
-    await userService.reserveNode(nodeId)
-    reservedNodeIds.value.add(nodeId) // Optimistically remove from UI
+    // Fetch user balance
+    const { balance } = await userService.fetchBalance()
+    // Calculate daily price (assuming monthly price divided by 30)
+    const basePrice = Number(node.price_usd ?? 0)
+    const extraFee = Number(node.extraFee ?? 0) / 1000
+    const dailyPrice = (basePrice + extraFee) / 30
+
+    if (balance < dailyPrice) {
+      useNotificationStore().error(
+        'Insufficient Balance',
+        `Your current balance is not enough to reserve this node. You need to have at least $${dailyPrice.toFixed(2)}. Please add funds to continue.`,
+        { duration: 15000 }
+      )
+      // Redirect to add funds card in dashboard
+      localStorage.setItem('dashboard-section', 'add-funds')
+      router.push('/dashboard')
+      return
+    }
+
+    await userService.reserveNode(node.nodeId)
+    reservedNodeIds.value.add(node.nodeId) // Optimistically remove from UI
     fetchNodes(nodeFilters)
   } catch (err) {
     console.error(err)
-    reservedNodeIds.value.delete(nodeId)
+    reservedNodeIds.value.delete(node.nodeId)
   } finally {
     reservingNodeId.value = null
   }
@@ -253,9 +274,9 @@ const paginatedNodes = computed(() =>
   filteredNodes.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize).filter(n => !reservedNodeIds.value.has(n.nodeId))
 )
 
-function handleNodeAction(node: any, payload: { nodeId: number; action: string }) {
+function handleNodeAction(node: NormalizedNode, payload: { nodeId: number; action: string }) {
   if (payload.action === 'reserve') {
-    reserveNode(payload.nodeId);
+    reserveNode(node);
   }
 }
 
