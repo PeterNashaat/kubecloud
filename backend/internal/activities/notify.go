@@ -3,6 +3,7 @@ package activities
 import (
 	"context"
 	"fmt"
+	"kubecloud/internal/constants"
 	"kubecloud/internal/notification"
 	"kubecloud/internal/statemanager"
 	"kubecloud/models"
@@ -84,7 +85,7 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 
 // notifyStepProgress sends step progress notifications
 func notifyStepProgress(notificationService *notification.NotificationService, state ewf.State, workflowName, stepName string, status string, err error, retryCount, maxRetries int) {
-	if stepName != StepDeployNetwork && !isDeployStep(stepName) {
+	if stepName != constants.StepDeployNetwork && !isDeployStep(stepName) {
 		return
 	}
 
@@ -183,7 +184,7 @@ func notifyStepHook(notificationService *notification.NotificationService) ewf.A
 }
 
 func calculateCurrentStep(stepName string) int {
-	if stepName == StepDeployNetwork {
+	if stepName == constants.StepDeployNetwork {
 		return 1
 	}
 

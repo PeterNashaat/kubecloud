@@ -1,4 +1,4 @@
-package activities
+package constants
 
 const (
 	// Workflow names
