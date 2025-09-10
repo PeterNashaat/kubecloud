@@ -19,30 +19,46 @@ func (h *Handler) TrackClusterHealth() {
 	defer ticker.Stop()
 
 	for range ticker.C {
+		logger.GetLogger().Info().Msg("Cluster health check test started")
 		clusters, err := h.db.ListAllClusters()
 		if err != nil {
 			logger.GetLogger().Error().Err(err)
 			continue
 		}
 
-		for _, cluster := range clusters {
-			timeoutCtx, cancel := context.WithTimeout(context.Background(), HealthCheckTimeoutPerCluster)
-			defer cancel()
+		if len(clusters) == 0 {
+			logger.GetLogger().Info().Msg("No clusters to check health for")
+			continue
+		}
 
-			wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowTrackClusterHealth)
-			if err != nil {
-				logger.GetLogger().Error().Err(err)
-				continue
-			}
-			cl, err := cluster.GetClusterResult()
-			if err != nil {
-				logger.GetLogger().Error().Err(err)
-				continue
-			}
-			wf.State = ewf.State{
-				"cluster": cl,
-			}
-			h.ewfEngine.RunAsync(timeoutCtx, wf)
+		for _, cluster := range clusters {
+			func() {
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), HealthCheckTimeoutPerCluster)
+				defer cancel()
+
+				wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowTrackClusterHealth)
+				if err != nil {
+					logger.GetLogger().Error().
+						Err(err).
+						Msg("Failed to create health tracking workflow")
+					return
+				}
+				cl, err := cluster.GetClusterResult()
+				if err != nil {
+					logger.GetLogger().Error().
+						Err(err).
+						Msg("Failed to get cluster result during health tracking")
+					return
+				}
+				wf.State = ewf.State{
+					"cluster": cl,
+					"config": map[string]interface{}{
+						"user_id": cluster.UserID,
+					},
+				}
+
+				h.ewfEngine.RunAsync(timeoutCtx, wf)
+			}()
 		}
 
 	}

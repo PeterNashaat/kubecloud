@@ -619,13 +619,6 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: StepRemoveCluster, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(WorkflowRollbackFailedDeployment, &rollbackWFTemplate)
-
-	trackClusterHealthWFTemplate := createDeployerWorkflowTemplate(sse, engine, metrics)
-	trackClusterHealthWFTemplate.Steps = []ewf.Step{
-		{Name: StepFetchKubeconfig, RetryPolicy: standardRetryPolicy},
-		{Name: StepVerifyClusterReady, RetryPolicy: standardRetryPolicy},
-	}
-	engine.RegisterTemplate(WorkflowTrackClusterHealth, &trackClusterHealthWFTemplate)
 }
 
 func getFromState[T any](state ewf.State, key string) (T, error) {
