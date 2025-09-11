@@ -53,12 +53,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     notifications.value.filter(n => n.persistent)
   )
 
-  // Helper function to convert backend notification to frontend format
-  const convertBackendNotification = (backendNotif: BackendNotification): Notification => ({
-    ...backendNotif,
-    persistent: true
-  })
-
   // Note: SSE toasts use the convenience methods below; no generic payload helper needed
 
   // Core functions
@@ -98,33 +92,24 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
-  const markAsRead = async (id: string) => {
+  const setReadStatus = async (id: string, target: NotificationStatus) => {
     const notification = notifications.value.find(n => n.id === id)
-    if (notification && notification.persistent && notification.status === 'unread') {
-      try {
-        await api.patch(`/v1/notifications/${id}/read`, undefined, { requiresAuth: true })
-        notification.status = 'read'
-        notification.read_at = new Date().toISOString()
-      } catch (error) {
-        console.error('Failed to mark notification as read:', error)
-        throw error
-      }
+    if (!notification || !notification.persistent) return
+    if (notification.status === target) return
+    try {
+      const action = target === 'read' ? 'read' : 'unread'
+      await api.patch(`/v1/notifications/${id}/${action}`, undefined, { requiresAuth: true })
+      notification.status = target
+      notification.read_at = target === 'read' ? new Date().toISOString() : undefined
+    } catch (error) {
+      console.error(`Failed to mark notification as ${target}:`, error)
+      throw error
     }
   }
 
-  const markAsUnread = async (id: string) => {
-    const notification = notifications.value.find(n => n.id === id)
-    if (notification && notification.persistent && notification.status === 'read') {
-      try {
-        await api.patch(`/v1/notifications/${id}/unread`, undefined, { requiresAuth: true })
-        notification.status = 'unread'
-        notification.read_at = undefined
-      } catch (error) {
-        console.error('Failed to mark notification as unread:', error)
-        throw error
-      }
-    }
-  }
+  const markAsRead = async (id: string) => setReadStatus(id, 'read')
+
+  const markAsUnread = async (id: string) => setReadStatus(id, 'unread')
 
   const markAllAsRead = async () => {
     const unreadNotifications = notifications.value.filter(n => n.persistent && n.status === 'unread')
@@ -167,26 +152,19 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
-  // Load persistent notifications from server
-  const loadNotifications = async () => {
+  // Internal: replace persistent notifications
+  const replacePersistent = (serverNotifications: BackendNotification[]) => {
+    notifications.value = serverNotifications.map(n => ({ ...n, persistent: true }))
+  }
+
+  // Internal: fetch endpoint and replace
+  const fetchAndReplace = async (endpoint: string) => {
     if (loading.value) return
-    
     try {
       loading.value = true
-      const response = await api.get('/v1/notifications?limit=50', { requiresAuth: true })
-      
-      if (response.status === 200 && (response.data as any)?.data?.notifications) {
-        const serverNotifications = (response.data as any).data.notifications.map((n: BackendNotification) => 
-          convertBackendNotification(n)
-        )
-        
-        // Replace persistent notifications, keep toast notifications
-        const toastNotifications = notifications.value.filter(n => !n.persistent)
-        notifications.value = [
-          ...serverNotifications,
-          ...toastNotifications
-        ]
-      }
+      const response = await api.get(endpoint, { requiresAuth: true })
+      const list = (response as any)?.data?.data?.notifications as BackendNotification[] | undefined
+      if (Array.isArray(list)) replacePersistent(list)
     } catch (error) {
       console.error('Failed to load notifications:', error)
     } finally {
@@ -194,73 +172,28 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
+  // Load persistent notifications from server
+  const loadNotifications = async () => fetchAndReplace('/v1/notifications?limit=50')
+
   // Load unread notifications from server
-  const loadUnreadNotifications = async () => {
-    if (loading.value) return
-    
-    try {
-      loading.value = true
-      const response = await api.get('/v1/notifications/unread?limit=50', { requiresAuth: true })
-      
-      if (response.status === 200 && (response.data as any)?.data?.notifications) {
-        const serverNotifications = (response.data as any).data.notifications.map((n: BackendNotification) => 
-          convertBackendNotification(n)
-        )
-        
-        // Replace persistent notifications, keep toast notifications
-        const toastNotifications = notifications.value.filter(n => !n.persistent)
-        notifications.value = [
-          ...serverNotifications,
-          ...toastNotifications
-        ]
-      }
-    } catch (error) {
-      console.error('Failed to load unread notifications:', error)
-    } finally {
-      loading.value = false
-    }
-  }
+  const loadUnreadNotifications = async () => fetchAndReplace('/v1/notifications/unread?limit=50')
 
   // Convenience methods for toast notifications
-  const success = (title: string, message: string) => 
-    addNotification({ 
-      type: 'user', 
-      severity: 'success', 
-      payload: { title, message }, 
+  // Internal: create toast
+  const addToast = (severity: NotificationSeverity, title: string, message: string) =>
+    addNotification({
+      type: 'user',
+      severity,
+      payload: { title, message },
       status: 'read',
-      persistent: false, 
-      created_at: new Date().toISOString() 
+      persistent: false,
+      created_at: new Date().toISOString()
     })
-  
-  const error = (title: string, message: string) => 
-    addNotification({ 
-      type: 'user', 
-      severity: 'error', 
-      payload: { title, message }, 
-      status: 'read',
-      persistent: false, 
-      created_at: new Date().toISOString() 
-    })
-  
-  const warning = (title: string, message: string) => 
-    addNotification({ 
-      type: 'user', 
-      severity: 'warning', 
-      payload: { title, message }, 
-      status: 'read',
-      persistent: false, 
-      created_at: new Date().toISOString() 
-    })
-  
-  const info = (title: string, message: string) => 
-    addNotification({ 
-      type: 'user', 
-      severity: 'info', 
-      payload: { title, message }, 
-      status: 'read',
-      persistent: false, 
-      created_at: new Date().toISOString() 
-    })
+
+  const success = (title: string, message: string) => addToast('success', title, message)
+  const error = (title: string, message: string) => addToast('error', title, message)
+  const warning = (title: string, message: string) => addToast('warning', title, message)
+  const info = (title: string, message: string) => addToast('info', title, message)
 
   // Cleanup function to prevent memory leaks
   const cleanup = () => {
@@ -293,9 +226,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     deleteNotification,
     loadNotifications,
     loadUnreadNotifications,
-    
-    // Helper functions
-    convertBackendNotification,
     
     // Toast convenience methods
     success,
