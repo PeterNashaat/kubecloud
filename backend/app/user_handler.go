@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"kubecloud/internal"
-	"kubecloud/internal/activities"
 	"kubecloud/internal/metrics"
 	"kubecloud/internal/notification"
 	"kubecloud/models"
@@ -22,9 +21,11 @@ import (
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 	"github.com/xmonader/ewf"
 
+	"kubecloud/internal/constants"
+	"kubecloud/internal/logger"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"kubecloud/internal/logger"
 
 	"github.com/vedhavyas/go-subkey"
 )
@@ -226,7 +227,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserRegistration)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowUserRegistration)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
@@ -308,7 +309,8 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 			return
 		}
 		payload := notification.CommonPayload{
-			Message: "User email is verified",
+			Message: "User email is verified successfully",
+			Subject: "User email verified",
 		}
 		notification := models.NewNotification(user.ID, "user_registration", notification.MergePayload(payload, map[string]string{}), models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityInfo))
 		err = h.notificationService.Send(context.Background(), notification)
@@ -317,7 +319,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		}
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowUserVerification)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
@@ -706,7 +708,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowChargeBalance)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowChargeBalance)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
@@ -886,7 +888,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowRedeemVoucher)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)

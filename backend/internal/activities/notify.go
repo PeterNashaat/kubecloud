@@ -3,9 +3,11 @@ package activities
 import (
 	"context"
 	"fmt"
+	"kubecloud/internal/constants"
 	"kubecloud/internal/notification"
 	"kubecloud/internal/statemanager"
 	"kubecloud/models"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,76 +17,115 @@ import (
 	"github.com/xmonader/ewf"
 )
 
-const (
-	timeFormat = "Mon Jan 2, 2006 at 3:04pm (MST)"
-)
+func workflowToNotificationType(workflowName string) models.NotificationType {
+	billingWf := []string{constants.WorkflowChargeBalance, constants.WorkflowAdminCreditBalance, constants.WorkflowRedeemVoucher}
+	deployWf := []string{constants.WorkflowDeleteAllClusters, constants.WorkflowDeleteCluster, constants.WorkflowRemoveNode, constants.WorkflowAddNode, constants.WorkflowRollbackFailedDeployment}
+	nodesWf := []string{constants.WorkflowReserveNode, constants.WorkflowUnreserveNode}
+	userWf := []string{constants.WorkflowUserVerification, constants.WorkflowUserRegistration}
+
+	switch {
+	case slices.Contains(billingWf, workflowName):
+		return models.NotificationTypeBilling
+	case slices.Contains(deployWf, workflowName):
+		return models.NotificationTypeDeployment
+	case slices.Contains(nodesWf, workflowName):
+		return models.NotificationTypeNode
+	case slices.Contains(userWf, workflowName):
+		return models.NotificationTypeUser
+	default:
+		return models.NotificationTypeDeployment
+	}
+}
 
 func notifyWorkflowProgress(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, wf *ewf.Workflow, err error) {
-		config, confErr := getConfig(wf.State)
-		if confErr != nil {
-			logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
-			return
+		var notifcation *models.Notification
+		notifcationType := workflowToNotificationType(wf.Name)
+		if notifcationType == models.NotificationTypeDeployment {
+			notifcation = CreateDeploymentWorkflowNotification(ctx, wf, err)
 		}
-
-		workflowDesc := getWorkflowDescription(wf.Name)
-		var notificationPayload map[string]string
-
-		if err != nil {
-			message := fmt.Sprintf("%s failed", workflowDesc)
-			if cluster, clusterErr := statemanager.GetCluster(wf.State); clusterErr == nil {
-				message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
-			}
-
-			notificationPayload = notification.MergePayload(notification.CommonPayload{
-				Message: message,
-				Error:   err.Error(),
-			}, map[string]string{
-				"name": wf.Name,
-			})
-
-			notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityError))
-			err = notificationService.Send(ctx, notification)
+		if notifcationType == models.NotificationTypeBilling {
+			notifcation = CreateBillingWorkflowNotification(ctx, wf, err)
+		}
+		if notifcationType == models.NotificationTypeNode {
+			notifcation = CreateNodeWorkflowNotification(ctx, wf, err)
+		}
+		if notifcationType == models.NotificationTypeUser {
+			notifcation = CreateUserWorkflowNotification(ctx, wf, err)
+		}
+		if notifcation != nil {
+			err = notificationService.Send(ctx, notifcation)
 			if err != nil {
-				logger.GetLogger().Error().Err(err).Msg("Failed to send workflow update notification")
+				logger.GetLogger().Error().Err(err).Msg("Failed to send notification")
 			}
-			return
-		}
-		cluster, clusterErr := statemanager.GetCluster(wf.State)
-		if clusterErr != nil {
-			notificationPayload = notification.MergePayload(notification.CommonPayload{
-				Message: fmt.Sprintf("%s completed successfully", workflowDesc),
-			}, map[string]string{
-				"name": wf.Name,
-			})
-
-		} else {
-			nodeCount := len(cluster.Nodes)
-			totalSteps := nodeCount + 2
-			message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
-				workflowDesc, cluster.Name, nodeCount)
-
-			notificationPayload = notification.MergePayload(notification.CommonPayload{
-				Message: message,
-			}, map[string]string{
-				"name":         wf.Name,
-				"cluster_name": cluster.Name,
-				"node_count":   fmt.Sprintf("%d", nodeCount),
-				"total_steps":  fmt.Sprintf("%d", totalSteps),
-			})
-		}
-
-		notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeveritySuccess))
-		err = notificationService.Send(ctx, notification)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Msg("Failed to send workflow update notification")
 		}
 	}
 }
 
+func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err error) *models.Notification {
+	config, confErr := getConfig(wf.State)
+	if confErr != nil {
+		logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
+		return &models.Notification{}
+	}
+
+	workflowDesc := getWorkflowDescription(wf.Name)
+	var notificationPayload map[string]string
+
+	if err != nil {
+		message := fmt.Sprintf("%s failed", workflowDesc)
+		if cluster, clusterErr := statemanager.GetCluster(wf.State); clusterErr == nil {
+			message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
+		}
+
+		notificationPayload = notification.MergePayload(notification.CommonPayload{
+			Message: message,
+			Error:   err.Error(),
+			Subject: fmt.Sprintf("%s failed", workflowDesc),
+			Status:  "failed",
+		}, map[string]string{
+			"name": wf.Name,
+		})
+
+		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+		return notification
+	}
+	cluster, clusterErr := statemanager.GetCluster(wf.State)
+	if clusterErr != nil {
+		notificationPayload = notification.MergePayload(notification.CommonPayload{
+			Message: fmt.Sprintf("%s completed successfully", workflowDesc),
+			Subject: fmt.Sprintf("%s completed successfully", workflowDesc),
+			Status:  "succeeded",
+		}, map[string]string{
+			"name": wf.Name,
+		})
+
+	} else {
+		nodeCount := len(cluster.Nodes)
+		totalSteps := nodeCount + 2
+		message := fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
+			workflowDesc, cluster.Name, nodeCount)
+
+		notificationPayload = notification.MergePayload(notification.CommonPayload{
+			Message: message,
+			Subject: fmt.Sprintf("%s completed successfully ",
+				workflowDesc),
+			Status: "succeeded",
+		}, map[string]string{
+			"name":         wf.Name,
+			"cluster_name": cluster.Name,
+			"node_count":   fmt.Sprintf("%d", nodeCount),
+			"total_steps":  fmt.Sprintf("%d", totalSteps),
+		})
+	}
+
+	notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
+	return notification
+}
+
 // notifyStepProgress sends step progress notifications
 func notifyStepProgress(notificationService *notification.NotificationService, state ewf.State, workflowName, stepName string, status string, err error, retryCount, maxRetries int) {
-	if stepName != StepDeployNetwork && !isDeployStep(stepName) {
+	if stepName != constants.StepDeployNetwork && !isDeployStep(stepName) {
 		return
 	}
 
@@ -128,7 +169,7 @@ func notifyStepProgress(notificationService *notification.NotificationService, s
 
 	payload := notification.MergePayload(
 		notification.CommonPayload{
-			Subject: "Cluster Deployment",
+			Subject: "Cluster Deployment Progress",
 			Status:  status,
 			Message: fmt.Sprintf("Deploying cluster %q - %s", clusterName, message),
 		},
@@ -183,7 +224,7 @@ func notifyStepHook(notificationService *notification.NotificationService) ewf.A
 }
 
 func calculateCurrentStep(stepName string) int {
-	if stepName == StepDeployNetwork {
+	if stepName == constants.StepDeployNetwork {
 		return 1
 	}
 
@@ -227,96 +268,14 @@ func isDeployStep(stepName string) bool {
 	return strings.HasPrefix(stepName, "deploy-") && strings.HasSuffix(stepName, "-node")
 }
 
-func NotifyCreateDeploymentResult(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
-	return func(ctx context.Context, wf *ewf.Workflow, err error) {
-		config, confErr := getConfig(wf.State)
-		if confErr != nil {
-			logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
-			return
-		}
-
-		cluster, clusterErr := statemanager.GetCluster(wf.State)
-		workflowDesc := getWorkflowDescription(wf.Name)
-
-		var notificationPayload map[string]string
-		if err != nil {
-			message := fmt.Sprintf("%s failed", workflowDesc)
-			if clusterErr == nil {
-				message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
-			}
-			notificationPayload = notification.MergePayload(notification.CommonPayload{
-				Subject: fmt.Sprintf("%s failed", workflowDesc),
-				Status:  "failed",
-				Message: message,
-				Error:   err.Error(),
-			}, map[string]string{})
-
-			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload, models.WithChannels(notification.ChannelEmail))
-			err := notificationService.Send(ctx, notification)
-			if err != nil {
-				logger.GetLogger().Error().Err(err).Msg("Failed to send deployment failure notification")
-			}
-			return
-		}
-
-		message := fmt.Sprintf("%s completed successfully", workflowDesc)
-		if clusterErr == nil {
-			nodeCount := len(cluster.Nodes)
-			message = fmt.Sprintf("%s completed successfully for cluster '%s' with %d nodes",
-				workflowDesc, cluster.Name, nodeCount)
-		}
-		notificationPayload = notification.MergePayload(notification.CommonPayload{
-			Subject: fmt.Sprintf("%s completed successfully", workflowDesc),
-			Status:  "succeeded",
-			Message: message,
-		}, map[string]string{
-			"cluster_name": cluster.Name,
-			"timestamp":    time.Now().Format(timeFormat),
-		})
-
-		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload, models.WithChannels(notification.ChannelEmail))
-		err = notificationService.Send(ctx, notification)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment success notification")
-		}
-	}
+func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err error) *models.Notification {
+	return nil
 }
 
-func NotifyDeploymentDeleted(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
-	return func(ctx context.Context, wf *ewf.Workflow, err error) {
-		config, confErr := getConfig(wf.State)
-		if confErr != nil {
-			logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
-			return
-		}
+func CreateNodeWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err error) *models.Notification {
+	return nil
+}
 
-		if err != nil {
-			return
-		}
-
-		// Try to get cluster and more data for richer notification
-		cluster, clusterErr := statemanager.GetCluster(wf.State)
-		message := "Deployment deleted successfully"
-		clusterName := ""
-		nodeCount := 0
-		if clusterErr == nil {
-			clusterName = cluster.Name
-			nodeCount = len(cluster.Nodes)
-			message = fmt.Sprintf("Deployment for cluster '%s' with %d nodes was deleted", clusterName, nodeCount)
-		}
-		notificationPayload := notification.MergePayload(notification.CommonPayload{
-			Subject: "Deployment deleted",
-			Status:  "deleted",
-			Message: message,
-		}, map[string]string{
-			"timestamp":    time.Now().Format(timeFormat),
-			"cluster_name": clusterName,
-		})
-
-		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
-		err = notificationService.Send(ctx, notification)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Msg("Failed to send deployment deleted notification")
-		}
-	}
+func CreateUserWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err error) *models.Notification {
+	return nil
 }
