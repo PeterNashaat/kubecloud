@@ -78,7 +78,7 @@ func RegisterEWFWorkflows(
 			BackOff:     ewf.ConstantBackoff(2 * time.Second),
 		}},
 	}
-	userVerificationTemplate.AfterWorkflowHooks = append(userVerificationTemplate.AfterWorkflowHooks, hookVerificationWorkflowCompleted(notificationService))
+
 	engine.RegisterTemplate(constants.WorkflowUserVerification, &userVerificationTemplate)
 
 	chargeBalanceTemplate := newKubecloudWorkflowTemplate(notificationService)

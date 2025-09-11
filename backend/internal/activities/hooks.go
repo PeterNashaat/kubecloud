@@ -6,7 +6,6 @@ import (
 
 	"kubecloud/internal/logger"
 	"kubecloud/internal/notification"
-	"kubecloud/models"
 
 	"github.com/xmonader/ewf"
 )
@@ -73,38 +72,4 @@ func getOrdinalSuffix(n int) string {
 
 func getDeployNodeStepName(index int) string {
 	return fmt.Sprintf("deploy-%d%s-node", index, getOrdinalSuffix(index))
-}
-
-// hookVerificationWorkflowCompleted is called after user verification workflow completes
-func hookVerificationWorkflowCompleted(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
-	return func(ctx context.Context, w *ewf.Workflow, err error) {
-		userID, ok := w.State["user_id"].(int)
-		if !ok {
-			logger.GetLogger().Error().Msg("user_id not found or invalid in workflow state")
-			return
-		}
-		notifcation := models.NewNotification(userID, "user_registration", map[string]string{}, models.WithNoPersist())
-		if err != nil {
-			notifcation.Severity = models.NotificationSeverityError
-			notifcation.Payload = notification.MergePayload(notification.CommonPayload{
-				Message: "User verification failed. Please try again later.",
-				Subject: "User verification",
-			}, map[string]string{})
-			err = notificationService.Send(ctx, notifcation)
-			if err != nil {
-				logger.GetLogger().Error().Err(err).Msg("Failed to send user verification notification")
-			}
-			return
-		}
-
-		notifcation.Severity = models.NotificationSeveritySuccess
-		notifcation.Payload = notification.MergePayload(notification.CommonPayload{
-			Message: "User verification completed successfully",
-			Subject: "User verification",
-		}, map[string]string{})
-		err = notificationService.Send(ctx, notifcation)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Msg("Failed to send user verification notification")
-		}
-	}
 }
