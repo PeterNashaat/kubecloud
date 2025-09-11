@@ -35,13 +35,14 @@ func hookStepDone(_ context.Context, w *ewf.Workflow, step *ewf.Step, err error)
 	}
 }
 
-func newKubecloudWorkflowTemplate() ewf.WorkflowTemplate {
+func newKubecloudWorkflowTemplate(n *notification.NotificationService) ewf.WorkflowTemplate {
 	return ewf.WorkflowTemplate{
 		BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
 			hookWorkflowStarted,
 		},
 		AfterWorkflowHooks: []ewf.AfterWorkflowHook{
 			hookWorkflowDone,
+			notifyWorkflowProgress(n),
 		},
 		BeforeStepHooks: []ewf.BeforeStepHook{
 			hookStepStarted,
@@ -77,7 +78,11 @@ func getDeployNodeStepName(index int) string {
 // hookVerificationWorkflowCompleted is called after user verification workflow completes
 func hookVerificationWorkflowCompleted(notificationService *notification.NotificationService) ewf.AfterWorkflowHook {
 	return func(ctx context.Context, w *ewf.Workflow, err error) {
-		userID := w.State["user_id"].(int)
+		userID, ok := w.State["user_id"].(int)
+		if !ok {
+			logger.GetLogger().Error().Msg("user_id not found or invalid in workflow state")
+			return
+		}
 		notifcation := models.NewNotification(userID, "user_registration", map[string]string{}, models.WithNoPersist())
 		if err != nil {
 			notifcation.Severity = models.NotificationSeverityError

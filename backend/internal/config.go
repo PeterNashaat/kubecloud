@@ -2,10 +2,10 @@ package internal
 
 import (
 	"fmt"
+	"kubecloud/internal/logger"
 	"os"
 	"os/user"
 	"path/filepath"
-	"kubecloud/internal/logger"
 	"strings"
 
 	"github.com/go-playground/validator"
@@ -222,7 +222,12 @@ func LoadConfig() (Configuration, error) {
 		return Configuration{}, fmt.Errorf("failed to expand log directory path: %w", err)
 	}
 
-	config.Notification, err = loadNotificationConfig(config.NotificationConfigPath)
+	notificationFilePath, err := expandPath(config.NotificationConfigPath)
+	if err != nil {
+		return Configuration{}, fmt.Errorf("failed to expand notification config path: %w", err)
+	}
+
+	config.Notification, err = loadNotificationConfig(notificationFilePath)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("Failed to load notification config")
 		config.Notification = NotificationConfig{}

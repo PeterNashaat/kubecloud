@@ -31,10 +31,11 @@ var (
 	longExponentialRetryPolicy = &ewf.RetryPolicy{MaxAttempts: 5, BackOff: ewf.ExponentialBackoff(30*time.Second, 5*time.Minute, 2.0)}
 
 	workflowsDescriptions = map[string]string{
-		constants.WorkflowAddNode:           "Adding Node",
-		constants.WorkflowRemoveNode:        "Removing Node",
-		constants.WorkflowDeleteCluster:     "Deleting Cluster",
-		constants.WorkflowDeleteAllClusters: "Deleting All Clusters",
+		constants.WorkflowAddNode:                  "Adding Node",
+		constants.WorkflowRemoveNode:               "Removing Node",
+		constants.WorkflowDeleteCluster:            "Deleting Cluster",
+		constants.WorkflowDeleteAllClusters:        "Deleting All Clusters",
+		constants.WorkflowRollbackFailedDeployment: "Rollback Deployment",
 	}
 )
 
@@ -520,9 +521,6 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 			logger.GetLogger().Error().Err(err).Msg("Failed to send notification")
 		}
 	})
-	workflow.AfterWorkflowHooks = append(workflow.AfterWorkflowHooks,
-		NotifyCreateDeploymentResult(notificationService),
-	)
 	workflow.Steps = steps
 	workflow.AfterStepHooks = []ewf.AfterStepHook{
 		notifyStepHook(notificationService),
@@ -581,10 +579,9 @@ func deploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.Aft
 }
 
 func createDeployerWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
-	template := newKubecloudWorkflowTemplate()
+	template := newKubecloudWorkflowTemplate(notificationService)
 	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
 		[]ewf.AfterWorkflowHook{
-			notifyWorkflowProgress(notificationService),
 			deploymentFailureHook(engine, metrics),
 			CloseClient,
 		}...)
@@ -613,9 +610,6 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: constants.StepRemoveCluster, RetryPolicy: standardRetryPolicy},
 		{Name: constants.StepRemoveClusterFromDB, RetryPolicy: standardRetryPolicy},
 	}
-	deleteWFTemplate.AfterWorkflowHooks = append(deleteWFTemplate.AfterWorkflowHooks,
-		NotifyDeploymentDeleted(notificationService),
-	)
 	engine.RegisterTemplate(constants.WorkflowDeleteCluster, &deleteWFTemplate)
 
 	deleteAllDeploymentsWFTemplate := createDeployerWorkflowTemplate(notificationService, engine, metrics)
