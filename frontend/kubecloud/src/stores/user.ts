@@ -71,6 +71,8 @@ export const useUserStore = defineStore('user',
       error.value = null
       // Clear localStorage
       authService.clearTokens()
+      // Clear notifications and related ephemeral state
+      useNotificationStore().reset()
     }
 
     interface RegisterFormData {

@@ -65,7 +65,8 @@
                 v-for="notification in displayedNotifications"
                 :key="notification.id"
                 :class="{ 
-                  'bg-blue-lighten-5 border-s-md border-primary': notification.status === 'unread',
+                  'notification-unread': notification.status === 'unread',
+                  'notification-read': notification.status === 'read',
                   'notification-clickable': true
                 }"
                 @click="onNotificationClick(notification)"
@@ -73,13 +74,13 @@
                 :ripple="true"
               >
                 <template v-slot:prepend>
-                  <v-avatar size="40" :color="getNotificationColor(notification.type)" class="notification-icon">
-                    <v-icon :icon="getNotificationIcon(notification.type)" color="white"></v-icon>
+                  <v-avatar size="40" :color="getNotificationColor(notification.severity)" class="notification-icon">
+                    <v-icon :icon="getNotificationIcon(notification.severity)" color="white"></v-icon>
                   </v-avatar>
                 </template>
 
-                <v-list-item-title class="notification-title">{{ notification.title }}</v-list-item-title>
-                <v-list-item-subtitle class="notification-message">{{ notification.message }}</v-list-item-subtitle>
+                <v-list-item-title class="notification-title">{{ notification.payload.title || notification.payload.message || 'Notification' }}</v-list-item-title>
+                <v-list-item-subtitle class="notification-message">{{ notification.payload.message || notification.payload.description || notification.payload.details || '' }}</v-list-item-subtitle>
                 <v-list-item-subtitle class="notification-time">{{ formatNotificationTime(notification.created_at) }}</v-list-item-subtitle>
 
                 <template v-slot:append>
@@ -120,6 +121,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useNotificationStore, type Notification } from '../stores/notifications'
 import { getNotificationIcon, getNotificationColor, formatNotificationTime } from '../utils/notificationUtils'
 
@@ -128,10 +130,15 @@ const notificationStore = useNotificationStore()
 const showDropdown = ref(false)
 const dropdownLimit = 10
 
+// Use storeToRefs to maintain reactivity
 const {
   persistentNotifications,
   loading,
-  unreadCount,
+  unreadCount
+} = storeToRefs(notificationStore)
+
+// Destructure methods (these don't need reactivity)
+const {
   markAsRead,
   markAllAsRead,
   loadNotifications
@@ -139,7 +146,7 @@ const {
 
 // Computed property to limit displayed notifications
 const displayedNotifications = computed(() =>
-  persistentNotifications.slice(0, dropdownLimit)
+  persistentNotifications.value.slice(0, dropdownLimit)
 )
 
 const onNotificationClick = (notification: Notification) => {
@@ -158,14 +165,14 @@ const navigateToNotificationsPage = () => {
 
 // Watch for dropdown state changes
 watch(showDropdown, (newValue) => {
-  if (newValue && persistentNotifications.length === 0) {
+  if (newValue && persistentNotifications.value.length === 0) {
     loadNotifications()
   }
 })
 
 // Initial load
 onMounted(() => {
-  if (persistentNotifications.length === 0) {
+  if (persistentNotifications.value.length === 0) {
     loadNotifications()
   }
 })
@@ -216,5 +223,28 @@ onMounted(() => {
 .notification-time {
   font-size: 0.75rem;
   opacity: 0.7;
+}
+
+/* Reuse page styles for consistency */
+.notification-unread {
+  background: linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg-hover) 100%) !important;
+  border-left: 4px solid var(--color-primary) !important;
+}
+
+.notification-read {
+  background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-elevated) 100%) !important;
+  border-left: 4px solid var(--color-border) !important;
+}
+
+.notification-title {
+  color: var(--color-text);
+}
+
+.notification-message {
+  color: var(--color-text-secondary);
+}
+
+.notification-time {
+  color: var(--color-text-muted);
 }
 </style>

@@ -13,9 +13,10 @@
 <script lang="ts" setup>
 import { RouterView, useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, onErrorCaptured } from 'vue'
-import { useUserStore } from './stores/user'
+import { useUserStore, type User } from './stores/user'
 import { useNotificationStore } from './stores/notifications'
 import { useMaintenanceStore } from './stores/maintenance'
+import { api, type ApiResponse } from './utils/api'
 import NavBar from './components/NavBar.vue'
 import AppFooter from './components/AppFooter.vue'
 import NotificationToast from './components/NotificationToast.vue'
@@ -59,8 +60,15 @@ onMounted(async () => {
 
     // Initialize notifications after auth is ready
     const initializeNotifications = async () => {
-      if (userStore.user && userStore.user.id) {
+      if (userStore.token) {
         try {
+          // Load user data if not already loaded
+          if (!userStore.user) {
+            const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
+            userStore.user = userRes.data.data.user
+          }
+          
+          // Load notifications
           await notificationStore.loadNotifications()
         } catch (error) {
           console.error('Failed to initialize notifications:', error)

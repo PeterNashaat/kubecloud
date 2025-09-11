@@ -4,14 +4,14 @@
       <div 
         v-for="notification in toastNotifications" 
         :key="notification.id" 
-        :class="['toast', notification.type]"
+        :class="['toast', notification.severity]"
       >
-        <v-icon class="toast-icon" :color="getToastColor(notification.type)" left>
-          {{ getToastIcon(notification.type) }}
+        <v-icon class="toast-icon" :color="getToastColor(notification.severity)" left>
+          {{ getToastIcon(notification.severity) }}
         </v-icon>
         <div class="toast-content">
-          <div class="toast-title">{{ notification.title }}</div>
-          <div class="toast-message">{{ notification.message }}</div>
+          <div class="toast-title">{{ notification.payload.title || notification.payload.message || 'Notification' }}</div>
+          <div class="toast-message">{{ notification.payload.message || notification.payload.description || notification.payload.details || '' }}</div>
         </div>
         <v-btn icon class="toast-close" @click="removeNotification(String(notification.id))">
           <v-icon>mdi-close</v-icon>

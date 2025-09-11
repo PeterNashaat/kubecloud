@@ -17,7 +17,6 @@ export function useSseEvents() {
   const notificationStore = useNotificationStore()
   const userStore = useUserStore()
   const clusterStore = useClusterStore()
-  const { fetchRentedNodes } = useNodeManagement()
 
   const isConnected = ref(false)
   const reconnectAttempts = ref(0)
@@ -71,7 +70,7 @@ export function useSseEvents() {
       return
     }
 
-    // Map known event kinds to UI toasts and/or persistent notifications
+    // Map known event kinds to UI toasts only (SSE should not persist)
     if (type === 'workflow_update') {
       const message = evt.message || evt.data?.message
       if (message) {
@@ -89,15 +88,19 @@ export function useSseEvents() {
       return
     }
 
-    // Default channel: create a persistent notification entry so bell shows it
-    notificationStore.addNotification({
-      type: (evt.type as any) || 'task_update',
-      title: evt.data?.status || 'Notification',
-      message: evt.data?.message || evt.message || 'New notification',
-      status: 'unread',
-      persistent: true,
-      created_at: new Date().toISOString()
-    })
+    // Default channel: show as toast only (non-persistent)
+    const title = evt.data?.status || 'Notification'
+    const message = evt.data?.message || evt.message || 'New notification'
+    const lower = `${title} ${message}`.toLowerCase()
+    if (lower.includes('fail')) {
+      notificationStore.error(title, message)
+    } else if (lower.includes('complete') || lower.includes('success')) {
+      notificationStore.success(title, message)
+    } else if (lower.includes('warn')) {
+      notificationStore.warning(title, message)
+    } else {
+      notificationStore.info(title, message)
+    }
   }
 
   async function refreshClusterData() {

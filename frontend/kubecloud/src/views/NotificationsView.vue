@@ -25,8 +25,9 @@
           <v-btn
             variant="outlined"
             color="secondary"
-            @click="confirmClearAll"
+            @click="openClearAllDialog"
             :loading="loading"
+            :disabled="persistentNotifications.length === 0 || loading"
             prepend-icon="mdi-delete-sweep"
           >
             Clear All
@@ -35,33 +36,30 @@
       </div>
 
       <!-- Filters -->
-      <v-card class="mb-6" elevation="2">
-        <v-card-text class="pa-4">
-          <div class="d-flex align-center gap-4">
-            <v-btn-toggle
-              v-model="statusFilter"
-              mandatory
-              color="primary"
-              variant="outlined"
-            >
-              <v-btn value="all">All</v-btn>
-              <v-btn value="unread">Unread ({{ unreadCount }})</v-btn>
-              <v-btn value="read">Read</v-btn>
-            </v-btn-toggle>
+      <div class="d-flex align-center gap-4 mb-5">
+        <v-btn-toggle
+          v-model="statusFilter"
+          mandatory
+          color="primary"
+          variant="outlined"
+        >
+          <v-btn value="all">All</v-btn>
+          <v-btn value="unread">Unread ({{ unreadCount }})</v-btn>
+          <v-btn value="read">Read</v-btn>
+        </v-btn-toggle>
 
-            <v-select
-              v-model="typeFilter"
-              :items="typeOptions"
-              label="Type"
-              variant="outlined"
-              density="compact"
-              hide-details
-              class="ml-4"
-              style="min-width: 200px"
-            ></v-select>
-          </div>
-        </v-card-text>
-      </v-card>
+        <v-select
+          v-model="typeFilter"
+          :items="typeOptions"
+          label="Type"
+          variant="outlined"
+          density="compact"
+          hide-details
+          class="ml-4"
+          style="min-width: 200px"
+        ></v-select>
+      </div>
+
 
       <!-- Notifications List -->
       <v-card elevation="2">
@@ -80,38 +78,39 @@
           </div>
 
           <div v-else>
-            <v-list class="pa-0">
+            <v-list>
               <v-list-item
                 v-for="notification in paginatedNotifications"
                 :key="notification.id"
                 :class="{ 
-                  'bg-blue-lighten-5 border-s-lg border-primary': notification.status === 'unread',
+                  'notification-unread': notification.status === 'unread',
+                  'notification-read': notification.status === 'read',
                   'notification-clickable': true
                 }"
                 @click="onNotificationClick(notification)"
-                class="pa-4 mb-2 mx-2 rounded-lg elevation-1"
+                class="pa-4 mb-3 mx-2 rounded-lg elevation-2"
                 :ripple="true"
               >
                 <template v-slot:prepend>
                   <v-avatar
                     size="48"
-                    :color="getNotificationColor(notification.type)"
+                    :color="getNotificationColor(notification.severity)"
                     class="notification-icon mr-4"
                   >
                     <v-icon
-                      :icon="getNotificationIcon(notification.type)"
+                      :icon="getNotificationIcon(notification.severity)"
                       color="white"
                       size="24"
                     ></v-icon>
                   </v-avatar>
                 </template>
 
-                <v-list-item-title class="text-h6 font-weight-medium mb-2 text-primary notification-title">
-                  {{ notification.title }}
+                <v-list-item-title class="text-h6 font-weight-medium mb-2 notification-title">
+                  {{ notification.payload.title || notification.payload.message || 'Notification' }}
                 </v-list-item-title>
 
-                <v-list-item-subtitle class="text-body-1 mb-2 text-medium-emphasis notification-message">
-                  {{ notification.message }}
+                <v-list-item-subtitle class="text-body-1 mb-2 notification-message">
+                  {{ notification.payload.message || notification.payload.description || notification.payload.details || '' }}
                 </v-list-item-subtitle>
 
                 <div class="d-flex align-center justify-space-between">
@@ -119,14 +118,14 @@
                     {{ formatNotificationTime(notification.created_at) }}
                   </v-list-item-subtitle>
 
-                  <div class="d-flex gap-2">
+                  <div class="d-flex gap-2 align-center">
                     <v-chip
-                      :color="getNotificationColor(notification.type)"
+                      :color="getNotificationColor(notification.severity)"
                       variant="tonal"
                       size="small"
                       class="text-caption"
                     >
-                      {{ notification.type.replace('_', ' ').toUpperCase() }}
+                      {{ notification.severity.toUpperCase() }}
                     </v-chip>
 
                     <v-chip
@@ -138,6 +137,41 @@
                     >
                       UNREAD
                     </v-chip>
+
+                    <v-btn
+                      v-if="notification.status === 'unread'"
+                      icon
+                      size="small"
+                      variant="text"
+                      @click.stop="markAsRead(notification.id)"
+                      color="success"
+                      class="ml-2"
+                    >
+                      <v-icon icon="mdi-check" size="16"></v-icon>
+                    </v-btn>
+
+                    <v-btn
+                      v-else
+                      icon
+                      size="small"
+                      variant="text"
+                      @click.stop="markAsUnread(notification.id)"
+                      color="primary"
+                      class="ml-2"
+                    >
+                      <v-icon icon="mdi-email-outline" size="16"></v-icon>
+                    </v-btn>
+
+                    <v-btn
+                      icon
+                      size="small"
+                      variant="text"
+                      @click.stop="openDeleteDialog(notification)"
+                      color="error"
+                      class="ml-1"
+                    >
+                      <v-icon icon="mdi-delete" size="16"></v-icon>
+                    </v-btn>
                   </div>
                 </div>
               </v-list-item>
@@ -160,43 +194,83 @@
           </div>
         </v-card-text>
       </v-card>
+      
+      <!-- Delete Confirmation Dialog -->
+      <v-dialog v-model="showDeleteDialog" max-width="420">
+        <v-card class="pa-3">
+          <v-card-title class="text-h6">Delete Notification</v-card-title>
+          <v-card-text>
+            Are you sure you want to delete this notification? This action cannot be undone.
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" color="grey" @click="showDeleteDialog = false">Cancel</v-btn>
+            <v-btn variant="outlined" color="error" :loading="deleting" @click="confirmDelete">Delete</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Clear All Confirmation Dialog -->
+      <v-dialog v-model="showClearAllDialog" max-width="420">
+        <v-card class="pa-3">
+          <v-card-title class="text-h6">Clear All Notifications</v-card-title>
+          <v-card-text>
+            Are you sure you want to clear all notifications? This action cannot be undone.
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" color="grey" @click="showClearAllDialog = false">Cancel</v-btn>
+            <v-btn variant="outlined" color="error" :loading="clearing" @click="confirmClearAll">Clear All</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useNotificationStore, type Notification } from '../stores/notifications'
 import { getNotificationIcon, getNotificationColor, formatNotificationTime } from '../utils/notificationUtils'
 
 const notificationStore = useNotificationStore()
+
+// Use storeToRefs to maintain reactivity
 const {
   persistentNotifications,
   loading,
-  unreadCount,
+  unreadCount
+} = storeToRefs(notificationStore)
+
+// Destructure methods (these don't need reactivity)
+const {
+  markAsRead,
+  markAsUnread,
   markAllAsRead,
   clearAll,
+  deleteNotification,
   loadNotifications
 } = notificationStore
 
 // Filters
 const statusFilter = ref<'all' | 'read' | 'unread'>('all')
-const typeFilter = ref<'all' | 'deployment_update' | 'task_update' | 'connected' | 'error'>('all')
+const typeFilter = ref<'all' | 'deployment' | 'billing' | 'user' | 'connected'>('all')
 const currentPage = ref(1)
 const pageSize = 10
 
 // Type options for filter
 const typeOptions = computed(() => [
   { title: 'All Types', value: 'all' },
-  { title: 'Deployment Updates', value: 'deployment_update' },
-  { title: 'Task Updates', value: 'task_update' },
-  { title: 'Connection Events', value: 'connected' },
-  { title: 'Errors', value: 'error' }
+  { title: 'Deployment', value: 'deployment' },
+  { title: 'Billing', value: 'billing' },
+  { title: 'User', value: 'user' },
+  { title: 'Connected', value: 'connected' }
 ])
 
 // Filtered notifications
 const filteredNotifications = computed(() => {
-  let filtered = [...persistentNotifications]
+  let filtered = [...persistentNotifications.value]
 
   // Filter by status
   if (statusFilter.value !== 'all') {
@@ -226,9 +300,41 @@ const onNotificationClick = async (notification: Notification) => {
   }
 }
 
-const confirmClearAll = () => {
-  if (confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
-    clearAll()
+// Dialog state and handlers
+const showClearAllDialog = ref(false)
+const showDeleteDialog = ref(false)
+const notificationToDelete = ref<Notification | null>(null)
+const clearing = ref(false)
+const deleting = ref(false)
+
+const openClearAllDialog = () => {
+  showClearAllDialog.value = true
+}
+
+const openDeleteDialog = (notification: Notification) => {
+  notificationToDelete.value = notification
+  showDeleteDialog.value = true
+}
+
+const confirmClearAll = async () => {
+  try {
+    clearing.value = true
+    await clearAll()
+  } finally {
+    clearing.value = false
+    showClearAllDialog.value = false
+  }
+}
+
+const confirmDelete = async () => {
+  if (!notificationToDelete.value) return
+  try {
+    deleting.value = true
+    await deleteNotification(notificationToDelete.value.id)
+  } finally {
+    deleting.value = false
+    showDeleteDialog.value = false
+    notificationToDelete.value = null
   }
 }
 
@@ -239,7 +345,7 @@ watch([statusFilter, typeFilter], () => {
 
 // Initial load
 onMounted(() => {
-  if (persistentNotifications.length === 0) {
+  if (persistentNotifications.value.length === 0) {
     loadNotifications()
   }
 })
@@ -287,5 +393,45 @@ onMounted(() => {
   white-space: normal;
   line-height: 1.5;
   max-width: none;
+}
+
+/* Enhanced notification styling using Mycelium Cloud theme */
+.notification-unread {
+  background: linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg-hover) 100%) !important;
+  border-left: 4px solid var(--color-primary) !important;
+  box-shadow: var(--shadow-md) !important;
+  transition: var(--transition-normal) !important;
+}
+
+.notification-unread:hover {
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.notification-read {
+  background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-elevated) 100%) !important;
+  border-left: 4px solid var(--color-border) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: var(--transition-normal) !important;
+}
+
+.notification-read:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+.notification-title {
+  color: var(--color-text) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.notification-message {
+  color: var(--color-text-secondary) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height-relaxed) !important;
+}
+
+.notification-time {
+  color: var(--color-text-muted) !important;
+  font-weight: var(--font-weight-medium) !important;
 }
 </style>
