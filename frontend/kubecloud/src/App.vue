@@ -20,7 +20,7 @@ import { api, type ApiResponse } from './utils/api'
 import NavBar from './components/NavBar.vue'
 import AppFooter from './components/AppFooter.vue'
 import NotificationToast from './components/NotificationToast.vue'
-import { useSseEvents } from "./composables/useSseEvents"
+import { useDeploymentEvents } from "./composables/useDeploymentEvents"
 const route = useRoute()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
@@ -56,7 +56,7 @@ onMounted(async () => {
       return
     }
     userStore.initializeAuth()
-    useSseEvents()
+    useDeploymentEvents()
 
     // Initialize notifications after auth is ready
     const initializeNotifications = async () => {
