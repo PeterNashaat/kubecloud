@@ -502,14 +502,20 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 
 	workflow := createDeployerWorkflowTemplate(notificationService, engine, metrics)
 	workflow.BeforeWorkflowHooks = append(workflow.BeforeWorkflowHooks, func(ctx context.Context, w *ewf.Workflow) {
-		userID := w.State["config"].(statemanager.ClientConfig).UserID
+		cfg, err := getConfig(w.State)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("missing or invalid config in workflow state")
+			return
+		}
+		userID := cfg.UserID
 		payload := notification.CommonPayload{
 			Status:  "started",
 			Message: "Your cluster has started deploying.",
+			Subject: "Cluster deployment started",
 		}
 
 		notification := models.NewNotification(userID, models.NotificationTypeDeployment, notification.MergePayload(payload, map[string]string{}))
-		err := notificationService.Send(ctx, notification)
+		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send notification")
 		}

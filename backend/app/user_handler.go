@@ -309,7 +309,8 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 			return
 		}
 		payload := notification.CommonPayload{
-			Message: "User email is verified",
+			Message: "User email is verified successfully",
+			Subject: "User email verified",
 		}
 		notification := models.NewNotification(user.ID, "user_registration", notification.MergePayload(payload, map[string]string{}), models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityInfo))
 		err = h.notificationService.Send(context.Background(), notification)

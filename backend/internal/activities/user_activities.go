@@ -153,6 +153,7 @@ func SetupTFChainStep(client *substrate.Substrate, config internal.Configuration
 		}
 		payload := notification.MergePayload(notification.CommonPayload{
 			Message: "Registering user is in progress",
+			Subject: "User Registration",
 		}, map[string]string{})
 		notification := models.NewNotification(userID, "user_registration", payload, models.WithNoPersist())
 		err := notificationService.Send(ctx, notification)
@@ -270,6 +271,7 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, notificationService *no
 		}
 		payload := notification.MergePayload(notification.CommonPayload{
 			Message: "Account verification is in progress",
+			Subject: "Account verification",
 		}, map[string]string{})
 		notification := models.NewNotification(userID, "user_registration", payload, models.WithNoPersist())
 		err = notificationService.Send(ctx, notification)
@@ -368,9 +370,9 @@ func CreatePaymentIntentStep(currency string, metrics *metrics.Metrics, notifica
 			metrics.IncrementStripePaymentFailure()
 			payload := notification.MergePayload(notification.CommonPayload{
 				Status:  "funds_failed",
-				Message: "Adding funds failed",
+				Message: "Failed to add funds to your account",
 				Error:   err.Error(),
-				Subject: "Adding funds failed",
+				Subject: "Adding Funds Failed",
 			}, map[string]string{
 				"amount": fmt.Sprintf("%.2f", internal.FromUSDMilliCentToUSD(amount)),
 			})
@@ -456,6 +458,7 @@ func CreatePendingRecord(substrateClient *substrate.Substrate, db models.DB, sys
 		if transferMode == models.RedeemVoucherMode {
 			notificationData := notification.MergePayload(notification.CommonPayload{
 				Message: fmt.Sprintf("Voucher redeemed successfully for %.2f$", amountUSD),
+				Subject: "Voucher Redeemed",
 			}, map[string]string{})
 			notification := models.NewNotification(userID, models.NotificationTypeBilling, notificationData, models.WithNoPersist(), models.WithSeverity(models.NotificationSeveritySuccess))
 			err = notificationService.Send(ctx, notification)
@@ -505,8 +508,8 @@ func UpdateCreditCardBalanceStep(db models.DB, notificationService *notification
 		newBalanceUSD := internal.FromUSDMilliCentToUSD(user.CreditCardBalance)
 		payload := notification.MergePayload(notification.CommonPayload{
 			Status:  "funds_succeeded",
-			Message: "Adding funds succeeded",
-			Subject: "Funds added to your balance",
+			Message: fmt.Sprintf("Funds were added successfully to your account. Amount added: $%.2f. New balance: $%.2f.", amountUSD, newBalanceUSD),
+			Subject: "Adding Funds Succeeded",
 		}, map[string]string{
 			"balance": fmt.Sprintf("%.2f", newBalanceUSD),
 			"amount":  fmt.Sprintf("%.2f", amountUSD),
@@ -555,18 +558,20 @@ func UpdateCreditedBalanceStep(db models.DB, notificationService *notification.N
 		amountUSD := internal.FromUSDMilliCentToUSD(amount)
 		newBalanceUSD := internal.FromUSDMilliCentToUSD(user.CreditedBalance)
 		status := "voucher_redeemed"
+		var message, subject string
 		if mode, ok := state["transfer_mode"].(string); ok && mode != models.RedeemVoucherMode {
 			status = "funds_succeeded"
-		}
-		message := "Voucher redeemed"
-		if status == "funds_succeeded" {
-			message = "Balance credited"
+			message = fmt.Sprintf("Your account has been credited with $%.2f. New balance: $%.2f.", amountUSD, newBalanceUSD)
+			subject = "Funds Added Successfully"
+		} else {
+			message = fmt.Sprintf("Voucher redeemed successfully. Amount added: $%.2f. New balance: $%.2f.", amountUSD, newBalanceUSD)
+			subject = "Voucher Redeemed"
 		}
 		payload := notification.MergePayload(
 			notification.CommonPayload{
 				Status:  status,
 				Message: message,
-				Subject: message,
+				Subject: subject,
 			}, map[string]string{
 				"amount":  fmt.Sprintf("%.2f", amountUSD),
 				"balance": fmt.Sprintf("%.2f", newBalanceUSD),

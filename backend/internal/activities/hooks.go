@@ -82,7 +82,8 @@ func hookVerificationWorkflowCompleted(notificationService *notification.Notific
 		if err != nil {
 			notifcation.Severity = models.NotificationSeverityError
 			notifcation.Payload = notification.MergePayload(notification.CommonPayload{
-				Message: "User verification failed",
+				Message: "User verification failed. Please try again later.",
+				Subject: "User verification",
 			}, map[string]string{})
 			err = notificationService.Send(ctx, notifcation)
 			if err != nil {
@@ -93,7 +94,8 @@ func hookVerificationWorkflowCompleted(notificationService *notification.Notific
 
 		notifcation.Severity = models.NotificationSeveritySuccess
 		notifcation.Payload = notification.MergePayload(notification.CommonPayload{
-			Message: "User verification completed",
+			Message: "User verification completed successfully",
+			Subject: "User verification",
 		}, map[string]string{})
 		err = notificationService.Send(ctx, notifcation)
 		if err != nil {

@@ -40,11 +40,12 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 			notificationPayload = notification.MergePayload(notification.CommonPayload{
 				Message: message,
 				Error:   err.Error(),
+				Subject: fmt.Sprintf("%s failed", workflowDesc),
 			}, map[string]string{
 				"name": wf.Name,
 			})
 
-			notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityError))
+			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeverityError))
 			err = notificationService.Send(ctx, notification)
 			if err != nil {
 				logger.GetLogger().Error().Err(err).Msg("Failed to send workflow update notification")
@@ -55,6 +56,7 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 		if clusterErr != nil {
 			notificationPayload = notification.MergePayload(notification.CommonPayload{
 				Message: fmt.Sprintf("%s completed successfully", workflowDesc),
+				Subject: fmt.Sprintf("%s completed successfully", workflowDesc),
 			}, map[string]string{
 				"name": wf.Name,
 			})
@@ -67,6 +69,8 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 
 			notificationPayload = notification.MergePayload(notification.CommonPayload{
 				Message: message,
+				Subject: fmt.Sprintf("%s completed successfully ",
+					workflowDesc),
 			}, map[string]string{
 				"name":         wf.Name,
 				"cluster_name": cluster.Name,
@@ -75,7 +79,7 @@ func notifyWorkflowProgress(notificationService *notification.NotificationServic
 			})
 		}
 
-		notification := models.NewNotification(config.UserID, "workflow_update", notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeveritySuccess))
+		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload, models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeveritySuccess))
 		err = notificationService.Send(ctx, notification)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send workflow update notification")
@@ -129,7 +133,7 @@ func notifyStepProgress(notificationService *notification.NotificationService, s
 
 	payload := notification.MergePayload(
 		notification.CommonPayload{
-			Subject: "Cluster Deployment",
+			Subject: "Cluster Deployment Progress",
 			Status:  status,
 			Message: fmt.Sprintf("Deploying cluster %q - %s", clusterName, message),
 		},
