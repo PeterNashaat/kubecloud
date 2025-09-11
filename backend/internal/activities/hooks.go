@@ -6,12 +6,40 @@ import (
 
 	"kubecloud/internal/logger"
 	"kubecloud/internal/notification"
+	"kubecloud/models"
 
 	"github.com/xmonader/ewf"
 )
 
-func hookWorkflowStarted(ctx context.Context, w *ewf.Workflow) {
-	logger.GetLogger().Info().Str("workflow_name", w.Name).Msg("Starting workflow")
+func hookWorkflowStarted(n *notification.NotificationService) ewf.BeforeWorkflowHook {
+	return func(ctx context.Context, w *ewf.Workflow) {
+		cfg, err := getConfig(w.State)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("missing or invalid config in workflow state")
+			return
+		}
+		userID := cfg.UserID
+
+		workflowDesc := getWorkflowDescription(w.Name)
+		subject := fmt.Sprintf("%s Started", workflowDesc)
+		message := fmt.Sprintf("%s has been started", workflowDesc)
+
+		payload := notification.MergePayload(notification.CommonPayload{
+			Subject: subject,
+			Message: message,
+			Status:  "started",
+		}, map[string]string{
+			"workflow_name": w.Name,
+		})
+
+		notificationType := workflowToNotificationType(w.Name)
+		notification := models.NewNotification(userID, notificationType, payload, models.WithNoPersist())
+		err = n.Send(ctx, notification)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("Failed to send notification")
+		}
+		logger.GetLogger().Info().Str("workflow_name", w.Name).Msg("Starting workflow")
+	}
 }
 
 func hookStepStarted(ctx context.Context, w *ewf.Workflow, step *ewf.Step) {
@@ -37,7 +65,7 @@ func hookStepDone(_ context.Context, w *ewf.Workflow, step *ewf.Step, err error)
 func newKubecloudWorkflowTemplate(n *notification.NotificationService) ewf.WorkflowTemplate {
 	return ewf.WorkflowTemplate{
 		BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
-			hookWorkflowStarted,
+			hookWorkflowStarted(n),
 		},
 		AfterWorkflowHooks: []ewf.AfterWorkflowHook{
 			hookWorkflowDone,

@@ -13,6 +13,21 @@ import (
 	"github.com/xmonader/ewf"
 )
 
+var workflowsDescriptions = map[string]string{
+	constants.WorkflowAddNode:                  "Adding Node",
+	constants.WorkflowRemoveNode:               "Removing Node",
+	constants.WorkflowDeleteCluster:            "Deleting Cluster",
+	constants.WorkflowDeleteAllClusters:        "Deleting All Clusters",
+	constants.WorkflowRollbackFailedDeployment: "Rollback Deployment",
+	constants.WorkflowUserRegistration:         "User Registration",
+	constants.WorkflowUserVerification:         "User Verification",
+	constants.WorkflowChargeBalance:            "Charge Balance",
+	constants.WorkflowAdminCreditBalance:       "Admin Credit Balance",
+	constants.WorkflowRedeemVoucher:            "Redeem Voucher",
+	constants.WorkflowReserveNode:              "Reserve Node",
+	constants.WorkflowUnreserveNode:            "Unreserve Node",
+}
+
 func RegisterEWFWorkflows(
 	engine *ewf.Engine,
 	config internal.Configuration,
@@ -123,5 +138,6 @@ func RegisterEWFWorkflows(
 		{Name: constants.StepSendUINotification, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: constants.StepSendEmailNotification, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
+	notificationTemplate.BeforeWorkflowHooks = []ewf.BeforeWorkflowHook{}
 	engine.RegisterTemplate(constants.WorkflowSendNotification, &notificationTemplate)
 }
