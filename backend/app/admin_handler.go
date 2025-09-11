@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"kubecloud/internal"
-	"kubecloud/internal/activities"
 	"kubecloud/models"
 	"mime/multipart"
 	"net/http"
@@ -16,10 +15,12 @@ import (
 	"sync"
 	"time"
 
+	"kubecloud/internal/constants"
+	"kubecloud/internal/logger"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
 	"gorm.io/gorm"
-	"kubecloud/internal/logger"
 )
 
 type UserResponse struct {
@@ -325,7 +326,7 @@ func (h *Handler) CreditUserHandler(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowAdminCreditBalance)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowAdminCreditBalance)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)

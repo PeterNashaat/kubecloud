@@ -31,11 +31,11 @@ type SSEManager struct {
 
 // SSEMessage represents a server-sent event message
 type SSEMessage struct {
-	Type      string    `json:"type"`
-	Data      any       `json:"data"`
-	Severity  string    `json:"severity"`
-	TaskID    string    `json:"task_id,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
+	Type      string            `json:"type"`
+	Data      map[string]string `json:"data"`
+	Severity  string            `json:"severity"`
+	TaskID    string            `json:"task_id,omitempty"`
+	Timestamp time.Time         `json:"timestamp"`
 }
 
 // NewSSEManager creates a new SSE manager
@@ -98,11 +98,14 @@ func (s *SSEManager) RemoveClient(userID int, clientChan chan SSEMessage) {
 }
 
 // Notify sends a message to all clients of a specific user
-func (s *SSEManager) Notify(userID int, msgType string, severity models.NotificationSeverity, data any, taskID ...string) {
+func (s *SSEManager) Notify(userID int, msgType string, severity models.NotificationSeverity, data map[string]string, taskID ...string) {
 	message := SSEMessage{
-		Type:      msgType,
-		Severity:  string(severity),
-		Data:      data,
+		Type:     msgType,
+		Severity: string(severity),
+		Data: map[string]string{
+			"message": data["message"],
+			"status":  data["status"],
+		},
 		Timestamp: time.Now(),
 	}
 
