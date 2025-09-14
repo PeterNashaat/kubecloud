@@ -603,6 +603,8 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	addNodeWFTemplate.Steps = []ewf.Step{
 		{Name: StepUpdateNetwork, RetryPolicy: criticalRetryPolicy},
 		{Name: StepAddNode, RetryPolicy: standardRetryPolicy},
+		{Name: StepFetchKubeconfig, RetryPolicy: criticalRetryPolicy},
+    	{Name: StepVerifyClusterReady, RetryPolicy: longExponentialRetryPolicy},
 		{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(WorkflowAddNode, &addNodeWFTemplate)
