@@ -584,7 +584,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepUpdateNetwork, UpdateNetworkStep(metrics))
 	engine.Register(StepRemoveNode, RemoveDeploymentNodeStep())
 	engine.Register(StepStoreDeployment, StoreDeploymentStep(db, metrics))
-	engine.Register(StepFetchKubeconfig, FetchKubeconfigStep(config.SSH.PrivateKeyPath))
+	engine.Register(StepFetchKubeconfig, FetchKubeconfigStep(db, config.SSH.PrivateKeyPath))
 	engine.Register(StepVerifyClusterReady, VerifyClusterReadyStep())
 	engine.Register(StepRemoveClusterFromDB, RemoveClusterFromDBStep(db))
 	engine.Register(StepGatherAllContractIDs, GatherAllContractIDsStep(db))
@@ -670,11 +670,24 @@ func getConfig(state ewf.State) (statemanager.ClientConfig, error) {
 	return config, nil
 }
 
-func FetchKubeconfigStep(privateKeyPath string) ewf.StepFn {
+func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		cluster, err := statemanager.GetCluster(state)
 		if err != nil {
 			return fmt.Errorf("failed to get cluster from state: %w", err)
+		}
+
+		config, err := getConfig(state)
+		if err != nil {
+			return err
+		}
+
+		// when updating existing cluster
+		existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
+		if err == nil && existingCluster.Kubeconfig != "" {
+			state["kubeconfig"] = existingCluster.Kubeconfig
+			return nil
+
 		}
 
 		master, err := cluster.GetLeaderNode()
