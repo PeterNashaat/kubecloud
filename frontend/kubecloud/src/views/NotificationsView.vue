@@ -99,7 +99,7 @@
                 <template v-slot:prepend>
                   <v-avatar
                     size="48"
-                    :color="getNotificationColor(notification.type)"
+                    :color="getNotificationColor(notification.severity)"
                     class="notification-icon mr-4"
                   >
                     <v-icon
@@ -125,7 +125,7 @@
 
                   <div class="d-flex gap-2 align-center">
                     <v-chip
-                      :color="getNotificationColor(notification.type)"
+                      :color="getNotificationColor(notification.severity)"
                       variant="tonal"
                       size="small"
                       class="text-caption"
