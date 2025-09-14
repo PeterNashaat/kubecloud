@@ -8,6 +8,7 @@ import (
 	"kubecloud/internal/logger"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -200,6 +201,26 @@ func addFlags() error {
 	return nil
 }
 
+// reloadNotificationsCmd represents the reload-notifications command
+var reloadNotificationsCmd = &cobra.Command{
+	Use:   "reload-notifications",
+	Short: "Reload notification configuration",
+	Long:  `Send a SIGHUP signal to reload notification configuration without restarting the server.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("Reloading notification configuration...")
+
+		execCmd := exec.Command("sh", "-c", "pgrep -f 'kubecloud.*--config' | head -1 | xargs kill -HUP")
+		if err := execCmd.Run(); err != nil {
+			return fmt.Errorf("failed to send reload signal (make sure kubecloud server is running): %w", err)
+		}
+
+		fmt.Println("Notification configuration reload signal sent!")
+		fmt.Println("Check logs: tail -f backend/logs/app.log")
+
+		return nil
+	},
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -208,6 +229,9 @@ func init() {
 
 	// Map environment variables to their corresponding keys
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Add subcommands
+	rootCmd.AddCommand(reloadNotificationsCmd)
 
 	if err := addFlags(); err != nil {
 		logger.GetLogger().Fatal().Err(err).Msg("Failed to add flags")

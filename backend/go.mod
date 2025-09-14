@@ -3,7 +3,6 @@ module kubecloud
 go 1.24.3
 
 require (
-	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
@@ -55,6 +54,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/ethereum/go-ethereum v1.11.6 // indirect
+	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/getsentry/sentry-go v0.29.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

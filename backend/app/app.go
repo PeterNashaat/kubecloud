@@ -11,11 +11,11 @@ import (
 	"kubecloud/models"
 	"net/http"
 	"os"
-	"path/filepath"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/deployer"
 	"github.com/threefoldtech/tfgrid-sdk-go/grid-client/graphql"
@@ -35,18 +35,18 @@ import (
 
 // App holds all configurations for the app
 type App struct {
-	router              *gin.Engine
-	httpServer          *http.Server
-	config              internal.Configuration
-	handlers            Handler
-	db                  models.DB
-	redis               *internal.RedisClient
-	sseManager          *internal.SSEManager
-	notificationService *notification.NotificationService
-	gridClient          deployer.TFPluginClient
-	appCtx              context.Context
-	appCancel           context.CancelFunc
-	metrics             *metrics.Metrics
+	router                   *gin.Engine
+	httpServer               *http.Server
+	config                   internal.Configuration
+	handlers                 Handler
+	db                       models.DB
+	redis                    *internal.RedisClient
+	sseManager               *internal.SSEManager
+	notificationService      *notification.NotificationService
+	gridClient               deployer.TFPluginClient
+	appCancel                context.CancelFunc
+	metrics                  *metrics.Metrics
+	notificationReloaderStop func()
 }
 
 // NewApp create new instance of the app with all configs
@@ -154,6 +154,8 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		return nil, fmt.Errorf("failed to validate notification configs channels against registered notifiers: %w", err)
 	}
 
+	stopNotificationReloader := startNotificationReloader(notificationService)
+
 	// Create an app-level context for coordinating shutdown
 	systemIdentity, err := substrate.NewIdentityFromSr25519Phrase(config.SystemAccount.Mnemonic)
 	if err != nil {
@@ -166,7 +168,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 	}
 	sshPublicKey := strings.TrimSpace(string(sshPublicKeyBytes))
 
-	appCtx, appCancel := context.WithCancel(ctx)
+	_, appCancel := context.WithCancel(ctx)
 
 	// Derive sponsor (system) account SS58 address once
 	sponsorKeyPair, err := internal.KeyPairFromMnemonic(config.SystemAccount.Mnemonic)
@@ -203,17 +205,17 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		systemIdentity, kycClient, sponsorKeyPair, sponsorAddress, metrics, notificationService)
 
 	app := &App{
-		router:              router,
-		config:              config,
-		handlers:            *handler,
-		redis:               redisClient,
-		db:                  db,
-		sseManager:          sseManager,
-		notificationService: notificationService,
-		appCtx:              appCtx,
-		appCancel:           appCancel,
-		gridClient:          gridClient,
-		metrics:             metrics,
+		router:                   router,
+		config:                   config,
+		handlers:                 *handler,
+		redis:                    redisClient,
+		db:                       db,
+		sseManager:               sseManager,
+		notificationService:      notificationService,
+		appCancel:                appCancel,
+		gridClient:               gridClient,
+		metrics:                  metrics,
+		notificationReloaderStop: stopNotificationReloader,
 	}
 
 	activities.RegisterEWFWorkflows(
@@ -356,11 +358,6 @@ func (app *App) Run() error {
 	internal.InitValidator()
 	app.StartBackgroundWorkers()
 	app.handlers.ewfEngine.ResumeRunningWorkflows()
-
-	// Start notification config watcher
-	startNotificationConfigWatcher(app.appCtx, app.notificationService, app.config.NotificationConfigPath)
-	logger.GetLogger().Info().Msg("Started notification config file watcher")
-
 	app.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", app.config.Server.Port),
 		Handler: app.router,
@@ -381,6 +378,10 @@ func (app *App) Shutdown(ctx context.Context) error {
 	// First, cancel the app context to signal all components to stop
 	if app.appCancel != nil {
 		app.appCancel()
+	}
+	//stop notification reload
+	if app.notificationReloaderStop != nil {
+		app.notificationReloaderStop()
 	}
 
 	if app.httpServer != nil {
@@ -414,78 +415,35 @@ func (app *App) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func startNotificationConfigWatcher(ctx context.Context, svc *notification.NotificationService, notificationConfigPath string) {
-	// Create fsnotify watcher
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		logger.GetLogger().Error().Err(err).Msg("failed to create file watcher")
-		return
-	}
+func startNotificationReloader(svc *notification.NotificationService) (stop func()) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGHUP)
 
-	// Add the notification config file to watch
-	err = watcher.Add(notificationConfigPath)
-	if err != nil {
-		logger.GetLogger().Error().Err(err).Str("file", notificationConfigPath).Msg("failed to watch notification config file")
-		watcher.Close()
-		return
-	}
-
-	// Start watching in a goroutine
+	done := make(chan struct{})
 	go func() {
-		defer watcher.Close()
-
 		for {
 			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-
-				// Only process Write and Create events, ignore temporary files
-				if (event.Op&(fsnotify.Write|fsnotify.Create) == 0) || isTemporaryFile(event.Name) {
-					continue
-				}
-
-				logger.GetLogger().Info().
-					Str("file", event.Name).
-					Str("operation", event.Op.String()).
-					Msg("notification config file changed, reloading...")
-
-				// Reload the config
+			case <-ch:
 				cfg, err := internal.LoadConfig()
 				if err != nil {
 					logger.GetLogger().Error().Err(err).Msg("failed to load notification config")
 					continue
 				}
-
 				err = svc.ReloadNotificationConfig(cfg.Notification)
 				if err != nil {
 					logger.GetLogger().Error().Err(err).Msg("failed to reload notification config")
 					continue
 				}
-
-				logger.GetLogger().Info().Msg("notification config reloaded successfully")
-
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				logger.GetLogger().Error().Err(err).Msg("file watcher error")
-
-			case <-ctx.Done():
-				logger.GetLogger().Info().Msg("notification config watcher stopping due to context cancellation")
+				logger.GetLogger().Info().Msg("notification config reloaded")
+			case <-done:
 				return
 			}
 		}
 	}()
-}
 
-// isTemporaryFile checks if the file is a temporary file that should be ignored
-func isTemporaryFile(filename string) bool {
-	base := filepath.Base(filename)
-	return strings.HasPrefix(base, ".") ||
-		strings.HasSuffix(base, "~") ||
-		strings.HasSuffix(base, ".tmp") ||
-		strings.Contains(base, ".swp") ||
-		strings.Contains(base, ".swo")
+	return func() {
+		signal.Stop(ch)
+		close(done)
+		close(ch)
+	}
 }
