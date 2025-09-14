@@ -9,14 +9,12 @@ import (
 	"github.com/xmonader/ewf"
 )
 
-const (
-	ClusterHealthCheckInterval = 6 * time.Hour
-)
-
 func (h *Handler) TrackClusterHealth() {
-	ticker := time.NewTicker(ClusterHealthCheckInterval)
-	defer ticker.Stop()
 
+	interval := time.Duration(h.config.ClusterHealthCheckIntervalInHours) * time.Hour
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for range ticker.C {
 		logger.GetLogger().Info().Msg("Cluster health check test started")
 		clusters, err := h.db.ListAllClusters()
