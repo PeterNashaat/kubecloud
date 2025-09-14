@@ -687,14 +687,14 @@ func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 		// when updating existing cluster
 		existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
 		if err != nil {
-            if !errors.Is(err, gorm.ErrRecordNotFound) {
-                return fmt.Errorf("failed to query cluster from database: %w", err)
-            }
-        }
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("failed to query cluster from database: %w", err)
+			}
+		}
 		if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
-            state["kubeconfig"] = existingCluster.Kubeconfig
-            return nil
-        }
+			state["kubeconfig"] = existingCluster.Kubeconfig
+			return nil
+		}
 
 		master, err := cluster.GetLeaderNode()
 		if err != nil {
