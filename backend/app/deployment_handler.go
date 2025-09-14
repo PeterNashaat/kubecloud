@@ -206,6 +206,11 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 		return
 	}
 
+	if cluster.Kubeconfig != "" {
+		c.JSON(http.StatusOK, gin.H{"kubeconfig": cluster.Kubeconfig})
+		return
+	}
+
 	clusterResult, err := cluster.GetClusterResult()
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to deserialize cluster result")
@@ -247,6 +252,11 @@ func (h *Handler) HandleGetKubeconfig(c *gin.Context) {
 		logger.GetLogger().Error().Err(err).Str("node_name", targetNode.Name).Msg("Failed to retrieve kubeconfig via SSH")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve kubeconfig: " + err.Error()})
 		return
+	}
+
+	cluster.Kubeconfig = kubeconfig
+	if err := h.db.UpdateCluster(&cluster); err != nil {
+		logger.GetLogger().Error().Err(err).Int("cluster_id", cluster.ID).Msg("Failed to save kubeconfig to database")
 	}
 
 	c.JSON(http.StatusOK, gin.H{"kubeconfig": kubeconfig})

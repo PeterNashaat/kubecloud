@@ -260,8 +260,14 @@ func StoreDeploymentStep(db models.DB, metrics *metrics.Metrics) ewf.StepFn {
 			return err
 		}
 
+		kubeconfig, ok := state["kubeconfig"].(string)
+		if !ok || kubeconfig == "" {
+			return fmt.Errorf("kubeconfig not found in state")
+		}
+
 		dbCluster := &models.Cluster{
 			ProjectName: cluster.ProjectName,
+			Kubeconfig:  kubeconfig,
 		}
 
 		if err := dbCluster.SetClusterResult(cluster); err != nil {
@@ -275,6 +281,7 @@ func StoreDeploymentStep(db models.DB, metrics *metrics.Metrics) ewf.StepFn {
 			}
 		} else { // cluster exists, update it
 			existingCluster.Result = dbCluster.Result
+			existingCluster.Kubeconfig = dbCluster.Kubeconfig
 			if err := db.UpdateCluster(&existingCluster); err != nil {
 				return fmt.Errorf("failed to update cluster in database: %w", err)
 			}
