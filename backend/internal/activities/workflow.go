@@ -58,6 +58,9 @@ func RegisterEWFWorkflows(
 	engine.Register(constants.StepSendUINotification, SendNotification(db, notificationService.GetNotifiers()[notification.ChannelUI]))
 
 	registerWorkflowTemplate := newKubecloudWorkflowTemplate(notificationService)
+	registerWorkflowTemplate.BeforeWorkflowHooks = []ewf.BeforeWorkflowHook{
+		hookNotificationWorkflowStarted,
+	}
 	registerWorkflowTemplate.Steps = []ewf.Step{
 		{Name: constants.StepCreateUser, RetryPolicy: &ewf.RetryPolicy{
 			MaxAttempts: 2,
@@ -138,6 +141,11 @@ func RegisterEWFWorkflows(
 		{Name: constants.StepSendUINotification, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 		{Name: constants.StepSendEmailNotification, RetryPolicy: &ewf.RetryPolicy{MaxAttempts: 2, BackOff: ewf.ConstantBackoff(2 * time.Second)}},
 	}
-	notificationTemplate.BeforeWorkflowHooks = []ewf.BeforeWorkflowHook{}
+	notificationTemplate.BeforeWorkflowHooks = []ewf.BeforeWorkflowHook{
+		hookNotificationWorkflowStarted,
+	}
+	notificationTemplate.AfterWorkflowHooks = []ewf.AfterWorkflowHook{
+		hookWorkflowDone,
+	}
 	engine.RegisterTemplate(constants.WorkflowSendNotification, &notificationTemplate)
 }

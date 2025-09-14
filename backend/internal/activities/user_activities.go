@@ -151,15 +151,7 @@ func SetupTFChainStep(client *substrate.Substrate, config internal.Configuration
 		if !ok {
 			return fmt.Errorf("'user_id' in state is not an int")
 		}
-		payload := notification.MergePayload(notification.CommonPayload{
-			Message: "Registering user is in progress",
-			Subject: "User Registration",
-		}, map[string]string{})
-		notification := models.NewNotification(userID, "user_registration", payload, models.WithNoPersist())
-		err := notificationService.Send(ctx, notification)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Msg("Failed to send notification registering user is in progress")
-		}
+
 		existingUser, err := db.GetUserByID(userID)
 		if err != nil {
 			return fmt.Errorf("failed to check existing user: %w", err)
@@ -268,15 +260,6 @@ func CreateKYCSponsorship(kycClient *internal.KYCClient, notificationService *no
 		mnemonic, ok := mnemonicVal.(string)
 		if !ok {
 			return fmt.Errorf("'mnemonic' in state is not a string")
-		}
-		payload := notification.MergePayload(notification.CommonPayload{
-			Message: "Account verification is in progress",
-			Subject: "Account verification",
-		}, map[string]string{})
-		notification := models.NewNotification(userID, "user_registration", payload, models.WithNoPersist())
-		err = notificationService.Send(ctx, notification)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Msg("Failed to send notification account verification is in progress")
 		}
 
 		// Set user.AccountAddress from mnemonic

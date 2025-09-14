@@ -331,9 +331,9 @@ func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, er
 }
 
 func CreateNodeWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err error) *models.Notification {
-	config, confErr := getConfig(wf.State)
-	if confErr != nil {
-		logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
+	userID, ok := wf.State["user_id"].(int)
+	if !ok {
+		logger.GetLogger().Error().Msg("Missing or invalid 'user_id' in workflow state")
 		return nil
 	}
 
@@ -395,7 +395,7 @@ func CreateNodeWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 	}
 
 	return models.NewNotification(
-		config.UserID,
+		userID,
 		models.NotificationTypeNode,
 		payload,
 		models.WithChannels(notification.ChannelUI),
@@ -405,9 +405,9 @@ func CreateNodeWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 }
 
 func CreateUserWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err error) *models.Notification {
-	config, confErr := getConfig(wf.State)
-	if confErr != nil {
-		logger.GetLogger().Error().Msg("Missing or invalid 'config' in workflow state")
+	userID, ok := wf.State["user_id"].(int)
+	if !ok {
+		logger.GetLogger().Error().Msg("Missing or invalid 'user_id' in workflow state")
 		return nil
 	}
 
@@ -449,7 +449,7 @@ func CreateUserWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 	}
 
 	return models.NewNotification(
-		config.UserID,
+		userID,
 		models.NotificationTypeUser,
 		payload,
 		models.WithNoPersist(),

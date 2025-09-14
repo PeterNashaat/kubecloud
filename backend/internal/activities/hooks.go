@@ -13,12 +13,22 @@ import (
 
 func hookWorkflowStarted(n *notification.NotificationService) ewf.BeforeWorkflowHook {
 	return func(ctx context.Context, w *ewf.Workflow) {
+		var userID int
 		cfg, err := getConfig(w.State)
+		if err == nil {
+			userID = cfg.UserID
+			logger.GetLogger().Info().Int("user_id", userID).Msg("hookWorkflowStarted")
+		}
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Msg("missing or invalid config in workflow state")
-			return
+			userIDVal, ok := w.State["user_id"].(int)
+			if !ok {
+				logger.GetLogger().Error().Msg("missing or invalid 'user_id' in workflow state")
+				return
+			}
+			userID = userIDVal
+			logger.GetLogger().Info().Int("user_id", userID).Msg("hookWorkflowStarted")
 		}
-		userID := cfg.UserID
 
 		workflowDesc := getWorkflowDescription(w.Name)
 		subject := fmt.Sprintf("%s Started", workflowDesc)
@@ -60,6 +70,10 @@ func hookStepDone(_ context.Context, w *ewf.Workflow, step *ewf.Step, err error)
 	} else {
 		logger.GetLogger().Info().Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step completed successfully")
 	}
+}
+
+func hookNotificationWorkflowStarted(ctx context.Context, w *ewf.Workflow) {
+	logger.GetLogger().Info().Str("workflow_name", w.Name).Msg("Starting notification workflow")
 }
 
 func newKubecloudWorkflowTemplate(n *notification.NotificationService) ewf.WorkflowTemplate {
