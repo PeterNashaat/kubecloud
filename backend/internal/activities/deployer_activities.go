@@ -3,6 +3,7 @@ package activities
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/metrics"
@@ -16,6 +17,7 @@ import (
 	"kubecloud/internal/logger"
 
 	"github.com/xmonader/ewf"
+	"gorm.io/gorm"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -684,11 +686,15 @@ func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 
 		// when updating existing cluster
 		existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
-		if err == nil && existingCluster.Kubeconfig != "" {
-			state["kubeconfig"] = existingCluster.Kubeconfig
-			return nil
-
-		}
+		if err != nil {
+            if !errors.Is(err, gorm.ErrRecordNotFound) {
+                return fmt.Errorf("failed to query cluster from database: %w", err)
+            }
+        }
+		if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
+            state["kubeconfig"] = existingCluster.Kubeconfig
+            return nil
+        }
 
 		master, err := cluster.GetLeaderNode()
 		if err != nil {
