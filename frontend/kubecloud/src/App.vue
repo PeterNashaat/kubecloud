@@ -12,7 +12,7 @@
 
 <script lang="ts" setup>
 import { RouterView, useRoute } from 'vue-router'
-import { computed, onMounted, onErrorCaptured } from 'vue'
+import { computed, onMounted, onUnmounted, onErrorCaptured } from 'vue'
 import { useUserStore } from './stores/user'
 import { useNotificationStore } from './stores/notifications'
 import { useMaintenanceStore } from './stores/maintenance'
@@ -34,7 +34,6 @@ onErrorCaptured((error: Error & { silent?: boolean }) => {
     notificationStore.error(
       'Something went wrong',
       error.message || 'An unexpected error occurred. Please try refreshing the page.',
-      { duration: 8000 }
     )
   }
 
@@ -57,6 +56,7 @@ onMounted(async () => {
     }
     userStore.initializeAuth()
     useDeploymentEvents()
+    await notificationStore.loadNotifications()
   } catch (error) {
     console.error('Failed to initialize application:', error)
   }
@@ -68,10 +68,14 @@ onMounted(async () => {
       notificationStore.error(
         'Unexpected Error',
         event.error?.message || 'An unexpected error occurred',
-        { duration: 8000 }
       )
     }
   })
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  notificationStore.cleanup()
 })
 
 </script>

@@ -42,6 +42,11 @@ export const useUserStore = defineStore('user',
     const isLoggedIn = computed(() => !!token.value)
 
     // Actions
+    const loadUser = async () => {
+      const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
+      user.value = userRes.data.data.user
+    }
+
     const login = async (email: string, password: string) => {
       isLoading.value = true
       error.value = null
@@ -55,8 +60,7 @@ export const useUserStore = defineStore('user',
 
         // Set token in store
         token.value = response.access_token
-        const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
-        user.value = userRes.data.data.user
+        await loadUser()
       } catch (err) {
         error.value = err instanceof Error ? err.message : 'Login failed'
         throw err
@@ -71,6 +75,8 @@ export const useUserStore = defineStore('user',
       error.value = null
       // Clear localStorage
       authService.clearTokens()
+      // Clear notifications and related ephemeral state
+      useNotificationStore().reset()
     }
 
     interface RegisterFormData {
@@ -120,8 +126,7 @@ export const useUserStore = defineStore('user',
           useNotificationStore().error('Registration Failed', 'Failed to register user')
           throw new Error('Failed to register user')
         }
-        const userRes = await api.get<ApiResponse<{ user: User }>>('/v1/user/', { requiresAuth: true, showNotifications: false })
-        user.value = userRes.data.data.user
+        await loadUser()
         router.push('/dashboard')
       } catch (err) {
         error.value = err instanceof Error ? err.message : 'Verification failed'
@@ -202,6 +207,7 @@ export const useUserStore = defineStore('user',
       refreshToken,
       initializeAuth,
       updateNetBalance,
+      loadUser,
     }
   },
   // Persisted state options
