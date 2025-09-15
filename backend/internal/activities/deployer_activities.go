@@ -674,6 +674,10 @@ func getConfig(state ewf.State) (statemanager.ClientConfig, error) {
 
 func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+		if kubeconfig, ok := state["kubeconfig"].(string); ok && kubeconfig != "" {
+			return nil
+		}
+
 		cluster, err := statemanager.GetCluster(state)
 		if err != nil {
 			return fmt.Errorf("failed to get cluster from state: %w", err)
@@ -686,11 +690,10 @@ func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 
 		// when updating existing cluster
 		existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
-		if err != nil {
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("failed to query cluster from database: %w", err)
-			}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("failed to query cluster from database: %w", err)
 		}
+
 		if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
 			state["kubeconfig"] = existingCluster.Kubeconfig
 			return nil
