@@ -699,9 +699,23 @@ func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 			return nil
 		}
 
-		master, err := cluster.GetLeaderNode()
-		if err != nil {
-			return fmt.Errorf("failed to get leader node in cluster")
+		var master kubedeployer.Node
+		if existingCluster.ID != 0 {
+			existingClusterResult, err := existingCluster.GetClusterResult()
+			if err != nil {
+				return fmt.Errorf("failed to get cluster result from existing cluster: %w", err)
+			}
+			master, err = existingClusterResult.GetLeaderNode()
+			if err != nil {
+				return fmt.Errorf("failed to get leader node from existing cluster: %w", err)
+			}
+
+		} else {
+			master, err = cluster.GetLeaderNode()
+			if err != nil {
+				return fmt.Errorf("failed to get leader node from existing cluster: %w", err)
+			}
+
 		}
 
 		privateKeyBytes, err := os.ReadFile(privateKeyPath)
