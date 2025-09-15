@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/natefinch/lumberjack"
 	"github.com/rs/zerolog"
@@ -47,9 +48,20 @@ func InitLogger(config LoggerConfig, debug bool) error {
 		Compress:   config.Compress,
 	}
 
+	lokiWriter := NewLokiWriter(
+		"http://loki:3100/loki/api/v1/push",
+		map[string]string{
+			"app":  "my-service",
+			"env":  os.Getenv("APP_ENV"),
+			"host": os.Getenv("HOSTNAME"),
+		},
+		2*time.Second,
+	)
+
 	multi := zerolog.MultiLevelWriter(
 		zerolog.ConsoleWriter{Out: os.Stderr},
 		rotator,
+		lokiWriter,
 	)
 
 	// Initialize the singleton instance
