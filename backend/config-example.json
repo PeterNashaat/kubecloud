@@ -11,10 +11,7 @@
     "access_token_expiry_minutes": 15,
     "refresh_token_expiry_hours": 25
   },
-  "admins": [
-    "admin@example.com",
-    "admin2@example.com"
-  ],
+  "admins": ["admin@example.com", "admin2@example.com"],
   "mailSender": {
     "email": "noreply@example.com",
     "sendgrid_key": "your-sendgrid-api-key-here",
@@ -63,5 +60,12 @@
     "max_backups": 12,
     "max_age": 30,
     "compress": true
+  },
+  "loki": {
+    "labels": {
+      "app": "myceliumCloud",
+      "env": "dev",
+      "host": ""
+    }
   }
 }

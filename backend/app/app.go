@@ -384,5 +384,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 
 	app.gridClient.Close()
 
+	logger.CloseLogger()
+
 	return nil
 }

@@ -12,7 +12,8 @@ import (
 
 // LoggerInstance holds the singleton logger instance
 type LoggerInstance struct {
-	logger zerolog.Logger
+	logger     zerolog.Logger
+	lokiWriter *LokiWriter
 }
 
 var (
@@ -29,8 +30,15 @@ type LoggerConfig struct {
 	Compress   bool   `json:"compress"`
 }
 
+// LokiConfig holds the configuration for Loki logging
+type LokiConfig struct {
+	URL           string            `json:"url"`
+	FlushInterval time.Duration     `json:"flush_interval"`
+	Labels        map[string]string `json:"labels"`
+}
+
 // InitLogger initializes the singleton logger with file and console output
-func InitLogger(config LoggerConfig, debug bool) error {
+func InitLogger(config LoggerConfig, lokiConfig *LokiConfig, debug bool) error {
 	logDir := config.LogDir
 	if logDir == "" {
 		logDir = "logs"
@@ -49,13 +57,9 @@ func InitLogger(config LoggerConfig, debug bool) error {
 	}
 
 	lokiWriter := NewLokiWriter(
-		"http://loki:3100/loki/api/v1/push",
-		map[string]string{
-			"app":  "my-service",
-			"env":  os.Getenv("APP_ENV"),
-			"host": os.Getenv("HOSTNAME"),
-		},
-		2*time.Second,
+		lokiConfig.URL,
+		lokiConfig.Labels,
+		lokiConfig.FlushInterval,
 	)
 
 	multi := zerolog.MultiLevelWriter(
@@ -66,7 +70,8 @@ func InitLogger(config LoggerConfig, debug bool) error {
 
 	// Initialize the singleton instance
 	instance = &LoggerInstance{
-		logger: zerolog.New(multi).With().Timestamp().Logger(),
+		logger:     zerolog.New(multi).With().Timestamp().Logger(),
+		lokiWriter: lokiWriter,
 	}
 
 	// Set log level based on debug configuration
@@ -91,4 +96,10 @@ func GetLogger() *zerolog.Logger {
 		}
 	})
 	return &instance.logger
+}
+
+func CloseLogger() {
+	if instance != nil && instance.lokiWriter != nil {
+		instance.lokiWriter.Close()
+	}
 }
