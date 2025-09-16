@@ -43,4 +43,5 @@ const (
 	StepDeployNetwork           = "deploy-network"
 	StepFetchKubeconfig         = "fetch_kubeconfig"
 	StepVerifyClusterReady      = "verify-cluster-ready"
+	StepVerifyNewNodes          = "prepare-verify-new-nodes"
 )
