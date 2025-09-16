@@ -569,15 +569,14 @@ func createDeployerWorkflowTemplate(sse *internal.SSEManager, engine *ewf.Engine
 }
 
 func createAddNodeWorkflowTemplate(sse *internal.SSEManager, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
-    template := newKubecloudWorkflowTemplate()
-    template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
-        []ewf.AfterWorkflowHook{
-            notifyWorkflowProgress(sse),
-            CloseClient,
-        }...)
-    return template
+	template := newKubecloudWorkflowTemplate()
+	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
+		[]ewf.AfterWorkflowHook{
+			notifyWorkflowProgress(sse),
+			CloseClient,
+		}...)
+	return template
 }
-
 
 func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, sse *internal.SSEManager, config internal.Configuration) {
 
@@ -619,50 +618,50 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: StepVerifyNewNodes, RetryPolicy: longExponentialRetryPolicy},
 		{Name: StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
-    addNodeWFTemplate.AfterWorkflowHooks = append(addNodeWFTemplate.AfterWorkflowHooks, func(ctx context.Context, wf *ewf.Workflow, err error) {
-        if err != nil && wf.Name == WorkflowAddNode {
-            node, ok := wf.State["node"].(kubedeployer.Node)
-            if !ok {
-                logger.GetLogger().Error().Str("workflow_name", wf.Name).Msg("node not found in state for rollback")
-                return
-            }
+	addNodeWFTemplate.AfterWorkflowHooks = append(addNodeWFTemplate.AfterWorkflowHooks, func(ctx context.Context, wf *ewf.Workflow, err error) {
+		if err != nil && wf.Name == WorkflowAddNode {
+			node, ok := wf.State["node"].(kubedeployer.Node)
+			if !ok {
+				logger.GetLogger().Error().Str("workflow_name", wf.Name).Msg("node not found in state for rollback")
+				return
+			}
 
-            cluster, clusterErr := statemanager.GetCluster(wf.State)
-            if clusterErr != nil || cluster.ProjectName == "" {
-                logger.GetLogger().Error().Err(clusterErr).Str("workflow_name", wf.Name).Msg("nothing to rollback")
-                return
-            }
+			cluster, clusterErr := statemanager.GetCluster(wf.State)
+			if clusterErr != nil || cluster.ProjectName == "" {
+				logger.GetLogger().Error().Err(clusterErr).Str("workflow_name", wf.Name).Msg("nothing to rollback")
+				return
+			}
 
-            kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client)
-            if !ok {
-                logger.GetLogger().Error().Str("workflow_name", wf.Name).Msg("no kubeclient found for rollback")
-                return
-            }
+			kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client)
+			if !ok {
+				logger.GetLogger().Error().Str("workflow_name", wf.Name).Msg("no kubeclient found for rollback")
+				return
+			}
 
-            logger.GetLogger().Info().
-                Str("project_name", cluster.ProjectName).
-                Str("node_name", node.Name).
-                Msg("Triggering rollback for newly added node")
+			logger.GetLogger().Info().
+				Str("project_name", cluster.ProjectName).
+				Str("node_name", node.Name).
+				Msg("Triggering rollback for newly added node")
 
-            if err := kubeClient.RemoveNode(ctx, &cluster, node.Name); err != nil {
-                logger.GetLogger().Error().Err(err).Str("node_name", node.Name).Msg("Failed to rollback node")
-                return
-            }
+			if err := kubeClient.RemoveNode(ctx, &cluster, node.Name); err != nil {
+				logger.GetLogger().Error().Err(err).Str("node_name", node.Name).Msg("Failed to rollback node")
+				return
+			}
 
-            if contractID, exists := cluster.Network.NodeDeploymentID[node.NodeID]; exists && contractID != 0 {
-                if err := kubeClient.GridClient.BatchCancelContract([]uint64{contractID}); err != nil {
-                    logger.GetLogger().Error().Err(err).Uint64("contract_id", contractID).Msg("Failed to cancel network contract in rollback")
-                } else {
-                    logger.GetLogger().Info().Uint64("contract_id", contractID).Msg("Canceled network contract in rollback")
-                }
-            }
+			if contractID, exists := cluster.Network.NodeDeploymentID[node.NodeID]; exists && contractID != 0 {
+				if err := kubeClient.GridClient.BatchCancelContract([]uint64{contractID}); err != nil {
+					logger.GetLogger().Error().Err(err).Uint64("contract_id", contractID).Msg("Failed to cancel network contract in rollback")
+				} else {
+					logger.GetLogger().Info().Uint64("contract_id", contractID).Msg("Canceled network contract in rollback")
+				}
+			}
 
-            statemanager.StoreCluster(wf.State, cluster)
-            logger.GetLogger().Info().Str("node_name", node.Name).Msg("Rollback of new node completed")
-        }
-    })
+			statemanager.StoreCluster(wf.State, cluster)
+			logger.GetLogger().Info().Str("node_name", node.Name).Msg("Rollback of new node completed")
+		}
+	})
 
-    engine.RegisterTemplate(WorkflowAddNode, &addNodeWFTemplate)
+	engine.RegisterTemplate(WorkflowAddNode, &addNodeWFTemplate)
 
 	removeNodeWFTemplate := createDeployerWorkflowTemplate(sse, engine, metrics)
 	removeNodeWFTemplate.Steps = []ewf.Step{
@@ -755,52 +754,51 @@ func FetchKubeconfigStep(privateKeyPath string) ewf.StepFn {
 }
 
 func VerifyAddedNodeStep() ewf.StepFn {
-    return func(ctx context.Context, state ewf.State) error {
-        node, ok := state["node"].(kubedeployer.Node)
-        if !ok {
-            return fmt.Errorf("missing or invalid 'node' in state for verification")
-        }
+	return func(ctx context.Context, state ewf.State) error {
+		node, ok := state["node"].(kubedeployer.Node)
+		if !ok {
+			return fmt.Errorf("missing or invalid 'node' in state for verification")
+		}
 
-        kubeconfig, ok := state["kubeconfig"].(string)
-        if !ok || kubeconfig == "" {
-            return fmt.Errorf("kubeconfig not found in state")
-        }
+		kubeconfig, ok := state["kubeconfig"].(string)
+		if !ok || kubeconfig == "" {
+			return fmt.Errorf("kubeconfig not found in state")
+		}
 
-        restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
-        if err != nil {
-            return fmt.Errorf("failed to parse kubeconfig: %w", err)
-        }
+		restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
+		if err != nil {
+			return fmt.Errorf("failed to parse kubeconfig: %w", err)
+		}
 
-        clientset, err := kubernetes.NewForConfig(restConfig)
-        if err != nil {
-            return fmt.Errorf("failed to create kubernetes client: %w", err)
-        }
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create kubernetes client: %w", err)
+		}
 
-        n, err := clientset.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
-        if err != nil {
-            return fmt.Errorf("failed to get node %s from cluster: %w", node.Name, err)
-        }
+		n, err := clientset.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get node %s from cluster: %w", node.Name, err)
+		}
 
-        ready := false
-        for _, cond := range n.Status.Conditions {
-            if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-                ready = true
-                break
-            }
-        }
+		ready := false
+		for _, cond := range n.Status.Conditions {
+			if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
+				ready = true
+				break
+			}
+		}
 
-        if !ready {
-            return fmt.Errorf("new node %s is not ready", node.Name)
-        }
+		if !ready {
+			return fmt.Errorf("new node %s is not ready", node.Name)
+		}
 
-        logger.GetLogger().Info().
-            Str("node", node.Name).
-            Msg("New node is Ready")
+		logger.GetLogger().Info().
+			Str("node", node.Name).
+			Msg("New node is Ready")
 
-        return nil
-    }
+		return nil
+	}
 }
-
 
 func VerifyClusterReadyStep() ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
