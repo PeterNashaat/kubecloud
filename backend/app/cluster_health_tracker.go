@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"kubecloud/internal/activities"
+	"kubecloud/internal/constants"
 	"kubecloud/internal/logger"
 	"time"
 
@@ -30,7 +30,7 @@ func (h *Handler) TrackClusterHealth() {
 
 		for _, cluster := range clusters {
 
-			wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowTrackClusterHealth)
+			wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowTrackClusterHealth)
 			if err != nil {
 				logger.GetLogger().Error().
 					Err(err).

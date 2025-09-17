@@ -139,7 +139,7 @@ func RegisterEWFWorkflows(
 		{Name: constants.StepFetchKubeconfig, RetryPolicy: standardRetryPolicy},
 		{Name: constants.StepVerifyClusterReady, RetryPolicy: standardRetryPolicy},
 	}
-	trackClusterHealthWFTemplate.AfterWorkflowHooks = append(trackClusterHealthWFTemplate.AfterWorkflowHooks, hookClusterHealthCheck(sse))
+	trackClusterHealthWFTemplate.AfterWorkflowHooks = append(trackClusterHealthWFTemplate.AfterWorkflowHooks, hookClusterHealthCheck(notificationService))
 	engine.RegisterTemplate(constants.WorkflowTrackClusterHealth, &trackClusterHealthWFTemplate)
 
 	registerDeploymentActivities(engine, metrics, db, notificationService, config)
