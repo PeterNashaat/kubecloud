@@ -669,6 +669,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	removeNodeWFTemplate := createDeployerWorkflowTemplate(notificationService, engine, metrics)
 	removeNodeWFTemplate.Steps = []ewf.Step{
 		{Name: constants.StepRemoveNode, RetryPolicy: standardRetryPolicy},
+		{Name: constants.StepFetchKubeconfig, RetryPolicy: criticalRetryPolicy},
 		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(constants.WorkflowRemoveNode, &removeNodeWFTemplate)
