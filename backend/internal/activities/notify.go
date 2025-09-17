@@ -275,6 +275,27 @@ func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, er
 		return nil
 	}
 
+	if wf.Name == constants.WorkflowAdminCreditBalance {
+		adminID, ok := wf.State["admin_id"].(int)
+		if !ok {
+			logger.GetLogger().Error().Msg("Missing or invalid 'admin_id' in workflow state")
+			return nil
+		}
+		payloadData := notification.CommonPayload{
+			Message: fmt.Sprintf("User %d was credited successfully money transferred successfully to their account", userID),
+			Subject: "Money transfer to user's account succeeded",
+			Status:  "succeeded",
+		}
+		severity := models.NotificationSeveritySuccess
+		if err != nil {
+			severity = models.NotificationSeverityError
+			payloadData.Message = fmt.Sprintf("Money transfer to user %d's account failed", userID)
+			payloadData.Subject = "Money transfer to user's account failed"
+			return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
+		}
+		return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
+	}
+
 	var payload map[string]string
 
 	// Extract amount and balance from workflow state
