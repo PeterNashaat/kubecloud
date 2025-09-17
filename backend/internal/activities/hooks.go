@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"kubecloud/internal"
 	"kubecloud/internal/logger"
+	"kubecloud/internal/statemanager"
+
+	"github.com/xmonader/ewf"
 	"kubecloud/internal/notification"
 	"kubecloud/models"
 
-	"github.com/xmonader/ewf"
 )
 
 func hookWorkflowStarted(n *notification.NotificationService) ewf.BeforeWorkflowHook {
@@ -69,6 +72,33 @@ func hookStepDone(_ context.Context, w *ewf.Workflow, step *ewf.Step, err error)
 		logger.GetLogger().Error().Err(err).Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step failed")
 	} else {
 		logger.GetLogger().Info().Str("workflow_name", w.Name).Str("step_name", step.Name).Msg("Step completed successfully")
+	}
+}
+func hookClusterHealthCheck(sse *internal.SSEManager) ewf.AfterWorkflowHook {
+	return func(ctx context.Context, wf *ewf.Workflow, err error) {
+		if err == nil {
+			return
+		}
+		config, err := getConfig(wf.State)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Str("workflow_name", wf.Name).Msg("Failed to get config from state")
+			return
+		}
+		cluster, errCluster := statemanager.GetCluster(wf.State)
+		if errCluster != nil {
+			logger.GetLogger().Error().Err(err).Str("workflow_name", wf.Name).Msg("Failed to get cluster from state")
+			sse.Notify(config.UserID, "error", map[string]interface{}{
+				"type":    "cluster_not_ready",
+				"message": err,
+			})
+			return
+		}
+		sse.Notify(config.UserID, "error", map[string]interface{}{
+			"type":         "cluster_not_ready",
+			"cluster_name": cluster.Name,
+			"message":      err,
+		})
+		logger.GetLogger().Error().Err(err).Str("workflow_name", wf.Name).Msg("Cluster health check failed")
 	}
 }
 
