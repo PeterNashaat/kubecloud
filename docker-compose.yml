@@ -39,7 +39,7 @@ services:
       - ./backend/config.json:/app/config.json
       - ./backend/notification-config.json:/opt/project/notification-config.json
       - ./backend/logs:/opt/project/logs
-      - /root/.ssh:/root/.ssh:ro
+      - /Users/codescalerseg/.ssh:/root/.ssh:ro
     environment:
       - MYCELIUM_HOST=localhost
       - REDIS_HOST=redis-db
@@ -53,7 +53,7 @@ services:
   frontend:
     environment:
       - VITE_API_BASE_URL=http://localhost:8080/api
-      - VITE_STRIPE_PUBLISHABLE_KEY=""
+      - VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51Rdp72C4WqB88qsawZgMYCdQo9t6AMBJktvBAwvca8qYHwDobDihxmesYs3oisucfGmk7n0FmLBPdizSTCjlwPcu005CEA2vQ8
       - VITE_NETWORK="dev"
     build:
       context: frontend/kubecloud/.

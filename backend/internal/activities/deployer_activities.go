@@ -621,48 +621,12 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: constants.StepVerifyNewNodes, RetryPolicy: longExponentialRetryPolicy},
 		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
-	addNodeWFTemplate.AfterWorkflowHooks = append(addNodeWFTemplate.AfterWorkflowHooks, func(ctx context.Context, wf *ewf.Workflow, err error) {
-		if err != nil && wf.Name == constants.WorkflowAddNode {
-			node, ok := wf.State["node"].(kubedeployer.Node)
-			if !ok {
-				logger.GetLogger().Error().Str("workflow_name", wf.Name).Msg("node not found in state for rollback")
-				return
-			}
-
-			cluster, clusterErr := statemanager.GetCluster(wf.State)
-			if clusterErr != nil || cluster.ProjectName == "" {
-				logger.GetLogger().Error().Err(clusterErr).Str("workflow_name", wf.Name).Msg("nothing to rollback")
-				return
-			}
-
-			kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client)
-			if !ok {
-				logger.GetLogger().Error().Str("workflow_name", wf.Name).Msg("no kubeclient found for rollback")
-				return
-			}
-
-			logger.GetLogger().Info().
-				Str("project_name", cluster.ProjectName).
-				Str("node_name", node.Name).
-				Msg("Triggering rollback for newly added node")
-
-			if err := kubeClient.RemoveNode(ctx, &cluster, node.Name); err != nil {
-				logger.GetLogger().Error().Err(err).Str("node_name", node.Name).Msg("Failed to rollback node")
-				return
-			}
-
-			if contractID, exists := cluster.Network.NodeDeploymentID[node.NodeID]; exists && contractID != 0 {
-				if err := kubeClient.GridClient.BatchCancelContract([]uint64{contractID}); err != nil {
-					logger.GetLogger().Error().Err(err).Uint64("contract_id", contractID).Msg("Failed to cancel network contract in rollback")
-				} else {
-					logger.GetLogger().Info().Uint64("contract_id", contractID).Msg("Canceled network contract in rollback")
-				}
-			}
-
-			statemanager.StoreCluster(wf.State, cluster)
-			logger.GetLogger().Info().Str("node_name", node.Name).Msg("Rollback of new node completed")
-		}
-	})
+	addNodeWFTemplate.AfterWorkflowHooks = append(
+		addNodeWFTemplate.AfterWorkflowHooks,
+		func(ctx context.Context, wf *ewf.Workflow, err error) {
+			handleAddNodeWorkflowFailure(ctx, wf, err)
+		},
+	)
 
 	engine.RegisterTemplate(constants.WorkflowAddNode, &addNodeWFTemplate)
 
@@ -888,4 +852,66 @@ func VerifyClusterReadyStep() ewf.StepFn {
 
 		return nil
 	}
+}
+
+func handleAddNodeWorkflowFailure(ctx context.Context, wf *ewf.Workflow, err error) {
+	if err == nil || wf.Name != constants.WorkflowAddNode {
+		return
+	}
+
+	node, ok := wf.State["node"].(kubedeployer.Node)
+	if !ok {
+		logger.GetLogger().Error().
+			Str("workflow_name", wf.Name).
+			Msg("node not found in state for rollback")
+		return
+	}
+
+	cluster, clusterErr := statemanager.GetCluster(wf.State)
+	if clusterErr != nil || cluster.ProjectName == "" {
+		logger.GetLogger().Error().
+			Err(clusterErr).
+			Str("workflow_name", wf.Name).
+			Msg("nothing to rollback")
+		return
+	}
+
+	kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client)
+	if !ok {
+		logger.GetLogger().Error().
+			Str("workflow_name", wf.Name).
+			Msg("no kubeclient found for rollback")
+		return
+	}
+
+	logger.GetLogger().Info().
+		Str("project_name", cluster.ProjectName).
+		Str("node_name", node.Name).
+		Msg("Triggering rollback for newly added node")
+
+	if err := kubeClient.RemoveNode(ctx, &cluster, node.Name); err != nil {
+		logger.GetLogger().Error().
+			Err(err).
+			Str("node_name", node.Name).
+			Msg("Failed to rollback node")
+		return
+	}
+
+	if contractID, exists := cluster.Network.NodeDeploymentID[node.NodeID]; exists && contractID != 0 {
+		if err := kubeClient.GridClient.BatchCancelContract([]uint64{contractID}); err != nil {
+			logger.GetLogger().Error().
+				Err(err).
+				Uint64("contract_id", contractID).
+				Msg("Failed to cancel network contract in rollback")
+		} else {
+			logger.GetLogger().Info().
+				Uint64("contract_id", contractID).
+				Msg("Canceled network contract in rollback")
+		}
+	}
+
+	statemanager.StoreCluster(wf.State, cluster)
+	logger.GetLogger().Info().
+		Str("node_name", node.Name).
+		Msg("Rollback of new node completed")
 }
