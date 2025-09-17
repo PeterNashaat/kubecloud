@@ -19,7 +19,9 @@ import { useMaintenanceStore } from './stores/maintenance'
 import NavBar from './components/NavBar.vue'
 import AppFooter from './components/AppFooter.vue'
 import NotificationToast from './components/NotificationToast.vue'
-import { useDeploymentEvents } from "./composables/useDeploymentEvents"
+import { useNotificationEvents } from './composables/useNotificationEvents'
+
+useNotificationEvents()
 const route = useRoute()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
@@ -55,7 +57,6 @@ onMounted(async () => {
       return
     }
     userStore.initializeAuth()
-    useDeploymentEvents()
     await notificationStore.loadNotifications()
   } catch (error) {
     console.error('Failed to initialize application:', error)
