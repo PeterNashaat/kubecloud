@@ -598,11 +598,11 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepStoreDeployment, StoreDeploymentStep(db, metrics))
 	engine.Register(StepFetchKubeconfig, FetchKubeconfigStep(db, config.SSH.PrivateKeyPath))
 	engine.Register(StepVerifyClusterReady, VerifyClusterReadyStep(sse))
+	engine.Register(StepVerifyNewNodes, VerifyAddedNodeStep(db, config.SSH.PrivateKeyPath))
 	engine.Register(StepRemoveClusterFromDB, RemoveClusterFromDBStep(db))
 	engine.Register(StepGatherAllContractIDs, GatherAllContractIDsStep(db))
 	engine.Register(StepBatchCancelContracts, BatchCancelContractsStep())
 	engine.Register(StepDeleteAllUserClusters, DeleteAllUserClustersStep(db))
-	engine.Register(StepVerifyNewNodes, VerifyAddedNodeStep())
 
 	deleteWFTemplate := createDeployerWorkflowTemplate(sse, engine, metrics)
 	deleteWFTemplate.Steps = []ewf.Step{
@@ -735,78 +735,81 @@ func getConfig(state ewf.State) (statemanager.ClientConfig, error) {
 	return config, nil
 }
 
+func retrieveKubeconfig(state ewf.State, db models.DB, privateKeyPath string) (string, error) {
+	if kc, ok := state["kubeconfig"].(string); ok && kc != "" {
+		return kc, nil
+	}
+
+	cluster, err := statemanager.GetCluster(state)
+	if err != nil {
+		return "", fmt.Errorf("failed to get cluster from state: %w", err)
+	}
+
+	config, err := getConfig(state)
+	if err != nil {
+		return "", err
+	}
+
+	// when updating existing cluster
+	existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", fmt.Errorf("failed to query cluster from database: %w", err)
+	}
+
+	if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
+		logger.GetLogger().Debug().Msgf("Using kubeconfig from DB for cluster %s", existingCluster.ProjectName)
+		return existingCluster.Kubeconfig, nil
+	}
+
+	var master kubedeployer.Node
+	if existingCluster.ID != 0 {
+		existingClusterResult, err := existingCluster.GetClusterResult()
+		if err != nil {
+			return "", fmt.Errorf("failed to get cluster result: %w", err)
+		}
+		master, err = existingClusterResult.GetLeaderNode()
+		if err != nil {
+			return "", fmt.Errorf("failed to get leader node: %w", err)
+		}
+	} else {
+		master, err = cluster.GetLeaderNode()
+		if err != nil {
+			return "", fmt.Errorf("failed to get leader node: %w", err)
+		}
+	}
+
+	privateKeyBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read SSH private key: %w", err)
+	}
+
+	logger.GetLogger().Debug().Msg("Fetching kubeconfig from leader node via SSH")
+	return internal.GetKubeconfigViaSSH(string(privateKeyBytes), &master)
+}
+
 func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		if kubeconfig, ok := state["kubeconfig"].(string); ok && kubeconfig != "" {
-			return nil
-		}
-
-		cluster, err := statemanager.GetCluster(state)
-		if err != nil {
-			return fmt.Errorf("failed to get cluster from state: %w", err)
-		}
-
-		config, err := getConfig(state)
+		kubeconfig, err := retrieveKubeconfig(state, db, privateKeyPath)
 		if err != nil {
 			return err
 		}
-
-		// when updating existing cluster
-		existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("failed to query cluster from database: %w", err)
-		}
-
-		if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
-			state["kubeconfig"] = existingCluster.Kubeconfig
-			return nil
-		}
-
-		var master kubedeployer.Node
-		if existingCluster.ID != 0 {
-			existingClusterResult, err := existingCluster.GetClusterResult()
-			if err != nil {
-				return fmt.Errorf("failed to get cluster result from existing cluster: %w", err)
-			}
-			master, err = existingClusterResult.GetLeaderNode()
-			if err != nil {
-				return fmt.Errorf("failed to get leader node from existing cluster: %w", err)
-			}
-
-		} else {
-			master, err = cluster.GetLeaderNode()
-			if err != nil {
-				return fmt.Errorf("failed to get leader node from existing cluster: %w", err)
-			}
-
-		}
-
-		privateKeyBytes, err := os.ReadFile(privateKeyPath)
-		if err != nil {
-			return fmt.Errorf("failed to read SSH private key: %w", err)
-		}
-
-		kubeconfig, err := internal.GetKubeconfigViaSSH(string(privateKeyBytes), &master)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve kubeconfig via SSH: %w", err)
-		}
-
 		state["kubeconfig"] = kubeconfig
 		return nil
 	}
 }
 
-func VerifyAddedNodeStep() ewf.StepFn {
+func VerifyAddedNodeStep(db models.DB, privateKeyPath string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
 		node, ok := state["node"].(kubedeployer.Node)
 		if !ok {
 			return fmt.Errorf("missing or invalid 'node' in state for verification")
 		}
 
-		kubeconfig, ok := state["kubeconfig"].(string)
-		if !ok || kubeconfig == "" {
-			return fmt.Errorf("kubeconfig not found in state")
+		kubeconfig, err := retrieveKubeconfig(state, db, privateKeyPath)
+		if err != nil {
+			return err
 		}
+		state["kubeconfig"] = kubeconfig
 
 		restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
 		if err != nil {
@@ -842,7 +845,6 @@ func VerifyAddedNodeStep() ewf.StepFn {
 		return nil
 	}
 }
-
 
 func VerifyClusterReadyStep(sse *internal.SSEManager) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
