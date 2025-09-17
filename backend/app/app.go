@@ -331,7 +331,6 @@ func (app *App) StartBackgroundWorkers() {
 
 // Run starts the server
 func (app *App) Run() error {
-	internal.InitValidator()
 	app.StartBackgroundWorkers()
 	app.handlers.ewfEngine.ResumeRunningWorkflows()
 	app.httpServer = &http.Server{

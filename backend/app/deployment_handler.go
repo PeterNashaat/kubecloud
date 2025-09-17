@@ -297,11 +297,6 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(cluster); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	if err := cluster.Validate(); err != nil {
 		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
@@ -467,11 +462,6 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 	var cluster kubedeployer.Cluster
 	if err := c.ShouldBindJSON(&cluster); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request json format"})
-		return
-	}
-
-	if err := internal.ValidateStruct(cluster); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
