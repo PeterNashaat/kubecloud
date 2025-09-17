@@ -121,7 +121,7 @@ const docTemplate = `{
                 ],
                 "summary": "Delete all deployments",
                 "responses": {
-                    "200": {
+                    "202": {
                         "description": "Delete all deployments workflow started successfully",
                         "schema": {
                             "$ref": "#/definitions/app.Response"
@@ -223,7 +223,7 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "description": "Deployment deletion workflow started successfully",
                         "schema": {
                             "$ref": "#/definitions/app.Response"
@@ -409,7 +409,7 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "description": "Node removal workflow started successfully",
                         "schema": {
                             "$ref": "#/definitions/app.Response"
@@ -931,6 +931,74 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to mark notification as unread",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes": {
+            "get": {
+                "description": "List all nodes from the grid proxy (no user-specific filtering)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "List all grid nodes",
+                "operationId": "list-all-grid-nodes",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Filter by healthy nodes (default: false)",
+                        "name": "healthy",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit the number of nodes returned (default: 50)",
+                        "name": "size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All grid nodes retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/app.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/app.ListNodesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid filter parameters",
+                        "schema": {
+                            "$ref": "#/definitions/app.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/app.APIResponse"
                         }
@@ -2004,7 +2072,7 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
+                    "202": {
                         "description": "workflow_id: string, email: string",
                         "schema": {
                             "$ref": "#/definitions/app.RegisterUserResponse"
@@ -2057,8 +2125,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "$ref": "#/definitions/app.VerifyRegisterUserResponse"
                         }
@@ -2453,8 +2521,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "$ref": "#/definitions/app.CreditUserResponse"
                         }
@@ -2872,6 +2940,20 @@ const docTemplate = `{
                 }
             }
         },
+        "app.ListNodesResponse": {
+            "type": "object",
+            "properties": {
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Node"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "app.ListNodesWithDiscountResponse": {
             "type": "object",
             "properties": {
@@ -3095,39 +3177,6 @@ const docTemplate = `{
                 }
             }
         },
-        "app.NotificationResponse": {
-            "description": "A notification response",
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "payload": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "read_at": {
-                    "type": "string"
-                },
-                "severity": {
-                    "$ref": "#/definitions/models.NotificationSeverity"
-                },
-                "status": {
-                    "$ref": "#/definitions/models.NotificationStatus"
-                },
-                "task_id": {
-                    "type": "string"
-                },
-                "type": {
-                    "$ref": "#/definitions/models.NotificationType"
-                }
-            }
-        },
         "app.PendingRecordsResponse": {
             "type": "object",
             "properties": {
@@ -3315,8 +3364,14 @@ const docTemplate = `{
         "app.Stats": {
             "type": "object",
             "properties": {
+                "cores": {
+                    "type": "integer"
+                },
                 "countries": {
                     "type": "integer"
+                },
+                "ssd": {
+                    "type": "number"
                 },
                 "total_clusters": {
                     "type": "integer"
@@ -3775,6 +3830,125 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "types.Node": {
+            "type": "object",
+            "properties": {
+                "certificationType": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "cpu_benchmark": {
+                    "$ref": "#/definitions/types.CpuBenchmark"
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "dedicated": {
+                    "type": "boolean"
+                },
+                "dmi": {
+                    "$ref": "#/definitions/types.Dmi"
+                },
+                "extraFee": {
+                    "type": "integer"
+                },
+                "farmId": {
+                    "type": "integer"
+                },
+                "farmName": {
+                    "type": "string"
+                },
+                "farm_free_ips": {
+                    "type": "integer"
+                },
+                "farmingPolicyId": {
+                    "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gpus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.NodeGPU"
+                    }
+                },
+                "gridVersion": {
+                    "type": "integer"
+                },
+                "healthy": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "inDedicatedFarm": {
+                    "type": "boolean"
+                },
+                "location": {
+                    "$ref": "#/definitions/types.Location"
+                },
+                "nodeId": {
+                    "type": "integer"
+                },
+                "num_gpu": {
+                    "type": "integer"
+                },
+                "power": {
+                    "$ref": "#/definitions/types.NodePower"
+                },
+                "price_usd": {
+                    "type": "number"
+                },
+                "publicConfig": {
+                    "$ref": "#/definitions/types.PublicConfig"
+                },
+                "rentContractId": {
+                    "type": "integer"
+                },
+                "rentable": {
+                    "type": "boolean"
+                },
+                "rented": {
+                    "type": "boolean"
+                },
+                "rentedByTwinId": {
+                    "type": "integer"
+                },
+                "serialNumber": {
+                    "type": "string"
+                },
+                "speed": {
+                    "$ref": "#/definitions/types.Speed"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_resources": {
+                    "$ref": "#/definitions/types.Capacity"
+                },
+                "twinId": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "integer"
+                },
+                "uptime": {
+                    "type": "integer"
+                },
+                "used_resources": {
+                    "$ref": "#/definitions/types.Capacity"
                 }
             }
         },

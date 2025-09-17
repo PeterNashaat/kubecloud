@@ -170,6 +170,15 @@ definitions:
       kubeconfig:
         type: string
     type: object
+  app.ListNodesResponse:
+    properties:
+      nodes:
+        items:
+          $ref: '#/definitions/types.Node'
+        type: array
+      total:
+        type: integer
+    type: object
   app.ListNodesWithDiscountResponse:
     properties:
       nodes:
@@ -468,8 +477,12 @@ definitions:
     type: object
   app.Stats:
     properties:
+      cores:
+        type: integer
       countries:
         type: integer
+      ssd:
+        type: number
       total_clusters:
         type: integer
       total_users:
@@ -783,6 +796,85 @@ definitions:
       type:
         type: string
     type: object
+  types.Node:
+    properties:
+      certificationType:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      cpu_benchmark:
+        $ref: '#/definitions/types.CpuBenchmark'
+      created:
+        type: integer
+      dedicated:
+        type: boolean
+      dmi:
+        $ref: '#/definitions/types.Dmi'
+      extraFee:
+        type: integer
+      farm_free_ips:
+        type: integer
+      farmId:
+        type: integer
+      farmName:
+        type: string
+      farmingPolicyId:
+        type: integer
+      features:
+        items:
+          type: string
+        type: array
+      gpus:
+        items:
+          $ref: '#/definitions/types.NodeGPU'
+        type: array
+      gridVersion:
+        type: integer
+      healthy:
+        type: boolean
+      id:
+        type: string
+      inDedicatedFarm:
+        type: boolean
+      location:
+        $ref: '#/definitions/types.Location'
+      nodeId:
+        type: integer
+      num_gpu:
+        type: integer
+      power:
+        $ref: '#/definitions/types.NodePower'
+      price_usd:
+        type: number
+      publicConfig:
+        $ref: '#/definitions/types.PublicConfig'
+      rentContractId:
+        type: integer
+      rentable:
+        type: boolean
+      rented:
+        type: boolean
+      rentedByTwinId:
+        type: integer
+      serialNumber:
+        type: string
+      speed:
+        $ref: '#/definitions/types.Speed'
+      status:
+        type: string
+      total_resources:
+        $ref: '#/definitions/types.Capacity'
+      twinId:
+        type: integer
+      updatedAt:
+        type: integer
+      uptime:
+        type: integer
+      used_resources:
+        $ref: '#/definitions/types.Capacity'
+    type: object
   types.NodeGPU:
     properties:
       contract:
@@ -869,7 +961,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
+        "202":
           description: Delete all deployments workflow started successfully
           schema:
             $ref: '#/definitions/app.Response'
@@ -956,7 +1048,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
+        "202":
           description: Deployment deletion workflow started successfully
           schema:
             $ref: '#/definitions/app.Response'
@@ -1111,7 +1203,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
+        "202":
           description: Node removal workflow started successfully
           schema:
             $ref: '#/definitions/app.Response'
@@ -1442,6 +1534,48 @@ paths:
       summary: Get unread notifications
       tags:
       - notifications
+  /nodes:
+    get:
+      consumes:
+      - application/json
+      description: List all nodes from the grid proxy (no user-specific filtering)
+      operationId: list-all-grid-nodes
+      parameters:
+      - description: 'Filter by healthy nodes (default: false)'
+        in: query
+        name: healthy
+        type: boolean
+      - description: 'Limit the number of nodes returned (default: 50)'
+        in: query
+        name: size
+        type: integer
+      - description: 'page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All grid nodes retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/app.ListNodesResponse'
+              type: object
+        "400":
+          description: Invalid filter parameters
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: List all grid nodes
+      tags:
+      - nodes
   /pending-records:
     get:
       consumes:
@@ -2132,7 +2266,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
+        "202":
           description: 'workflow_id: string, email: string'
           schema:
             $ref: '#/definitions/app.RegisterUserResponse'
@@ -2167,8 +2301,8 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "202":
+          description: Accepted
           schema:
             $ref: '#/definitions/app.VerifyRegisterUserResponse'
         "400":
@@ -2371,8 +2505,8 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "202":
+          description: Accepted
           schema:
             $ref: '#/definitions/app.CreditUserResponse'
         "400":
