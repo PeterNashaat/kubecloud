@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"kubecloud/internal/logger"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -42,6 +43,11 @@ type Configuration struct {
 	KYCChallengeDomain string `json:"kyc_challenge_domain" validate:"required"`
 
 	Logger LoggerConfig `json:"logger"`
+	Loki   LokiConfig   `json:"loki"`
+
+	// Notification configuration
+	NotificationConfigPath string             `json:"notification_config_path"`
+	Notification           NotificationConfig `json:"-"`
 }
 
 type SSHConfig struct {
@@ -112,6 +118,73 @@ type LoggerConfig struct {
 	Compress   bool   `json:"compress"`
 }
 
+type LokiConfig struct {
+	URL                 string            `json:"url"`
+	FlushIntervalSecond int               `json:"flush_interval_second"`
+	Labels              map[string]string `json:"labels"`
+}
+
+// NotificationConfig holds notification template type rules
+type NotificationConfig struct {
+	TemplateTypes         map[string]NotificationTemplateTypeConfig `json:"template_types"`
+	EmailTemplatesDirPath string                                    `json:"email_templates_dir_path"`
+}
+
+// ChannelRuleConfig represents channel and severity rules for notification template type
+type ChannelRuleConfig struct {
+	Channels []string `json:"channels" validate:"required,dive,min=1"`
+	Severity string   `json:"severity" validate:"required,oneof=info error warning success"`
+}
+
+// NotificationTemplateTypeConfig represents a notification template type configuration
+type NotificationTemplateTypeConfig struct {
+	Default  ChannelRuleConfig            `json:"default" validate:"required"`
+	ByStatus map[string]ChannelRuleConfig `json:"by_status"`
+}
+
+// LoadNotificationConfig loads notification configuration from a separate file
+func loadNotificationConfig(configPath string) (NotificationConfig, error) {
+	var notificationConfig NotificationConfig
+
+	if configPath == "" {
+		return NotificationConfig{}, fmt.Errorf("notification config path is required")
+	}
+
+	notificationViper := viper.New()
+	notificationViper.SetConfigFile(configPath)
+	notificationViper.SetConfigType("json")
+
+	if err := notificationViper.ReadInConfig(); err != nil {
+		return NotificationConfig{}, fmt.Errorf("failed to read notification config file: %w", err)
+	}
+
+	// Use mapstructure to decode the config
+	decoderConfig := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  &notificationConfig,
+	}
+
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return NotificationConfig{}, fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	if err := decoder.Decode(notificationViper.AllSettings()); err != nil {
+		return NotificationConfig{}, fmt.Errorf("unable to decode notification config: %w", err)
+	}
+
+	v := validator.New()
+	if err := v.Struct(notificationConfig); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			ve := validationErrors[0]
+			return NotificationConfig{}, fmt.Errorf("notification config validation error on field '%s': %s", ve.Namespace(), ve.Tag())
+		}
+		return NotificationConfig{}, fmt.Errorf("invalid notification config: %w", err)
+	}
+
+	return notificationConfig, nil
+}
+
 // LoadConfig load configurations
 func LoadConfig() (Configuration, error) {
 	var config Configuration
@@ -137,6 +210,17 @@ func LoadConfig() (Configuration, error) {
 		return Configuration{}, fmt.Errorf("unable to decode into struct, %w", err)
 	}
 
+	if labelsRaw := viper.GetString("loki.labels"); labelsRaw != "" {
+		parsed := make(map[string]string)
+		pairs := strings.Split(labelsRaw, ",")
+		for _, p := range pairs {
+			if kv := strings.SplitN(p, "=", 2); len(kv) == 2 {
+				parsed[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+		config.Loki.Labels = parsed
+	}
+
 	config.Database.File, err = expandPath(config.Database.File)
 	if err != nil {
 		return Configuration{}, fmt.Errorf("failed to expand database file path: %w", err)
@@ -155,6 +239,17 @@ func LoadConfig() (Configuration, error) {
 	config.Logger.LogDir, err = expandPath(config.Logger.LogDir)
 	if err != nil {
 		return Configuration{}, fmt.Errorf("failed to expand log directory path: %w", err)
+	}
+
+	notificationFilePath, err := expandPath(config.NotificationConfigPath)
+	if err != nil {
+		return Configuration{}, fmt.Errorf("failed to expand notification config path: %w", err)
+	}
+
+	config.Notification, err = loadNotificationConfig(notificationFilePath)
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("Failed to load notification config")
+		config.Notification = NotificationConfig{}
 	}
 
 	validate := validator.New()

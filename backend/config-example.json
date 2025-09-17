@@ -61,5 +61,13 @@
     "max_backups": 12,
     "max_age": 30,
     "compress": true
-  }
+  },
+  "loki": {
+    "labels": {
+      "app": "myceliumCloud",
+      "env": "dev",
+      "host": ""
+    }
+  },
+  "notification_config_path": "./notification-config-example.json"
 }

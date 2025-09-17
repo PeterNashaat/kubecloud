@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"kubecloud/internal"
-	"kubecloud/internal/activities"
 	"kubecloud/internal/metrics"
+	"kubecloud/internal/notification"
 	"kubecloud/models"
 	"net/http"
 	"strconv"
@@ -21,6 +21,7 @@ import (
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 	"github.com/xmonader/ewf"
 
+	"kubecloud/internal/constants"
 	"kubecloud/internal/logger"
 
 	"github.com/gin-gonic/gin"
@@ -31,24 +32,25 @@ import (
 
 // Handler struct holds configs for all handlers
 type Handler struct {
-	tokenManager    internal.TokenManager
-	db              models.DB
-	config          internal.Configuration
-	mailService     internal.MailService
-	proxyClient     proxy.Client
-	substrateClient *substrate.Substrate
-	graphqlClient   graphql.GraphQl
-	firesquidClient graphql.GraphQl
-	redis           *internal.RedisClient
-	sseManager      *internal.SSEManager
-	ewfEngine       *ewf.Engine
-	gridNet         string // Network name for the grid
-	sshPublicKey    string // SSH public key loaded at startup
-	systemIdentity  substrate.Identity
-	kycClient       *internal.KYCClient
-	sponsorKeyPair  subkey.KeyPair
-	sponsorAddress  string
-	metrics         *metrics.Metrics
+	tokenManager        internal.TokenManager
+	db                  models.DB
+	config              internal.Configuration
+	mailService         internal.MailService
+	proxyClient         proxy.Client
+	substrateClient     *substrate.Substrate
+	graphqlClient       graphql.GraphQl
+	firesquidClient     graphql.GraphQl
+	redis               *internal.RedisClient
+	sseManager          *internal.SSEManager
+	ewfEngine           *ewf.Engine
+	gridNet             string // Network name for the grid
+	sshPublicKey        string // SSH public key loaded at startup
+	systemIdentity      substrate.Identity
+	kycClient           *internal.KYCClient
+	sponsorKeyPair      subkey.KeyPair
+	sponsorAddress      string
+	metrics             *metrics.Metrics
+	notificationService *notification.NotificationService
 }
 
 // NewHandler create new handler
@@ -59,27 +61,28 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 	redis *internal.RedisClient, sseManager *internal.SSEManager, ewfEngine *ewf.Engine,
 	gridNet string, sshPublicKey string, systemIdentity substrate.Identity,
 	kycClient *internal.KYCClient, sponsorKeyPair subkey.KeyPair, sponsorAddress string,
-	metrics *metrics.Metrics) *Handler {
+	metrics *metrics.Metrics, notificationService *notification.NotificationService) *Handler {
 
 	return &Handler{
-		tokenManager:    tokenManager,
-		db:              db,
-		config:          config,
-		mailService:     mailService,
-		proxyClient:     gridproxy,
-		substrateClient: substrateClient,
-		graphqlClient:   graphqlClient,
-		firesquidClient: firesquidClient,
-		redis:           redis,
-		sseManager:      sseManager,
-		ewfEngine:       ewfEngine,
-		gridNet:         gridNet,
-		sshPublicKey:    sshPublicKey,
-		systemIdentity:  systemIdentity,
-		kycClient:       kycClient,
-		sponsorKeyPair:  sponsorKeyPair,
-		sponsorAddress:  sponsorAddress,
-		metrics:         metrics,
+		tokenManager:        tokenManager,
+		db:                  db,
+		config:              config,
+		mailService:         mailService,
+		proxyClient:         gridproxy,
+		substrateClient:     substrateClient,
+		graphqlClient:       graphqlClient,
+		firesquidClient:     firesquidClient,
+		redis:               redis,
+		sseManager:          sseManager,
+		ewfEngine:           ewfEngine,
+		gridNet:             gridNet,
+		sshPublicKey:        sshPublicKey,
+		systemIdentity:      systemIdentity,
+		kycClient:           kycClient,
+		sponsorKeyPair:      sponsorKeyPair,
+		sponsorAddress:      sponsorAddress,
+		metrics:             metrics,
+		notificationService: notificationService,
 	}
 }
 
@@ -219,7 +222,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		}
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserRegistration)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowUserRegistration)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to start registration workflow")
 		InternalServerError(c)
@@ -295,11 +298,18 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 			InternalServerError(c)
 			return
 		}
-
-		h.sseManager.Notify(user.ID, "user_registration", "User email is verified")
+		payload := notification.CommonPayload{
+			Message: "User email is verified successfully",
+			Subject: "User email verified",
+		}
+		notification := models.NewNotification(user.ID, "user_registration", notification.MergePayload(payload, map[string]string{}), models.WithNoPersist(), models.WithChannels(notification.ChannelUI), models.WithSeverity(models.NotificationSeveritySuccess))
+		err = h.notificationService.Send(context.Background(), notification)
+		if err != nil {
+			logger.GetLogger().Error().Err(err).Msg("failed to send user registration notification")
+		}
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowUserVerification)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowUserVerification)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("failed to start user verification workflow")
 		InternalServerError(c)
@@ -597,6 +607,18 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 
 	}
 
+	payload := notification.CommonPayload{
+		Status:  "password_changed",
+		Subject: "Your password was changed",
+		Message: "Your account password has been successfully updated.",
+	}
+
+	notification := models.NewNotification(c.GetInt("user_id"), models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}))
+	err = h.notificationService.Send(c, notification)
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("failed to send password changed notification")
+	}
+
 	Success(c, http.StatusAccepted, "password is updated successfully", nil)
 
 }
@@ -646,7 +668,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowChargeBalance)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowChargeBalance)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
@@ -826,7 +848,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 		return
 	}
 
-	wf, err := h.ewfEngine.NewWorkflow(activities.WorkflowRedeemVoucher)
+	wf, err := h.ewfEngine.NewWorkflow(constants.WorkflowRedeemVoucher)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		InternalServerError(c)
@@ -929,6 +951,17 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 		return
 	}
 
+	payload := notification.CommonPayload{
+		Status:  "ssh_key_added",
+		Subject: "New SSH key added",
+		Message: fmt.Sprintf("SSH key '%s' was added to your account.", sshKey.Name),
+	}
+	notification := models.NewNotification(userID, models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}))
+	err := h.notificationService.Send(c, notification)
+	if err != nil {
+		logger.GetLogger().Error().Err(err).Msg("failed to send ssh key added notification")
+	}
+
 	Success(c, http.StatusCreated, "SSH key added successfully", sshKey)
 }
 
@@ -968,6 +1001,17 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 		return
 	}
 
+	sshKey, err := h.db.GetSSHKeyByID(keyID, userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, http.StatusNotFound, "Not Found", "SSH key not found")
+			return
+		}
+		logger.GetLogger().Error().Err(err).Msg("failed to get SSH key before deletion")
+		InternalServerError(c)
+		return
+	}
+
 	if err := h.db.DeleteSSHKey(keyID, userID); err != nil {
 		if err.Error() == fmt.Sprintf("no SSH key found with ID %d for user %d", keyID, userID) {
 			Error(c, http.StatusNotFound, "Not Found", "SSH key not found")
@@ -976,6 +1020,16 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 		logger.GetLogger().Error().Err(err).Msg("failed to delete SSH key")
 		InternalServerError(c)
 		return
+	}
+
+	payload := notification.CommonPayload{
+		Status:  "ssh_key_deleted",
+		Subject: "SSH key deleted",
+		Message: fmt.Sprintf("SSH key '%s' was deleted from your account.", sshKey.Name),
+	}
+	n := models.NewNotification(userID, models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}), models.WithSeverity(models.NotificationSeveritySuccess))
+	if err := h.notificationService.Send(c, n); err != nil {
+		logger.GetLogger().Error().Err(err).Msg("failed to send ssh key deleted notification")
 	}
 
 	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
