@@ -54,11 +54,7 @@ export const useUserStore = defineStore('user',
       try {
         const loginData: LoginRequest = { email, password }
         const response = await authService.login(loginData)
-
-        // Store tokens
         authService.storeTokens(response.access_token, response.refresh_token)
-
-        // Set token in store
         token.value = response.access_token
         await loadUser()
       } catch (err) {
@@ -95,7 +91,7 @@ export const useUserStore = defineStore('user',
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          confirm_password: formData.confirmPassword
+          confirm_password: formData.confirmPassword,
         }
         const response = await authService.register(registerData)
         return response
@@ -114,20 +110,6 @@ export const useUserStore = defineStore('user',
         const response = await authService.verifyCode(data)
         authService.storeTokens(response.access_token, response.refresh_token)
         token.value = response.access_token
-        const workflowChecker = createWorkflowStatusChecker(response.workflow_id, {
-          initialDelay: 3000,
-          interval: 2000,
-        })
-        const status = await workflowChecker.status
-        if (status === WorkflowStatus.StatusCompleted) {
-          useNotificationStore().success('Registration Success', 'User registered successfully')
-        }
-        if (status === WorkflowStatus.StatusFailed) {
-          useNotificationStore().error('Registration Failed', 'Failed to register user')
-          throw new Error('Failed to register user')
-        }
-        await loadUser()
-        router.push('/dashboard')
       } catch (err) {
         error.value = err instanceof Error ? err.message : 'Verification failed'
         throw err
