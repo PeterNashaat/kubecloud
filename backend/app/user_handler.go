@@ -1046,6 +1046,17 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 		return
 	}
 
+	sshKey, err := h.db.GetSSHKeyByID(keyID, userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, http.StatusNotFound, "Not Found", "SSH key not found")
+			return
+		}
+		logger.GetLogger().Error().Err(err).Msg("failed to get SSH key before deletion")
+		InternalServerError(c)
+		return
+	}
+
 	if err := h.db.DeleteSSHKey(keyID, userID); err != nil {
 		if err.Error() == fmt.Sprintf("no SSH key found with ID %d for user %d", keyID, userID) {
 			Error(c, http.StatusNotFound, "Not Found", "SSH key not found")
@@ -1054,6 +1065,16 @@ func (h *Handler) DeleteSSHKeyHandler(c *gin.Context) {
 		logger.GetLogger().Error().Err(err).Msg("failed to delete SSH key")
 		InternalServerError(c)
 		return
+	}
+
+	payload := notification.CommonPayload{
+		Status:  "ssh_key_deleted",
+		Subject: "SSH key deleted",
+		Message: fmt.Sprintf("SSH key '%s' was deleted from your account.", sshKey.Name),
+	}
+	n := models.NewNotification(userID, models.NotificationTypeUser, notification.MergePayload(payload, map[string]string{}), models.WithSeverity(models.NotificationSeveritySuccess))
+	if err := h.notificationService.Send(c, n); err != nil {
+		logger.GetLogger().Error().Err(err).Msg("failed to send ssh key deleted notification")
 	}
 
 	Success(c, http.StatusOK, "SSH key deleted successfully", nil)
