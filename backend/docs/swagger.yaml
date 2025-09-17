@@ -331,6 +331,28 @@ definitions:
       used_resources:
         $ref: '#/definitions/types.Capacity'
     type: object
+  app.NotificationResponse:
+    description: A notification response
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      payload:
+        additionalProperties:
+          type: string
+        type: object
+      read_at:
+        type: string
+      severity:
+        $ref: '#/definitions/models.NotificationSeverity'
+      status:
+        $ref: '#/definitions/models.NotificationStatus'
+      task_id:
+        type: string
+      type:
+        $ref: '#/definitions/models.NotificationType'
+    type: object
   app.PendingRecordsResponse:
     properties:
       created_at:
@@ -620,6 +642,38 @@ definitions:
       rent_created_at:
         type: string
     type: object
+  models.NotificationSeverity:
+    enum:
+    - info
+    - error
+    - warning
+    - success
+    type: string
+    x-enum-varnames:
+    - NotificationSeverityInfo
+    - NotificationSeverityError
+    - NotificationSeverityWarning
+    - NotificationSeveritySuccess
+  models.NotificationStatus:
+    enum:
+    - unread
+    - read
+    type: string
+    x-enum-varnames:
+    - NotificationStatusUnread
+    - NotificationStatusRead
+  models.NotificationType:
+    enum:
+    - deployment
+    - billing
+    - user
+    - connected
+    type: string
+    x-enum-varnames:
+    - NotificationTypeDeployment
+    - NotificationTypeBilling
+    - NotificationTypeUser
+    - NotificationTypeConnected
   models.SSHKey:
     properties:
       created_at:
@@ -1198,6 +1252,288 @@ paths:
       summary: Get all invoices
       tags:
       - admin
+  /notifications:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes all notifications for a user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All notifications deleted successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to delete notifications
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Delete all notifications
+      tags:
+      - notifications
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all user notifications with pagination
+      parameters:
+      - description: 'Maximum number of notifications to return (default: 20, max:
+          100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Number of notifications to skip (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notifications retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    count:
+                      type: integer
+                    limit:
+                      type: integer
+                    notifications:
+                      items:
+                        $ref: '#/definitions/app.NotificationResponse'
+                      type: array
+                    offset:
+                      type: integer
+                  type: object
+              type: object
+        "400":
+          description: Invalid pagination parameters
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to retrieve notifications
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Get all notifications
+      tags:
+      - notifications
+  /notifications/{notification_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a specific notification for a user
+      parameters:
+      - description: Notification ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification deleted successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Invalid notification ID
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: Notification not found
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to delete notification
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Delete a specific notification
+      tags:
+      - notifications
+  /notifications/{notification_id}/read:
+    patch:
+      consumes:
+      - application/json
+      description: Marks a specific notification as read for a user
+      parameters:
+      - description: Notification ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification marked as read successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Invalid notification ID
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: Notification not found
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to mark notification as read
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Mark a specific notification as read
+      tags:
+      - notifications
+  /notifications/{notification_id}/unread:
+    patch:
+      consumes:
+      - application/json
+      description: Marks a specific notification as unread for a user
+      parameters:
+      - description: Notification ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification marked as unread successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Invalid notification ID
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "404":
+          description: Notification not found
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to mark notification as unread
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Mark a specific notification as unread
+      tags:
+      - notifications
+  /notifications/read-all:
+    patch:
+      consumes:
+      - application/json
+      description: Marks all notifications as read for a user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All notifications marked as read successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Invalid notification ID
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to mark notifications as read
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Mark all notifications as read
+      tags:
+      - notifications
+  /notifications/unread:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves only unread notifications for a user
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Unread notifications retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    count:
+                      type: integer
+                    limit:
+                      type: integer
+                    notifications:
+                      items:
+                        $ref: '#/definitions/app.NotificationResponse'
+                      type: array
+                    offset:
+                      type: integer
+                  type: object
+              type: object
+        "400":
+          description: Invalid pagination parameters
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+        "500":
+          description: Failed to retrieve unread notifications
+          schema:
+            $ref: '#/definitions/app.APIResponse'
+      summary: Get unread notifications
+      tags:
+      - notifications
   /nodes:
     get:
       consumes:

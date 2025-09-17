@@ -1,4 +1,4 @@
-package activities
+package constants
 
 const (
 	// Workflow names
@@ -13,6 +13,7 @@ const (
 	WorkflowAddNode                  = "add-node"
 	WorkflowRemoveNode               = "remove-node"
 	WorkflowDeleteAllClusters        = "delete-all-clusters"
+	WorkflowSendNotification         = "send-notification"
 	WorkflowRollbackFailedDeployment = "rollback-failed-deployment"
 	WorkflowTrackClusterHealth       = "track-cluster-health"
 
@@ -44,4 +45,6 @@ const (
 	StepDeployNetwork           = "deploy-network"
 	StepFetchKubeconfig         = "fetch_kubeconfig"
 	StepVerifyClusterReady      = "verify-cluster-ready"
+	StepSendEmailNotification   = "send-email-notification"
+	StepSendUINotification      = "send-ui-notification"
 )
