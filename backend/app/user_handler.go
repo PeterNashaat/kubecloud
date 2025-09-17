@@ -21,9 +21,10 @@ import (
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 	"github.com/xmonader/ewf"
 
+	"kubecloud/internal/logger"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"kubecloud/internal/logger"
 
 	"github.com/vedhavyas/go-subkey"
 )
@@ -84,46 +85,46 @@ func NewHandler(tokenManager internal.TokenManager, db models.DB,
 
 // RegisterInput struct for data needed when user register
 type RegisterInput struct {
-	Name            string `json:"name" validate:"required,min=3,max=64"`
-	Email           string `json:"email" validate:"required,email"`
-	Password        string `json:"password" validate:"required,min=8,max=64"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+	Name            string `json:"name" binding:"required,min=3,max=64"`
+	Email           string `json:"email" binding:"required,email"`
+	Password        string `json:"password" binding:"required,min=8,max=64"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
 }
 
 // LoginInput struct for login handler
 type LoginInput struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=3,max=64"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=3,max=64"`
 }
 
 // RefreshTokenInput struct when user refresh token
 type RefreshTokenInput struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 // EmailInput struct for user when forgetting password
 type EmailInput struct {
-	Email string `json:"email" validate:"required,email"`
+	Email string `json:"email" binding:"required,email"`
 }
 
 // VerifyCodeInput struct takes verification code from user
 type VerifyCodeInput struct {
-	Email string `json:"email" validate:"required,email"`
-	Code  int    `json:"code" validate:"required"`
+	Email string `json:"email" binding:"required,email"`
+	Code  int    `json:"code" binding:"required"`
 }
 
 // ChangePasswordInput struct for user to change password
 type ChangePasswordInput struct {
-	Email           string `json:"email" validate:"required,email"`
-	Password        string `json:"password" validate:"required,min=8,max=64"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+	Email           string `json:"email" binding:"required,email"`
+	Password        string `json:"password" binding:"required,min=8,max=64"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
 }
 
 // ChargeBalanceInput struct holds required data to charge users' balance
 type ChargeBalanceInput struct {
-	CardType     string  `json:"card_type" validate:"required"`
-	PaymentToken string  `json:"payment_method_id" validate:"required"`
-	Amount       float64 `json:"amount" validate:"required,gt=0"`
+	CardType     string  `json:"card_type" binding:"required"`
+	PaymentToken string  `json:"payment_method_id" binding:"required"`
+	Amount       float64 `json:"amount" binding:"required,gt=0"`
 }
 
 // RegisterResponse struct holds data returned when user registers
@@ -152,8 +153,8 @@ type UserBalanceResponse struct {
 
 // SSHKeyInput struct for adding SSH keys
 type SSHKeyInput struct {
-	Name      string `json:"name" validate:"required"`
-	PublicKey string `json:"public_key" validate:"required"`
+	Name      string `json:"name" binding:"required"`
+	PublicKey string `json:"public_key" binding:"required"`
 }
 
 // RegisterUserResponse holds the response for user registration
@@ -189,7 +190,7 @@ type GetUserResponse struct {
 // @Accept json
 // @Produce json
 // @Param body body RegisterInput true "Register Input"
-// @Success 201 {object} RegisterUserResponse "workflow_id: string, email: string"
+// @Success 202 {object} RegisterUserResponse "workflow_id: string, email: string"
 // @Failure 400 {object} APIResponse "Invalid request format"
 // @Failure 409 {object} APIResponse "User is already registered"
 // @Failure 500 {object} APIResponse "Internal server error"
@@ -201,11 +202,6 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
-		return
-	}
-
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -238,7 +234,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "Registration in progress. You can check its status using the workflow id.", RegisterUserResponse{
+	Success(c, http.StatusAccepted, "Registration in progress. You can check its status using the workflow id.", RegisterUserResponse{
 		WorkflowID: wf.UUID,
 		Email:      request.Email,
 	})
@@ -251,7 +247,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body VerifyCodeInput true "Verification details"
-// @Success 201 {object} VerifyRegisterUserResponse
+// @Success 202 {object} VerifyRegisterUserResponse
 // @Failure 400 {object} APIResponse "Invalid request"
 // @Failure 409 {object} APIResponse "User is already registered"
 // @Failure 500 {object} APIResponse "Internal server error"
@@ -262,11 +258,6 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
-		return
-	}
-
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -337,7 +328,7 @@ func (h *Handler) VerifyRegisterCode(c *gin.Context) {
 		return
 	}
 
-	Success(c, http.StatusCreated, "Verification is in progress", VerifyRegisterUserResponse{
+	Success(c, http.StatusAccepted, "Verification is in progress", VerifyRegisterUserResponse{
 		WorkflowID: wf.UUID,
 		Email:      user.Email,
 		TokenPair:  tokenPair,
@@ -363,11 +354,6 @@ func (h *Handler) LoginUserHandler(c *gin.Context) {
 	// check on request format
 	if err := c.ShouldBindJSON(&request); err != nil {
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
-		return
-	}
-
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -432,11 +418,6 @@ func (h *Handler) RefreshTokenHandler(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	accessToken, err := h.tokenManager.AccessTokenFromRefresh(request.RefreshToken)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
@@ -469,11 +450,6 @@ func (h *Handler) ForgotPasswordHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
-		return
-	}
-
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 
@@ -538,11 +514,6 @@ func (h *Handler) VerifyForgetPasswordCodeHandler(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	// get user by email
 	user, err := h.db.GetUserByEmail(request.Email)
 	if err != nil {
@@ -603,11 +574,6 @@ func (h *Handler) ChangePasswordHandler(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	// hash password
 	hashedPassword, err := internal.HashAndSaltPassword([]byte(request.Password))
 	if err != nil {
@@ -657,11 +623,6 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	user, err := h.db.GetUserByID(userID)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Send()
@@ -704,7 +665,7 @@ func (h *Handler) ChargeBalance(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusCreated, "Charge in progress. You can check its status using the workflow id.", ChargeBalanceResponse{
+	Success(c, http.StatusAccepted, "Charge in progress. You can check its status using the workflow id.", ChargeBalanceResponse{
 		WorkflowID: wf.UUID,
 		Email:      user.Email,
 	})
@@ -880,7 +841,7 @@ func (h *Handler) RedeemVoucherHandler(c *gin.Context) {
 	}
 	h.ewfEngine.RunAsync(context.Background(), wf)
 
-	Success(c, http.StatusOK, "Voucher is redeemed successfully. Money transfer in progress.", RedeemVoucherResponse{
+	Success(c, http.StatusAccepted, "Voucher is redeemed successfully. Money transfer in progress.", RedeemVoucherResponse{
 		WorkflowID:  wf.UUID,
 		VoucherCode: voucher.Code,
 		Amount:      voucher.Value,
@@ -942,11 +903,6 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.GetLogger().Error().Err(err).Send()
 		Error(c, http.StatusBadRequest, "Invalid request format", err.Error())
-		return
-	}
-
-	if err := internal.ValidateStruct(request); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
 	}
 

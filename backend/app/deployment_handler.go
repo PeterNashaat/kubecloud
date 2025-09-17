@@ -307,11 +307,6 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(cluster); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	if err := cluster.Validate(); err != nil {
 		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
 		return
@@ -358,7 +353,7 @@ func (h *Handler) HandleDeployCluster(c *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Param name path string true "Deployment name"
-// @Success 200 {object} Response "Deployment deletion workflow started successfully"
+// @Success 202 {object} Response "Deployment deletion workflow started successfully"
 // @Failure 400 {object} APIResponse "Invalid request"
 // @Failure 401 {object} APIResponse "Unauthorized"
 // @Failure 404 {object} APIResponse "Deployment not found"
@@ -401,7 +396,7 @@ func (h *Handler) HandleDeleteCluster(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusAccepted, Response{
 		WorkflowID: wf.UUID,
 		Status:     string(wf.Status),
 		Message:    "Deployment deletion workflow started successfully",
@@ -413,7 +408,7 @@ func (h *Handler) HandleDeleteCluster(c *gin.Context) {
 // @Tags deployments
 // @Security BearerAuth
 // @Produce json
-// @Success 200 {object} Response "Delete all deployments workflow started successfully"
+// @Success 202 {object} Response "Delete all deployments workflow started successfully"
 // @Failure 401 {object} APIResponse "Unauthorized"
 // @Failure 500 {object} APIResponse "Internal server error"
 // @Router /deployments [delete]
@@ -480,11 +475,6 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 		return
 	}
 
-	if err := internal.ValidateStruct(cluster); err != nil {
-		Error(c, http.StatusBadRequest, "Validation failed", err.Error())
-		return
-	}
-
 	projectName := kubedeployer.GetProjectName(config.UserID, cluster.Name)
 	existingCluster, err := h.db.GetClusterByName(config.UserID, projectName)
 	if err != nil {
@@ -542,7 +532,7 @@ func (h *Handler) HandleAddNode(c *gin.Context) {
 // @Produce json
 // @Param name path string true "Deployment name"
 // @Param node_name path string true "Node name to remove"
-// @Success 200 {object} Response "Node removal workflow started successfully"
+// @Success 202 {object} Response "Node removal workflow started successfully"
 // @Failure 400 {object} APIResponse "Invalid request"
 // @Failure 401 {object} APIResponse "Unauthorized"
 // @Failure 404 {object} APIResponse "Deployment not found"
@@ -614,7 +604,7 @@ func (h *Handler) HandleRemoveNode(c *gin.Context) {
 
 	h.ewfEngine.RunAsync(c, wf)
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusAccepted, Response{
 		WorkflowID: wf.UUID,
 		Status:     string(wf.Status),
 		Message:    "Node removal workflow started successfully",

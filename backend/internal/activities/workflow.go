@@ -111,5 +111,13 @@ func RegisterEWFWorkflows(
 	}
 	engine.RegisterTemplate(WorkflowUnreserveNode, &unreserveNodeTemplate)
 
+	trackClusterHealthWFTemplate := newKubecloudWorkflowTemplate()
+	trackClusterHealthWFTemplate.Steps = []ewf.Step{
+		{Name: StepFetchKubeconfig, RetryPolicy: standardRetryPolicy},
+		{Name: StepVerifyClusterReady, RetryPolicy: standardRetryPolicy},
+	}
+	trackClusterHealthWFTemplate.AfterWorkflowHooks = append(trackClusterHealthWFTemplate.AfterWorkflowHooks, hookClusterHealthCheck(sse))
+	engine.RegisterTemplate(WorkflowTrackClusterHealth, &trackClusterHealthWFTemplate)
+
 	registerDeploymentActivities(engine, metrics, db, sse, config)
 }

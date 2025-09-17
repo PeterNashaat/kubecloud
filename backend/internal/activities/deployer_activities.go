@@ -587,7 +587,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(StepRemoveNode, RemoveDeploymentNodeStep())
 	engine.Register(StepStoreDeployment, StoreDeploymentStep(db, metrics))
 	engine.Register(StepFetchKubeconfig, FetchKubeconfigStep(db, config.SSH.PrivateKeyPath))
-	engine.Register(StepVerifyClusterReady, VerifyClusterReadyStep())
+	engine.Register(StepVerifyClusterReady, VerifyClusterReadyStep(sse))
 	engine.Register(StepRemoveClusterFromDB, RemoveClusterFromDBStep(db))
 	engine.Register(StepGatherAllContractIDs, GatherAllContractIDsStep(db))
 	engine.Register(StepBatchCancelContracts, BatchCancelContractsStep())
@@ -733,8 +733,9 @@ func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 	}
 }
 
-func VerifyClusterReadyStep() ewf.StepFn {
+func VerifyClusterReadyStep(sse *internal.SSEManager) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
+
 		cluster, err := statemanager.GetCluster(state)
 		if err != nil {
 			return fmt.Errorf("failed to get cluster: %w", err)
