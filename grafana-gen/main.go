@@ -101,10 +101,31 @@ func main() {
 		graphPanel("GORM Idle Connections", "gorm_idle_connections", "stat", id+18, y+42, 12, 12, 6, false),
 
 		// Go Runtime
-		rowPanel("Go Runtime", id+19, y+49),
-		graphPanel("Go Goroutines", "go_goroutines", "graph", id+20, y+50, 0, 12, 8, false),
-		graphPanel("Go Memory Usage", "go_memstats_alloc_bytes", "graph", id+21, y+50, 12, 12, 8, false),
-		graphPanel("Go GC Cycles", "go_gc_duration_seconds_count", "graph", id+22, y+58, 0, 12, 8, false),
+		rowPanel("Go Runtime", id+19, y+50),
+		graphPanel("Go Goroutines", "go_goroutines", "graph", id+17, y+42, 0, 12, 8, false),
+		graphPanel("Go Memory Usage", "go_memstats_alloc_bytes", "graph", id+18, y+42, 12, 12, 8, false),
+		graphPanel("Go GC Cycles", "go_gc_duration_seconds_count", "graph", id+19, y+50, 0, 12, 8, false),
+
+		// Loki Logs
+		rowPanel("Loki Logs", id+23, y+66),
+		map[string]interface{}{
+			"id":    id + 24,
+			"type":  "logs",
+			"title": "Application Logs",
+			"targets": []map[string]interface{}{
+				{
+					"expr":     `{job="app-logs"}`,
+					"refId":    "A",
+					"datasource": "Loki",
+				},
+			},
+			"gridPos": map[string]int{
+				"h": 8,
+				"w": 24,
+				"x": 0,
+				"y": y + 67,
+			},
+		},
 	}
 
 	dashboard := map[string]interface{}{

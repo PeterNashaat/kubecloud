@@ -43,6 +43,7 @@ type Configuration struct {
 	KYCChallengeDomain string `json:"kyc_challenge_domain" validate:"required"`
 
 	Logger LoggerConfig `json:"logger"`
+	Loki   LokiConfig   `json:"loki"`
 
 	// Notification configuration
 	NotificationConfigPath string             `json:"notification_config_path"`
@@ -115,6 +116,12 @@ type LoggerConfig struct {
 	MaxBackups int    `json:"max_backups"`
 	MaxAgeDays int    `json:"max_age_days"` // in days
 	Compress   bool   `json:"compress"`
+}
+
+type LokiConfig struct {
+	URL                 string            `json:"url"`
+	FlushIntervalSecond int               `json:"flush_interval_second"`
+	Labels              map[string]string `json:"labels"`
 }
 
 // NotificationConfig holds notification template type rules
@@ -201,6 +208,17 @@ func LoadConfig() (Configuration, error) {
 
 	if err := decoder.Decode(viper.AllSettings()); err != nil {
 		return Configuration{}, fmt.Errorf("unable to decode into struct, %w", err)
+	}
+
+	if labelsRaw := viper.GetString("loki.labels"); labelsRaw != "" {
+		parsed := make(map[string]string)
+		pairs := strings.Split(labelsRaw, ",")
+		for _, p := range pairs {
+			if kv := strings.SplitN(p, "=", 2); len(kv) == 2 {
+				parsed[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+		config.Loki.Labels = parsed
 	}
 
 	config.Database.File, err = expandPath(config.Database.File)

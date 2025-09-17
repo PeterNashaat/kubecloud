@@ -44,6 +44,8 @@ services:
       - MYCELIUM_HOST=localhost
       - REDIS_HOST=redis-db
       - REDIS_PORT=6379
+      - APP_ENV=dev
+      - HOSTNAME=backend-1 
       - TEMPLATE_DIR=/app/internal/templates/notifications
     command: ["/myceliumcloud", "--config", "/app/config.json"]
     network_mode: "service:mycelium" # inherits mycelium's network, including app-network access
@@ -97,11 +99,36 @@ services:
       - GRAFANA_PASSWORD=admin
     networks:
       - app-network
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml
+      - loki-data:/loki
+    networks:
+      - app-network
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./loki/promtail-config.yaml:/etc/promtail/promtail-config.yaml
+      - /var/log:/var/log
+      - ./backend/logs:/app/logs
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    networks:
+      - app-network
+
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  mycelium-data:
+  mycelium-data: 
   prometheus-data:
+  loki-data:

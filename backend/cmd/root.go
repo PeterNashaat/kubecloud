@@ -193,6 +193,17 @@ func addFlags() error {
 		return fmt.Errorf("failed to bind logger.compress flag: %w", err)
 	}
 
+	// === Loki ===
+	if err := bindStringFlag(rootCmd, "loki.url", "http://loki:3100/loki/api/v1/push", "Loki URL"); err != nil {
+		return fmt.Errorf("failed to bind loki.url flag: %w", err)
+	}
+	if err := bindIntFlag(rootCmd, "loki.flush_interval_second", 2, "Loki flush interval (seconds)"); err != nil {
+		return fmt.Errorf("failed to bind loki.flush_interval_second flag: %w", err)
+	}
+	if err := bindStringFlag(rootCmd, "loki.labels", "app=myceliumCloud,env=,host=", "Loki labels (key=value,key2=value2)"); err != nil {
+		return fmt.Errorf("failed to bind loki.labels flag: %w", err)
+	}
+
 	// === Notification Config ===
 	if err := bindStringFlag(rootCmd, "notification_config_path", "./notification-config.json", "Path to notification configuration file"); err != nil {
 		return fmt.Errorf("failed to bind notification_config_path flag: %w", err)
@@ -306,7 +317,12 @@ It supports:
 			loggerConfig.LogDir = "./logs"
 		}
 		fmt.Printf("Setting up logging to: %s/app.log\n", loggerConfig.LogDir)
-		if err := logger.InitLogger(loggerConfig, config.Debug); err != nil {
+		lokiConfig := &logger.LokiConfig{
+			URL:           config.Loki.URL,
+			FlushInterval: time.Duration(config.Loki.FlushIntervalSecond) * time.Second,
+			Labels:        config.Loki.Labels,
+		}
+		if err := logger.InitLogger(loggerConfig, lokiConfig, config.Debug); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
 
