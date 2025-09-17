@@ -16,52 +16,7 @@ myceliumcloud --config /path/to/config.json
 
 The configuration file should be in JSON format. Example:
 
-```json
-{
-  "server": {
-    "host": "localhost",
-    "port": "8080"
-  },
-  "database": {
-    "file": "/path/to/db/file"
-  },
-  "token": {
-    "secret": "your-secret-key",
-    "access_token_expiry_minutes": 60,
-    "refresh_token_expiry_hours": 24
-  },
-  "currency": "USD",
-  "stripe_secret": "your-stripe-secret",
-  "tfchain_url": "wss://tfchain.dev.grid.tf/wss",
-  "gridproxy_url": "https://gridproxy.dev.grid.tf/",
-  "activation_service_url": "https://activation.grid.tf/activation/activate",
-  "graphql_url": "https://graphql.grid.tf/graphql",
-  "firesquid_url": "https://firesquid.grid.tf/graphql",
-  "redis": {
-    "host": "localhost",
-    "port": 6379,
-    "password": "",
-    "db": 0
-  },
-  "grid": {
-    "mne": "your-mnemonic",
-    "net": "main"
-  },
-  "invoice": {
-    "name": "Mycelium Cloud Invoice",
-    "address": "123 Mycelium Cloud St, Cloud City, CC 12345",
-    "governorate": "Cloud Governorate"
-  },
-  "logger": {
-  "log_dir": "./app/logs",
-  "max_size": 512,
-  "max_backups": 12,
-  "max_age": 30,
-  "compress": true
-  },
-  "cluster_health_check_interval_hours":6
-}
-```
+check the config [example](./config-example.json)
 
 ### Notification Configuration
 
