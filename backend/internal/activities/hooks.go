@@ -83,9 +83,9 @@ func hookClusterHealthCheck(notificationService *notification.NotificationServic
 		if err == nil {
 			return
 		}
-		config, err := getConfig(wf.State)
-		if err != nil {
-			logger.GetLogger().Error().Err(err).Str("workflow_name", wf.Name).Msg("Failed to get config from state")
+		config, cfgErr := getConfig(wf.State)
+		if cfgErr != nil {
+			logger.GetLogger().Error().Err(cfgErr).Str("workflow_name", wf.Name).Msg("Failed to get config from state")
 			return
 		}
 		severity := models.NotificationSeverityError
@@ -100,7 +100,7 @@ func hookClusterHealthCheck(notificationService *notification.NotificationServic
 		})
 		cluster, errCluster := statemanager.GetCluster(wf.State)
 		if errCluster != nil {
-			logger.GetLogger().Error().Err(err).Str("workflow_name", wf.Name).Msg("Failed to get cluster from state")
+			logger.GetLogger().Error().Err(errCluster).Str("workflow_name", wf.Name).Msg("Failed to get cluster from state")
 
 			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, payload, models.WithSeverity(severity), models.WithChannels(notification.ChannelEmail))
 			if err := notificationService.Send(ctx, notification); err != nil {
