@@ -25,6 +25,15 @@
         padding: 16px 20px;
         background: #1976d2;
       }
+      .header.success {
+        background: #1976d2;
+      }
+      .header.warning {
+        background: #ed6c02;
+      }
+      .header.error {
+        background: #c62828;
+      }
       .header h1 {
         margin: 0;
         font-size: 20px;
@@ -73,8 +82,10 @@
   </head>
   <body>
     <div class="container">
-      <div class="header">
-        <h1>Deployment {{ index .Payload "status" }}</h1>
+      <div class="header {{ .Severity }}">
+        <h1>
+          <h1>Deployment {{ index .Payload "status" }}</h1>
+        </h1>
       </div>
       <div class="content">
         <p>{{ index .Payload "message" }}</p>
@@ -110,7 +121,7 @@
           If you need assistance, please reply to this email or contact support.
         </p>
       </div>
-      <div class="footer">KubeCloud. All rights reserved.</div>
+      <div class="footer">Mycelium Cloud. All rights reserved.</div>
     </div>
   </body>
 </html>
