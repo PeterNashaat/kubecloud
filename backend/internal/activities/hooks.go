@@ -46,7 +46,7 @@ func hookWorkflowStarted(n *notification.NotificationService) ewf.BeforeWorkflow
 			Message: message,
 			Status:  "started",
 		}, map[string]string{
-			"workflow_name": w.Name,
+			"workflow_name": workflowDesc,
 		})
 
 		notificationType := workflowToNotificationType(w.Name)
