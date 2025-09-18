@@ -321,6 +321,7 @@ func CancelDeploymentStep(db models.DB, metrics *metrics.Metrics) ewf.StepFn {
 			if err != nil {
 				return fmt.Errorf("failed to get cluster result: %w", err)
 			}
+			state["cluster"] = cluster
 		}
 
 		if err := kubeClient.CancelCluster(ctx, cluster); err != nil {

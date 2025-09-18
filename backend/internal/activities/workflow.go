@@ -26,6 +26,7 @@ var workflowsDescriptions = map[string]string{
 	constants.WorkflowRedeemVoucher:            "Redeem Voucher",
 	constants.WorkflowReserveNode:              "Reserve Node",
 	constants.WorkflowUnreserveNode:            "Unreserve Node",
+	constants.WorkflowTrackClusterHealth:       "Cluster Health Check",
 }
 
 func RegisterEWFWorkflows(

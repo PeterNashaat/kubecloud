@@ -84,15 +84,19 @@
     <div class="container">
       <div class="header {{ .Severity }}">
         <h1>
-          <h1>Deployment {{ index .Payload "status" }}</h1>
+          <h1>
+          {{ index .Payload "workflow_name" }} {{ index .Payload "status" }}
+        </h1>
         </h1>
       </div>
       <div class="content">
         <p>{{ index .Payload "message" }}</p>
+        {{ $cluster := index .Payload "cluster_name" }} {{ if $cluster }}
         <div class="kv">
           <span class="label">Cluster:</span>
-          <span class="value">{{ index .Payload "cluster_name" }}</span>
+          <span class="value">{{ $cluster }}</span>
         </div>
+        {{ end }}
         <div class="kv">
           <span class="label">Time:</span>
           <span class="value">{{ index .Payload "timestamp" }}</span>

@@ -11,11 +11,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"kubecloud/internal/logger"
 
 	"github.com/xmonader/ewf"
 )
+
+const timestampFormat = "Mon, 02 Jan 2006 15:04:05 MST"
 
 func workflowToNotificationType(workflowName string) models.NotificationType {
 	billingWf := []string{constants.WorkflowChargeBalance, constants.WorkflowAdminCreditBalance, constants.WorkflowRedeemVoucher}
@@ -73,9 +76,12 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 	var notificationPayload map[string]string
 
 	if err != nil {
+		var clusterName string
 		message := fmt.Sprintf("%s failed", workflowDesc)
 		if cluster, clusterErr := statemanager.GetCluster(wf.State); clusterErr == nil {
+			clusterName = cluster.Name
 			message = fmt.Sprintf("%s for cluster '%s' failed", workflowDesc, cluster.Name)
+
 		}
 
 		notificationPayload = notification.MergePayload(notification.CommonPayload{
@@ -84,7 +90,9 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 			Subject: fmt.Sprintf("%s failed", workflowDesc),
 			Status:  "failed",
 		}, map[string]string{
-			"name": wf.Name,
+			"workflow_name": workflowDesc,
+			"cluster_name":  clusterName,
+			"timestamp":     time.Now().Local().Format(timestampFormat),
 		})
 
 		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
@@ -97,7 +105,9 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 			Subject: fmt.Sprintf("%s completed successfully", workflowDesc),
 			Status:  "succeeded",
 		}, map[string]string{
-			"name": wf.Name,
+			"workflow_name": getWorkflowDescription(wf.Name),
+			"cluster_name":  cluster.Name,
+			"timestamp":     time.Now().Local().Format(timestampFormat),
 		})
 
 	} else {
@@ -112,10 +122,11 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 				workflowDesc),
 			Status: "succeeded",
 		}, map[string]string{
-			"name":         wf.Name,
-			"cluster_name": cluster.Name,
-			"node_count":   fmt.Sprintf("%d", nodeCount),
-			"total_steps":  fmt.Sprintf("%d", totalSteps),
+			"workflow_name": workflowDesc,
+			"cluster_name":  cluster.Name,
+			"node_count":    fmt.Sprintf("%d", nodeCount),
+			"total_steps":   fmt.Sprintf("%d", totalSteps),
+			"timestamp":     time.Now().Local().Format(timestampFormat),
 		})
 	}
 
@@ -148,21 +159,17 @@ func notifyStepProgress(notificationService *notification.NotificationService, s
 
 	var message string
 	var notificationType string
-	var severity models.NotificationSeverity
 	switch {
 	case err != nil:
 		notificationType = "step_failed"
 		message = fmt.Sprintf("Step failed%s", progressStr)
-		severity = models.NotificationSeverityError
 	case status == "completed":
 		notificationType = "step_completed"
 		message = fmt.Sprintf("Step completed%s", progressStr)
-		severity = models.NotificationSeveritySuccess
 	case status == "retrying":
 		notificationType = "step_retrying"
 		retryStr := fmt.Sprintf(" - retry %d/%d", retryCount, maxRetries)
 		message = fmt.Sprintf("Retrying Step %s%s", progressStr, retryStr)
-		severity = models.NotificationSeverityWarning
 	default:
 		return
 	}
@@ -191,7 +198,7 @@ func notifyStepProgress(notificationService *notification.NotificationService, s
 		payload,
 		models.WithNoPersist(),
 		models.WithChannels(notification.ChannelUI),
-		models.WithSeverity(severity),
+		models.WithSeverity(models.NotificationSeverityInfo),
 	)
 	err = notificationService.Send(context.Background(), notification)
 	if err != nil {
@@ -291,9 +298,15 @@ func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, er
 			severity = models.NotificationSeverityError
 			payloadData.Message = fmt.Sprintf("Money transfer to user %d's account failed", userID)
 			payloadData.Subject = "Money transfer to user's account failed"
-			return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
+			return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{
+				"workflow_name": getWorkflowDescription(wf.Name),
+				"timestamp":     time.Now().Local().Format(timestampFormat),
+			}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
 		}
-		return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
+		return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{
+			"workflow_name": getWorkflowDescription(wf.Name),
+			"timestamp":     time.Now().Local().Format(timestampFormat),
+		}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
 	}
 
 	var payload map[string]string
@@ -325,7 +338,8 @@ func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, er
 		}
 	}
 	payloadData := map[string]string{
-		"name": wf.Name,
+		"workflow_name": getWorkflowDescription(wf.Name),
+		"timestamp":     time.Now().Local().Format(timestampFormat),
 	}
 	if amountUSD > 0 {
 		payloadData["amount"] = fmt.Sprintf("%.2f", amountUSD)
@@ -397,7 +411,8 @@ func CreateNodeWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 
 	// Build payload data
 	payloadData := map[string]string{
-		"name": wf.Name,
+		"workflow_name": getWorkflowDescription(wf.Name),
+		"timestamp":     time.Now().Local().Format(timestampFormat),
 	}
 	if nodeID > 0 {
 		payloadData["node_id"] = fmt.Sprintf("%d", nodeID)
@@ -457,7 +472,8 @@ func CreateUserWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 	}
 
 	payloadData := map[string]string{
-		"name": wf.Name,
+		"workflow_name": getWorkflowDescription(wf.Name),
+		"timestamp":     time.Now().Local().Format(timestampFormat),
 	}
 
 	payload = notification.MergePayload(notification.CommonPayload{
