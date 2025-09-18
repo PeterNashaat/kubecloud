@@ -18,8 +18,6 @@ import (
 	"github.com/xmonader/ewf"
 )
 
-const timestampFormat = "Mon, 02 Jan 2006 15:04:05 MST"
-
 func workflowToNotificationType(workflowName string) models.NotificationType {
 	billingWf := []string{constants.WorkflowChargeBalance, constants.WorkflowAdminCreditBalance, constants.WorkflowRedeemVoucher}
 	deployWf := []string{constants.WorkflowDeleteAllClusters, constants.WorkflowDeleteCluster, constants.WorkflowRemoveNode, constants.WorkflowAddNode, constants.WorkflowRollbackFailedDeployment}
@@ -92,7 +90,7 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 		}, map[string]string{
 			"workflow_name": workflowDesc,
 			"cluster_name":  clusterName,
-			"timestamp":     time.Now().Local().Format(timestampFormat),
+			"timestamp":     time.Now().Local().Format(TimestampFormat),
 		})
 
 		notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notificationPayload)
@@ -107,7 +105,7 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 		}, map[string]string{
 			"workflow_name": getWorkflowDescription(wf.Name),
 			"cluster_name":  cluster.Name,
-			"timestamp":     time.Now().Local().Format(timestampFormat),
+			"timestamp":     time.Now().Local().Format(TimestampFormat),
 		})
 
 	} else {
@@ -126,7 +124,7 @@ func CreateDeploymentWorkflowNotification(ctx context.Context, wf *ewf.Workflow,
 			"cluster_name":  cluster.Name,
 			"node_count":    fmt.Sprintf("%d", nodeCount),
 			"total_steps":   fmt.Sprintf("%d", totalSteps),
-			"timestamp":     time.Now().Local().Format(timestampFormat),
+			"timestamp":     time.Now().Local().Format(TimestampFormat),
 		})
 	}
 
@@ -300,12 +298,12 @@ func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, er
 			payloadData.Subject = "Money transfer to user's account failed"
 			return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{
 				"workflow_name": getWorkflowDescription(wf.Name),
-				"timestamp":     time.Now().Local().Format(timestampFormat),
+				"timestamp":     time.Now().Local().Format(TimestampFormat),
 			}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
 		}
 		return models.NewNotification(adminID, models.NotificationTypeBilling, notification.MergePayload(payloadData, map[string]string{
 			"workflow_name": getWorkflowDescription(wf.Name),
-			"timestamp":     time.Now().Local().Format(timestampFormat),
+			"timestamp":     time.Now().Local().Format(TimestampFormat),
 		}), models.WithSeverity(severity), models.WithChannels(notification.ChannelUI))
 	}
 
@@ -339,7 +337,7 @@ func CreateBillingWorkflowNotification(ctx context.Context, wf *ewf.Workflow, er
 	}
 	payloadData := map[string]string{
 		"workflow_name": getWorkflowDescription(wf.Name),
-		"timestamp":     time.Now().Local().Format(timestampFormat),
+		"timestamp":     time.Now().Local().Format(TimestampFormat),
 	}
 	if amountUSD > 0 {
 		payloadData["amount"] = fmt.Sprintf("%.2f", amountUSD)
@@ -412,7 +410,7 @@ func CreateNodeWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 	// Build payload data
 	payloadData := map[string]string{
 		"workflow_name": getWorkflowDescription(wf.Name),
-		"timestamp":     time.Now().Local().Format(timestampFormat),
+		"timestamp":     time.Now().Local().Format(TimestampFormat),
 	}
 	if nodeID > 0 {
 		payloadData["node_id"] = fmt.Sprintf("%d", nodeID)
@@ -473,7 +471,7 @@ func CreateUserWorkflowNotification(ctx context.Context, wf *ewf.Workflow, err e
 
 	payloadData := map[string]string{
 		"workflow_name": getWorkflowDescription(wf.Name),
-		"timestamp":     time.Now().Local().Format(timestampFormat),
+		"timestamp":     time.Now().Local().Format(TimestampFormat),
 	}
 
 	payload = notification.MergePayload(notification.CommonPayload{
