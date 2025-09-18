@@ -576,7 +576,6 @@ func createAddNodeWorkflowTemplate(notificationService *notification.Notificatio
 	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
 		[]ewf.AfterWorkflowHook{
 			notifyWorkflowProgress(notificationService),
-			CloseClient,
 		}...)
 	return template
 }
@@ -627,6 +626,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 			handleAddNodeWorkflowFailure(ctx, wf, err)
 		},
 	)
+	addNodeWFTemplate.AfterWorkflowHooks = append(addNodeWFTemplate.AfterWorkflowHooks, CloseClient)
 
 	engine.RegisterTemplate(constants.WorkflowAddNode, &addNodeWFTemplate)
 
