@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -83,21 +84,21 @@ func (lw *LokiWriter) flush() {
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		GetLogger().Error().Err(err).Msg("loki marshal error")
+		log.Printf("[LokiWriter] JSON marshal error: %v", err)
 		lw.batch = lw.batch[:0]
 		return
 	}
 
 	resp, err := lw.client.Post(lw.url, "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		GetLogger().Error().Err(err).Msg("loki push error")
+		log.Printf("[LokiWriter] push error: %v", err)
 		lw.batch = lw.batch[:0]
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		GetLogger().Error().Msgf("loki push failed: %s", resp.Status)
+		log.Printf("[LokiWriter] push failed: %s", resp.Status)
 	}
 
 	// Clear batch
