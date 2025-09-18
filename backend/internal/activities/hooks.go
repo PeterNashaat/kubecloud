@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	TimestampFormat = "Mon, 02 Jan 2006 15:04:05 MST"
+	TimestampFormat = "Mon, 02 Jan 2006 15:04"
 )
 
 func hookWorkflowStarted(n *notification.NotificationService) ewf.BeforeWorkflowHook {
@@ -96,7 +96,7 @@ func hookClusterHealthCheck(notificationService *notification.NotificationServic
 			Error:   err.Error(),
 		}, map[string]string{
 			"workflow_name": wf.Name,
-			"timestamp":     time.Now().Local().Format(TimestampFormat),
+			"timestamp":     time.Now().UTC().Format(TimestampFormat),
 		})
 		cluster, errCluster := statemanager.GetCluster(wf.State)
 		if errCluster != nil {
