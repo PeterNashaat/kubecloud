@@ -3,6 +3,7 @@ package activities
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"kubecloud/internal/logger"
 	"kubecloud/internal/statemanager"
@@ -11,6 +12,10 @@ import (
 	"kubecloud/models"
 
 	"github.com/xmonader/ewf"
+)
+
+const (
+	TimestampFormat = "Mon, 02 Jan 2006 15:04:05 MST"
 )
 
 func hookWorkflowStarted(n *notification.NotificationService) ewf.BeforeWorkflowHook {
@@ -84,24 +89,29 @@ func hookClusterHealthCheck(notificationService *notification.NotificationServic
 			return
 		}
 		severity := models.NotificationSeverityError
-		payload := notification.CommonPayload{
+		payload := notification.MergePayload(notification.CommonPayload{
 			Message: "Cluster health check failed",
 			Subject: "Cluster health check failed",
 			Status:  "failed",
-		}
+			Error:   err.Error(),
+		}, map[string]string{
+			"workflow_name": wf.Name,
+			"timestamp":     time.Now().Local().Format(TimestampFormat),
+		})
 		cluster, errCluster := statemanager.GetCluster(wf.State)
 		if errCluster != nil {
 			logger.GetLogger().Error().Err(err).Str("workflow_name", wf.Name).Msg("Failed to get cluster from state")
 
-			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notification.MergePayload(payload, map[string]string{}), models.WithSeverity(severity), models.WithChannels(notification.ChannelEmail))
+			notification := models.NewNotification(config.UserID, models.NotificationTypeDeployment, payload, models.WithSeverity(severity), models.WithChannels(notification.ChannelEmail))
 			if err := notificationService.Send(ctx, notification); err != nil {
 				logger.GetLogger().Error().Err(err).Msg("Failed to send cluster health check notification")
 			}
 
 			return
 		}
-		payload.Message = fmt.Sprintf("Cluster health check failed for cluster Name: %s, Number of nodes: %d", cluster.Name, len(cluster.Nodes))
-		notificationObj := models.NewNotification(config.UserID, models.NotificationTypeDeployment, notification.MergePayload(payload, map[string]string{}), models.WithSeverity(severity), models.WithChannels(notification.ChannelEmail))
+		payload["message"] = fmt.Sprintf("Cluster health check failed for cluster Name: %s, Number of nodes: %d", cluster.Name, len(cluster.Nodes))
+		payload["cluster_name"] = cluster.Name
+		notificationObj := models.NewNotification(config.UserID, models.NotificationTypeDeployment, payload, models.WithSeverity(severity), models.WithChannels(notification.ChannelEmail))
 		if err := notificationService.Send(ctx, notificationObj); err != nil {
 			logger.GetLogger().Error().Err(err).Msg("Failed to send cluster health check notification")
 		}
