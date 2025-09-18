@@ -897,19 +897,6 @@ func handleAddNodeWorkflowFailure(ctx context.Context, wf *ewf.Workflow, err err
 		return
 	}
 
-	if contractID, exists := cluster.Network.NodeDeploymentID[node.NodeID]; exists && contractID != 0 {
-		if err := kubeClient.GridClient.BatchCancelContract([]uint64{contractID}); err != nil {
-			logger.GetLogger().Error().
-				Err(err).
-				Uint64("contract_id", contractID).
-				Msg("Failed to cancel network contract in rollback")
-		} else {
-			logger.GetLogger().Info().
-				Uint64("contract_id", contractID).
-				Msg("Canceled network contract in rollback")
-		}
-	}
-
 	statemanager.StoreCluster(wf.State, cluster)
 	logger.GetLogger().Info().
 		Str("node_name", node.Name).
