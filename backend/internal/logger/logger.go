@@ -68,7 +68,6 @@ func InitLogger(config LoggerConfig, lokiConfig *LokiConfig, debug bool) error {
 		lokiWriter = NewLokiWriter(lokiConfig.URL, lokiConfig.Labels, lokiConfig.FlushInterval)
 
 		if err := pingLoki(lokiWriter); err != nil {
-			fmt.Fprintf(os.Stderr, "[logger] Loki unreachable (%v), disabling Loki output.\n", err)
 			lokiWriter = nil
 		} else {
 			writers = append(writers, lokiWriter)
@@ -86,10 +85,19 @@ func InitLogger(config LoggerConfig, lokiConfig *LokiConfig, debug bool) error {
 	// Set log level based on debug configuration
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		instance.logger.Debug().Msg("debug logging enabled")
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
+
+	outputTypes := []string{"console", "file"}
+	if lokiWriter != nil {
+		outputTypes = append(outputTypes, "Loki")
+	}
+
+	instance.logger.Info().
+		Bool("level-debug", debug).
+		Strs("writers", outputTypes).
+		Msgf("Logger initialized")
 
 	return nil
 }
@@ -114,14 +122,20 @@ func CloseLogger() {
 }
 
 func pingLoki(lw *LokiWriter) error {
+	if lw == nil {
+		return fmt.Errorf("loki writer is nil")
+	}
+
 	testPayload := `{"streams":[]}`
 	resp, err := lw.client.Post(lw.url, "application/json", bytes.NewBufferString(testPayload))
 	if err != nil {
-		return err
+		return fmt.Errorf("loki post test failed: %w", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("bad response: %s", resp.Status)
+		return fmt.Errorf("loki returned bad status: %s", resp.Status)
 	}
+
 	return nil
 }
