@@ -7,12 +7,18 @@ import (
 	"kubecloud/internal/logger"
 	"kubecloud/internal/notification"
 	"kubecloud/models"
+	"strings"
 	"sync"
 	"time"
 
 	proxy "github.com/threefoldtech/tfgrid-sdk-go/grid-proxy/pkg/client"
 	"github.com/xmonader/ewf"
 )
+
+type NodeHealthResult struct {
+	userID          int
+	unhealthyNodeID uint32
+}
 
 func (h *Handler) TrackClusterHealth() {
 
@@ -97,7 +103,7 @@ func (h *Handler) TrackReservedNodeHealth(notificationService *notification.Noti
 
 // checkNodesWithWorkerPool uses a worker pool to check node health concurrently
 func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, grid proxy.Client, notificationService *notification.NotificationService) {
-	timeout := 5 * time.Second
+	timeout := 10 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -107,12 +113,12 @@ func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, gri
 	}
 
 	jobs := make(chan models.UserNodes, len(reservedNodes))
-	results := make(chan error, len(reservedNodes))
+	results := make(chan NodeHealthResult, len(reservedNodes))
 
 	var wg sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go h.healthCheckWorker(ctx, &wg, jobs, results, grid, notificationService)
+		go h.healthCheckWorker(ctx, &wg, jobs, results, grid)
 	}
 
 	go func() {
@@ -127,54 +133,74 @@ func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, gri
 		close(results)
 	}()
 
-	var errorCount int
-	for err := range results {
-		if err != nil {
-			errorCount++
-		}
+	userNodes := make(map[int][]uint32)
+	for res := range results {
+		userNodes[res.userID] = append(userNodes[res.userID], res.unhealthyNodeID)
 	}
 
-	logger.GetLogger().Info().
-		Int("total_nodes", len(reservedNodes)).
-		Int("workers", workerCount).
-		Int("errors", errorCount).
-		Msg("Health check completed")
+	for userID, nodeIDs := range userNodes {
+		if len(nodeIDs) == 0 {
+			continue
+		}
+
+		subject := "Reserved Node Health Check Failed"
+
+		var b strings.Builder
+		for i, id := range nodeIDs {
+			if i > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(fmt.Sprintf("Node ID: %d", id))
+		}
+		message := fmt.Sprintf(
+			"You have %d reserved node(s) that are currently unhealthy. See list below.",
+			len(nodeIDs),
+		)
+
+		payloadData := map[string]string{
+			"unhealthy_count": fmt.Sprintf("%d", len(nodeIDs)),
+			"timestamp":       time.Now().UTC().Format("2006-01-02 15:04:05 UTC"),
+		}
+		payloadData["nodes_list"] = b.String()
+
+		payload := notification.MergePayload(notification.CommonPayload{
+			Subject: subject,
+			Message: message,
+			Status:  "unhealthy",
+		}, payloadData)
+
+		notif := models.NewNotification(
+			userID,
+			models.NotificationTypeNode,
+			payload,
+			models.WithSeverity(models.NotificationSeverityError),
+			models.WithChannels(notification.ChannelEmail),
+		)
+
+		if err := notificationService.Send(ctx, notif); err != nil {
+			logger.GetLogger().Error().Err(err).Int("user_id", userID).Msg("Failed to send consolidated notification")
+		}
+		cancel()
+	}
 }
 
-func (h *Handler) healthCheckWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan models.UserNodes, results chan<- error, grid proxy.Client, notificationService *notification.NotificationService) {
+func (h *Handler) healthCheckWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan models.UserNodes, results chan<- NodeHealthResult, grid proxy.Client) {
 	defer wg.Done()
 
 	for userNode := range jobs {
 		node, err := grid.Node(ctx, userNode.NodeID)
 		if err != nil {
 			logger.GetLogger().Error().Err(err).Uint32("node_id", userNode.NodeID).Msg("Failed to get node for health check")
-			results <- err
 			continue
 		}
 
 		if node.Healthy {
-			results <- nil
 			continue
 		}
 
-		payload := notification.MergePayload(notification.CommonPayload{
-			Subject: "Reserved node health check failed",
-			Message: fmt.Sprintf("Your reserved node (ID: %d, contract ID: %d) is currently not healthy.", userNode.NodeID, userNode.ContractID),
-			Status:  "failed",
-		}, map[string]string{
-			"node_id":     fmt.Sprintf("%d", userNode.NodeID),
-			"contract_id": fmt.Sprintf("%d", userNode.ContractID),
-		})
-
-		notificationObj := models.NewNotification(userNode.UserID, models.NotificationTypeNode, payload,
-			models.WithSeverity(models.NotificationSeverityError),
-			models.WithChannels(notification.ChannelEmail))
-
-		if err := notificationService.Send(ctx, notificationObj); err != nil {
-			logger.GetLogger().Error().Err(err).Uint32("node_id", userNode.NodeID).Msg("Failed to send notification")
-			results <- err
-		} else {
-			results <- nil
+		results <- NodeHealthResult{
+			userID:          userNode.UserID,
+			unhealthyNodeID: userNode.NodeID,
 		}
 	}
 }

@@ -110,16 +110,10 @@
           <strong>Health Check Status:</strong> {{ index .Payload "message" }}
         </p>
 
-        {{ $nodeId := index .Payload "node_id" }} {{ if $nodeId }}
+        {{ $nodes := index .Payload "nodes_list" }} {{ if $nodes }}
         <div class="kv">
-          <span class="label">Node ID:</span>
-          <span class="value">{{ $nodeId }}</span>
-        </div>
-        {{ end }} {{ $contractId := index .Payload "contract_id" }} {{ if
-        $contractId }}
-        <div class="kv">
-          <span class="label">Contract ID:</span>
-          <span class="value">{{ $contractId }}</span>
+          <span class="label">Unhealthy Nodes:</span>
+          <pre class="code" style="white-space: pre-wrap; margin: 8px 0 0 0;">{{ $nodes }}</pre>
         </div>
         {{ end }}
       <div class="footer">Mycelium Cloud. All rights reserved.</div>
