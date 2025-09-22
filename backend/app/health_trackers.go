@@ -92,7 +92,6 @@ func (h *Handler) TrackReservedNodeHealth(notificationService *notification.Noti
 			Int("count", len(reservedNodes)).
 			Msg("Starting health check for reserved nodes")
 
-		// Use worker pool for concurrent health checks
 		h.checkNodesWithWorkerPool(reservedNodes, grid, notificationService)
 
 		logger.GetLogger().Info().
@@ -103,11 +102,11 @@ func (h *Handler) TrackReservedNodeHealth(notificationService *notification.Noti
 
 // checkNodesWithWorkerPool uses a worker pool to check node health concurrently
 func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, grid proxy.Client, notificationService *notification.NotificationService) {
-	timeout := 10 * time.Second
+	timeout := time.Duration(h.config.ReservedNodeHealthCheckTimeoutInMinutes) * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	workerCount := h.config.DeployerWorkersNum
+	workerCount := h.config.ReservedNodeHealthCheckWorkersNum
 	if workerCount > len(reservedNodes) {
 		workerCount = len(reservedNodes)
 	}
@@ -153,7 +152,7 @@ func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, gri
 			b.WriteString(fmt.Sprintf("Node ID: %d", id))
 		}
 		message := fmt.Sprintf(
-			"You have %d reserved node(s) that are currently unhealthy. See list below.",
+			"You have %d reserved node(s) that are currently unhealthy",
 			len(nodeIDs),
 		)
 
@@ -177,10 +176,9 @@ func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, gri
 			models.WithChannels(notification.ChannelEmail),
 		)
 
-		if err := notificationService.Send(ctx, notif); err != nil {
+		if err := notificationService.Send(context.Background(), notif); err != nil {
 			logger.GetLogger().Error().Err(err).Int("user_id", userID).Msg("Failed to send consolidated notification")
 		}
-		cancel()
 	}
 }
 

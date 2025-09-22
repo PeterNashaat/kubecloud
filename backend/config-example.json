@@ -56,6 +56,8 @@
   "notify_admins_for_pending_records_in_hours": 24,
   "cluster_health_check_interval_in_hours": 1,
   "reserved_node_health_check_interval_in_hours": 1,
+  "reserved_node_health_check_timeout_in_minutes": 1,
+  "reserved_node_health_check_workers_num": 10,
   "kyc_verifier_api_url": "kyc-url",
   "kyc_challenge_domain": "kyc-domain",
   "logger": {
