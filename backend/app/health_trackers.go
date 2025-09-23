@@ -123,7 +123,12 @@ func (h *Handler) checkNodesWithWorkerPool(reservedNodes []models.UserNodes, gri
 	go func() {
 		defer close(jobs)
 		for _, userNode := range reservedNodes {
-			jobs <- userNode
+			select {
+			case <-ctx.Done():
+				logger.GetLogger().Info().Msg("Context done, stopping health check worker")
+				return
+			case jobs <- userNode:
+			}
 		}
 	}()
 
