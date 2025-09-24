@@ -345,6 +345,17 @@ func CreateBillingWorkflowNotifications(ctx context.Context, wf *ewf.Workflow, e
 	var payload map[string]string
 
 	// Extract amount and balance from workflow state
+	if amountVal, ok := wf.State["amount"]; ok {
+		if amount, okAmount := amountVal.(uint64); okAmount {
+			amountUSD = internal.FromUSDMilliCentToUSD(amount)
+		}
+	}
+
+	if balanceVal, exists := wf.State["net_balance"]; exists {
+		if balance, okBalance := balanceVal.(uint64); okBalance {
+			newBalanceUSD = internal.FromUSDMilliCentToUSD(balance)
+		}
+	}
 
 	status := "funds_failed"
 	subject := "Adding Funds Failed"
@@ -352,7 +363,8 @@ func CreateBillingWorkflowNotifications(ctx context.Context, wf *ewf.Workflow, e
 	if err == nil {
 		status = "funds_succeeded"
 		subject = "Adding Funds Succeeded"
-		message = fmt.Sprintf("Funds were added successfully to your account. Amount added: $%.2f. New balance: $%.2f.", amountUSD, newBalanceUSD)
+		message = fmt.Sprintf("Funds were added successfully to your account. Amount added: $%.2f. New balance will be: $%.2f.", amountUSD, newBalanceUSD)
+
 		if wf.Name == constants.WorkflowRedeemVoucher {
 			status = "voucher_redeemed"
 			subject = "Voucher Redeemed"
