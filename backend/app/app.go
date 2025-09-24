@@ -227,6 +227,7 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		sponsorKeyPair,
 		app.metrics,
 		app.notificationService,
+		gridProxy,
 	)
 
 	app.registerHandlers()
