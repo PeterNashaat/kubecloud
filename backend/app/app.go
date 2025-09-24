@@ -350,6 +350,7 @@ func (app *App) StartBackgroundWorkers() {
 	go app.handlers.TrackUserDebt(app.gridClient)
 	go app.handlers.MonitorSystemBalanceAndHandleSettlement()
 	go app.handlers.TrackClusterHealth()
+	go app.handlers.TrackReservedNodeHealth(app.notificationService, app.handlers.proxyClient)
 }
 
 // Run starts the server
