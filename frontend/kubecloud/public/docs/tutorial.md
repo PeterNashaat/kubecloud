@@ -530,4 +530,11 @@ kubectl exec -it deployment/frontend-service -- curl http://backend-service:8001
 kubectl exec -it deployment/backend-service -- curl http://database-service:8002/api/stats
 ```
 
+> Note: If you see an error like `exec: "curl": not found`, the base image (e.g., `python:3.9-slim`) doesn't include curl. Install it inside the running container, then rerun the curl command command:
+>
+> ```bash
+> kubectl exec -it deployment/frontend-service -- sh -lc 'apt-get update && apt-get install -y curl'
+> kubectl exec -it deployment/backend-service -- sh -lc 'apt-get update && apt-get install -y curl'
+> ```
+
 This demonstrates how services communicate across nodes using Mycelium networking.
