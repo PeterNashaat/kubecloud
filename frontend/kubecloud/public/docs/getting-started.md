@@ -10,16 +10,26 @@ Mycelium Cloud provides a complete solution for cloud-native applications with:
 - **Kubernetes Management**: Full K3s cluster deployment and management
 - **IPv6 Networking**: Mycelium peer-to-peer networking
 - **High Availability**: Multi-master cluster support
-- **Monitoring**: Integrated Prometheus and Grafana
-- **Web Interface**: Modern Vue.js dashboard
+
+## Architecture
+
+Mycelium Cloud uses peer-to-peer networking that enables:
+
+- **Direct Node Access**: Each node gets a unique Mycelium IP address
+- **Cross-Node Communication**: Services communicate across nodes using Mycelium networking
+- **Secure Communication**: All traffic is encrypted through the Mycelium network
+- **No Public IPs Required**: Services accessible via Mycelium IPs
+
+**Network Flow**: `User Machine → Mycelium Network → Cluster Node → Service`
 
 ## Quick Start
 
 ### 1. Account Setup
 
-1. **Sign Up**: Create your account at [Mycelium Cloud](https://staging.vdc.grid.tf/sign-up)
+1. **Sign Up**: Create your account from signup page
 2. **Verify Email**: Check your email and verify your account
 3. **Add Funds**: Navigate to your dashboard and add credits to your account
+4. **Add SSH Key**: Navigate to Add SSH card and upload your public SSH key
 
 ### 2. Deploy Your First Cluster
 
@@ -32,79 +42,30 @@ Mycelium Cloud provides a complete solution for cloud-native applications with:
 
 ### 3. Access Your Cluster
 
-Once deployed, you can:
+#### Download Kubeconfig
 
-- **Download Kubeconfig**: Get your cluster configuration file
-- **Monitor Status**: View cluster health and metrics
-- **Manage Resources**: Scale nodes up or down as needed
+1. Go to dashboard → Clusters → Click download icon (⬇️)
+2. Set kubeconfig: `export KUBECONFIG=/path/to/config`
+3. Test: `kubectl get nodes`
 
-## Configuration
+#### SSH Access
 
-### Backend Configuration
+1. **Find Mycelium IPs**: Check cluster details page for node IPs
+2. **Download Mycelium Binary** (only when needed for SSH):
 
-Mycelium Cloud supports configuration through environment variables, CLI flags, and configuration files.
+   ```bash
+   wget https://github.com/threefoldtech/mycelium/releases/latest/download/mycelium-private-x86_64-unknown-linux-musl.tar.gz
+   tar -xzf mycelium-private-x86_64-unknown-linux-musl.tar.gz
+   sudo chmod +x mycelium-private
+   sudo mv mycelium-private /usr/local/bin/mycelium
+   ```
 
-#### Configuration File
+3. **Start Mycelium** (only for SSH access):
 
-By default, Mycelium Cloud looks for a `config.json` file in the current directory. You can specify a custom configuration file path using the `--config` or `-c` flag:
+   ```bash
+   sudo mycelium --peers tcp://188.40.132.242:9651 tcp://136.243.47.186:9651 tcp://185.69.166.7:9651 tcp://185.69.166.8:9651 tcp://65.21.231.58:9651 tcp://65.109.18.113:9651 tcp://209.159.146.190:9651 tcp://5.78.122.16:9651 tcp://5.223.43.251:9651 tcp://142.93.217.194:9651
+   ```
 
-```bash
-myceliumcloud --config /path/to/config.json
-```
+4. **SSH to nodes**: `ssh root@<mycelium-ip>`
 
-The configuration file should be in JSON format. Check the [config example](https://github.com/codescalers/kubecloud/blob/master/backend/config-example.json) for reference.
-
-#### Notification Configuration
-
-Mycelium Cloud supports a separate notification configuration file to define how different types of notifications are handled:
-
-```bash
-kubecloud --notification_config_path /path/to/notification-config.json
-```
-
-Or set via environment variable:
-
-```bash
-export KUBECLOUD_NOTIFICATION_CONFIG_PATH=/path/to/notification-config.json
-```
-
-#### Default Behavior
-
-If no notification configuration file is provided, Mycelium Cloud will use default settings:
-
-- **All channels**: `["ui"]` (UI notifications only)
-- **All severity levels**: `"info"`
-- **All notification types**: Use the default settings unless specifically overridden
-
-## Key Features
-
-### Decentralized Deployment
-
-Deploy Kubernetes clusters across the ThreeFold Grid's decentralized infrastructure for enhanced reliability and geographic distribution.
-
-### IPv6 Networking
-
-Built-in Mycelium networking provides secure peer-to-peer IPv6 connectivity between all cluster components.
-
-### High Availability
-
-Configure multi-master clusters for production workloads with automatic failover capabilities.
-
-### Monitoring & Observability
-
-Integrated Prometheus metrics collection and Grafana dashboards for comprehensive cluster monitoring.
-
-## Next Steps
-
-- [Platform Tutorial](https://github.com/codescalers/kubecloud/blob/master/frontend/kubecloud/public/docs/tutorial.md) - Complete walkthrough including Hello World, 3 Python servers, and service communication examples
-- [Architecture Overview](https://github.com/codescalers/kubecloud/blob/master/frontend/kubecloud/public/docs/architecture.md) - Deep dive into Mycelium networking and system design
-- [API Reference](https://github.com/codescalers/kubecloud/blob/master/frontend/kubecloud/public/docs/api-reference.md) - Complete API documentation
-- [FAQ](https://github.com/codescalers/kubecloud/blob/master/frontend/kubecloud/public/docs/faq.md) - Frequently asked questions and troubleshooting
-
-## Support
-
-Need help? Contact our support team or check our community resources:
-
-- GitHub Issues: [Report bugs and feature requests](https://github.com/codescalers/kubecloud/issues)
-- Documentation: Browse our comprehensive guides
-- Community: Join our community channels
+> **Note**: Mycelium is only needed for SSH access. Normal kubectl operations work without it.
