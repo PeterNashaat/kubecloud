@@ -6,7 +6,7 @@ This tutorial covers advanced deployment scenarios for Mycelium Cloud. For basic
 
 - Completed [Getting Started Guide](#getting-started)
 - Deployed cluster with kubectl access
-- Mycelium binary installed (only needed for SSH access)
+- Mycelium binary installed
 
 ### Setting up kubectl access
 

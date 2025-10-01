@@ -51,7 +51,7 @@ Mycelium Cloud uses peer-to-peer networking that enables:
 #### SSH Access
 
 1. **Find Mycelium IPs**: Check cluster details page for node IPs
-2. **Download Mycelium Binary** (only when needed for SSH):
+2. **Download Mycelium Binary**:
 
    ```bash
    wget https://github.com/threefoldtech/mycelium/releases/latest/download/mycelium-private-x86_64-unknown-linux-musl.tar.gz
@@ -60,12 +60,10 @@ Mycelium Cloud uses peer-to-peer networking that enables:
    sudo mv mycelium-private /usr/local/bin/mycelium
    ```
 
-3. **Start Mycelium** (only for SSH access):
+3. **Start Mycelium**:
 
    ```bash
    sudo mycelium --peers tcp://188.40.132.242:9651 tcp://136.243.47.186:9651 tcp://185.69.166.7:9651 tcp://185.69.166.8:9651 tcp://65.21.231.58:9651 tcp://65.109.18.113:9651 tcp://209.159.146.190:9651 tcp://5.78.122.16:9651 tcp://5.223.43.251:9651 tcp://142.93.217.194:9651
    ```
 
 4. **SSH to nodes**: `ssh root@<mycelium-ip>`
-
-> **Note**: Mycelium is only needed for SSH access. Normal kubectl operations work without it.
