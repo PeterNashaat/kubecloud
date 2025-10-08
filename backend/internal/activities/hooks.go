@@ -123,10 +123,6 @@ func hookClusterHealthCheck(notificationService *notification.NotificationServic
 	}
 }
 
-func hookNotificationWorkflowStarted(ctx context.Context, w *ewf.Workflow) {
-	logger.GetLogger().Info().Str("workflow_name", w.Name).Msg("Starting notification workflow")
-}
-
 func newKubecloudWorkflowTemplate(n *notification.NotificationService) ewf.WorkflowTemplate {
 	return ewf.WorkflowTemplate{
 		BeforeWorkflowHooks: []ewf.BeforeWorkflowHook{
