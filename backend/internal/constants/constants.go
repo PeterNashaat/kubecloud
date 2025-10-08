@@ -16,6 +16,7 @@ const (
 	WorkflowSendNotification         = "send-notification"
 	WorkflowRollbackFailedDeployment = "rollback-failed-deployment"
 	WorkflowTrackClusterHealth       = "track-cluster-health"
+	WorkflowRollbackFailedAddNode    = "rollback-add-node"
 
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"

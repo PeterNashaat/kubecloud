@@ -513,7 +513,7 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 	engine.RegisterTemplate(wfName, &workflow)
 }
 
-func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
+func closeClient(ctx context.Context, wf *ewf.Workflow, err error) {
 	if kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client); ok {
 		// Save final GridClient state before closing
 		statemanager.SaveGridClientState(wf.State, kubeClient)
@@ -565,10 +565,18 @@ func deploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.Aft
 func createDeployerWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
 	template := newKubecloudWorkflowTemplate(notificationService)
 	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
-		[]ewf.AfterWorkflowHook{
-			deploymentFailureHook(engine, metrics),
-			CloseClient,
-		}...)
+		deploymentFailureHook(engine, metrics),
+		closeClient,
+	)
+
+	return template
+}
+
+func createBaseDeployerWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
+	template := newKubecloudWorkflowTemplate(notificationService)
+	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
+		closeClient,
+	)
 
 	return template
 }
@@ -576,14 +584,13 @@ func createDeployerWorkflowTemplate(notificationService *notification.Notificati
 func createAddNodeWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
 	template := newKubecloudWorkflowTemplate(notificationService)
 	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
-		[]ewf.AfterWorkflowHook{
-			notifyWorkflowProgress(notificationService),
-		}...)
+		addNodeFailureHook(engine, metrics),
+		closeClient,
+	)
 	return template
 }
 
 func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, notificationService *notification.NotificationService, config internal.Configuration) {
-
 	engine.Register(constants.StepDeployNetwork, DeployNetworkStep(metrics))
 	engine.Register(constants.StepDeployNode, DeployNodeStep(metrics))
 	engine.Register(constants.StepRemoveCluster, CancelDeploymentStep(db, metrics))
@@ -622,14 +629,6 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: constants.StepVerifyNewNodes, RetryPolicy: longExponentialRetryPolicy},
 		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
-	addNodeWFTemplate.AfterWorkflowHooks = append(
-		addNodeWFTemplate.AfterWorkflowHooks,
-		func(ctx context.Context, wf *ewf.Workflow, err error) {
-			handleAddNodeWorkflowFailure(ctx, wf, err)
-		},
-	)
-	addNodeWFTemplate.AfterWorkflowHooks = append(addNodeWFTemplate.AfterWorkflowHooks, CloseClient)
-
 	engine.RegisterTemplate(constants.WorkflowAddNode, &addNodeWFTemplate)
 
 	removeNodeWFTemplate := createDeployerWorkflowTemplate(notificationService, engine, metrics)
@@ -646,12 +645,12 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	}
 	engine.RegisterTemplate(constants.WorkflowRollbackFailedDeployment, &rollbackWFTemplate)
 
-	rollbackAddNodeWFTemplate := createDeployerWorkflowTemplate(notificationService, engine, metrics)
+	rollbackAddNodeWFTemplate := createBaseDeployerWorkflowTemplate(notificationService, engine, metrics)
 	rollbackAddNodeWFTemplate.Steps = []ewf.Step{
 		{Name: constants.StepRemoveNode, RetryPolicy: standardRetryPolicy},
 		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
-	engine.RegisterTemplate("rollback-add-node", &rollbackAddNodeWFTemplate)
+	engine.RegisterTemplate(constants.WorkflowRollbackFailedAddNode, &rollbackAddNodeWFTemplate)
 }
 
 func getFromState[T any](state ewf.State, key string) (T, error) {
@@ -854,53 +853,4 @@ func VerifyClusterReadyStep() ewf.StepFn {
 
 		return nil
 	}
-}
-
-func handleAddNodeWorkflowFailure(ctx context.Context, wf *ewf.Workflow, err error) {
-	if err == nil || wf.Name != constants.WorkflowAddNode {
-		return
-	}
-
-	node, ok := wf.State["node"].(kubedeployer.Node)
-	if !ok {
-		logger.GetLogger().Error().
-			Str("workflow_name", wf.Name).
-			Msg("node not found in state for rollback")
-		return
-	}
-
-	cluster, clusterErr := statemanager.GetCluster(wf.State)
-	if clusterErr != nil || cluster.ProjectName == "" {
-		logger.GetLogger().Error().
-			Err(clusterErr).
-			Str("workflow_name", wf.Name).
-			Msg("nothing to rollback")
-		return
-	}
-
-	kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client)
-	if !ok {
-		logger.GetLogger().Error().
-			Str("workflow_name", wf.Name).
-			Msg("no kubeclient found for rollback")
-		return
-	}
-
-	logger.GetLogger().Info().
-		Str("project_name", cluster.ProjectName).
-		Str("node_name", node.Name).
-		Msg("Triggering rollback for newly added node")
-
-	if err := kubeClient.RemoveNode(ctx, &cluster, node.Name); err != nil {
-		logger.GetLogger().Error().
-			Err(err).
-			Str("node_name", node.Name).
-			Msg("Failed to rollback node")
-		return
-	}
-
-	statemanager.StoreCluster(wf.State, cluster)
-	logger.GetLogger().Info().
-		Str("node_name", node.Name).
-		Msg("Rollback of new node completed")
 }
