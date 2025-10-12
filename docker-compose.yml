@@ -33,12 +33,12 @@ services:
     depends_on:
       - redis-db
       - mycelium
-    working_dir: /opt/project
+    working_dir: /app
     volumes:
       - ./backend/myceliumCloud.db:/app/myceliumCloud.db
       - ./backend/config.json:/app/config.json
-      - ./backend/notification-config.json:/opt/project/notification-config.json
-      - ./backend/logs:/opt/project/logs
+      - ./backend/notification-config.json:/app/notification-config.json
+      - ./backend/app/logs:/app/logs
       - /root/.ssh:/root/.ssh:ro
     environment:
       - MYCELIUM_HOST=localhost
