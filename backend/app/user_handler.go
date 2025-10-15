@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"kubecloud/internal"
 	"kubecloud/internal/metrics"
@@ -13,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"errors"
+
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mattn/go-sqlite3"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
@@ -955,8 +957,7 @@ func (h *Handler) AddSSHKeyHandler(c *gin.Context) {
 	}
 
 	if err := h.db.CreateSSHKey(&sshKey); err != nil {
-		var sqliteErr sqlite3.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+		if isUniqueViolation(err) {
 			Error(c, http.StatusBadRequest, "Duplicate SSH key", "SSH key name or public key already exists for this user.")
 			return
 		}
@@ -1132,4 +1133,28 @@ func isUserRegistered(user models.User) bool {
 		len(strings.TrimSpace(user.AccountAddress)) > 0 &&
 		len(strings.TrimSpace(user.StripeCustomerID)) > 0 &&
 		len(strings.TrimSpace(user.Mnemonic)) > 0
+}
+
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		// 23505 is the code for unique constraint violation
+		return pgErr.Code == "23505"
+	}
+
+	var sqlLiteErr sqlite3.Error
+	if errors.As(err, &sqlLiteErr) {
+		if sqlLiteErr.Code == sqlite3.ErrConstraint {
+			return sqlLiteErr.ExtendedCode == sqlite3.ErrConstraintUnique || sqlLiteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey
+		}
+	}
+	return false
 }

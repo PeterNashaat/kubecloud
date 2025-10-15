@@ -71,7 +71,14 @@ func NewApp(ctx context.Context, config internal.Configuration) (*App, error) {
 		time.Duration(config.JwtToken.RefreshExpiryHours)*time.Hour,
 	)
 
-	db, err := models.NewSqliteDB(config.Database.File)
+	dbPoolConfig := models.DBPoolConfig{
+		MaxOpenConns:           config.Database.MaxOpenConns,
+		MaxIdleConns:           config.Database.MaxIdleConns,
+		ConnMaxLifetimeMinutes: config.Database.ConnMaxLifetimeMinutes,
+		ConnMaxIdleTimeMinutes: config.Database.ConnMaxIdleTimeMinutes,
+	}
+
+	db, err := models.NewDB(config.Database.DSN, dbPoolConfig)
 	if err != nil {
 		logger.GetLogger().Error().Err(err).Msg("Failed to create user storage")
 		return nil, fmt.Errorf("failed to create user storage: %w", err)
