@@ -513,7 +513,7 @@ func NewDynamicDeployWorkflowTemplate(engine *ewf.Engine, metrics *metrics.Metri
 	engine.RegisterTemplate(wfName, &workflow)
 }
 
-func CloseClient(ctx context.Context, wf *ewf.Workflow, err error) {
+func closeClient(ctx context.Context, wf *ewf.Workflow, err error) {
 	if kubeClient, ok := wf.State["kubeclient"].(*kubedeployer.Client); ok {
 		// Save final GridClient state before closing
 		statemanager.SaveGridClientState(wf.State, kubeClient)
@@ -565,16 +565,32 @@ func deploymentFailureHook(engine *ewf.Engine, metrics *metrics.Metrics) ewf.Aft
 func createDeployerWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
 	template := newKubecloudWorkflowTemplate(notificationService)
 	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
-		[]ewf.AfterWorkflowHook{
-			deploymentFailureHook(engine, metrics),
-			CloseClient,
-		}...)
+		deploymentFailureHook(engine, metrics),
+		closeClient,
+	)
 
 	return template
 }
 
-func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, notificationService *notification.NotificationService, config internal.Configuration) {
+func createBaseDeployerWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
+	template := newKubecloudWorkflowTemplate(notificationService)
+	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
+		closeClient,
+	)
 
+	return template
+}
+
+func createAddNodeWorkflowTemplate(notificationService *notification.NotificationService, engine *ewf.Engine, metrics *metrics.Metrics) ewf.WorkflowTemplate {
+	template := newKubecloudWorkflowTemplate(notificationService)
+	template.AfterWorkflowHooks = append(template.AfterWorkflowHooks,
+		addNodeFailureHook(engine, metrics),
+		closeClient,
+	)
+	return template
+}
+
+func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, db models.DB, notificationService *notification.NotificationService, config internal.Configuration) {
 	engine.Register(constants.StepDeployNetwork, DeployNetworkStep(metrics))
 	engine.Register(constants.StepDeployNode, DeployNodeStep(metrics))
 	engine.Register(constants.StepRemoveCluster, CancelDeploymentStep(db, metrics))
@@ -584,6 +600,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	engine.Register(constants.StepStoreDeployment, StoreDeploymentStep(db, metrics))
 	engine.Register(constants.StepFetchKubeconfig, FetchKubeconfigStep(db, config.SSH.PrivateKeyPath))
 	engine.Register(constants.StepVerifyClusterReady, VerifyClusterReadyStep())
+	engine.Register(constants.StepVerifyNewNodes, VerifyAddedNodeStep(db, config.SSH.PrivateKeyPath))
 	engine.Register(constants.StepRemoveClusterFromDB, RemoveClusterFromDBStep(db))
 	engine.Register(constants.StepGatherAllContractIDs, GatherAllContractIDsStep(db))
 	engine.Register(constants.StepBatchCancelContracts, BatchCancelContractsStep())
@@ -604,10 +621,12 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	}
 	engine.RegisterTemplate(constants.WorkflowDeleteAllClusters, &deleteAllDeploymentsWFTemplate)
 
-	addNodeWFTemplate := createDeployerWorkflowTemplate(notificationService, engine, metrics)
+	addNodeWFTemplate := createAddNodeWorkflowTemplate(notificationService, engine, metrics)
 	addNodeWFTemplate.Steps = []ewf.Step{
 		{Name: constants.StepUpdateNetwork, RetryPolicy: criticalRetryPolicy},
 		{Name: constants.StepAddNode, RetryPolicy: standardRetryPolicy},
+		{Name: constants.StepFetchKubeconfig, RetryPolicy: criticalRetryPolicy},
+		{Name: constants.StepVerifyNewNodes, RetryPolicy: longExponentialRetryPolicy},
 		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(constants.WorkflowAddNode, &addNodeWFTemplate)
@@ -615,6 +634,7 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 	removeNodeWFTemplate := createDeployerWorkflowTemplate(notificationService, engine, metrics)
 	removeNodeWFTemplate.Steps = []ewf.Step{
 		{Name: constants.StepRemoveNode, RetryPolicy: standardRetryPolicy},
+		{Name: constants.StepFetchKubeconfig, RetryPolicy: criticalRetryPolicy},
 		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(constants.WorkflowRemoveNode, &removeNodeWFTemplate)
@@ -624,6 +644,13 @@ func registerDeploymentActivities(engine *ewf.Engine, metrics *metrics.Metrics, 
 		{Name: constants.StepRemoveCluster, RetryPolicy: standardRetryPolicy},
 	}
 	engine.RegisterTemplate(constants.WorkflowRollbackFailedDeployment, &rollbackWFTemplate)
+
+	rollbackAddNodeWFTemplate := createBaseDeployerWorkflowTemplate(notificationService, engine, metrics)
+	rollbackAddNodeWFTemplate.Steps = []ewf.Step{
+		{Name: constants.StepRemoveNode, RetryPolicy: standardRetryPolicy},
+		{Name: constants.StepStoreDeployment, RetryPolicy: standardRetryPolicy},
+	}
+	engine.RegisterTemplate(constants.WorkflowRollbackFailedAddNode, &rollbackAddNodeWFTemplate)
 }
 
 func getFromState[T any](state ewf.State, key string) (T, error) {
@@ -668,63 +695,113 @@ func getConfig(state ewf.State) (statemanager.ClientConfig, error) {
 	return config, nil
 }
 
+func retrieveKubeconfig(state ewf.State, db models.DB, privateKeyPath string) (string, error) {
+	if kc, ok := state["kubeconfig"].(string); ok && kc != "" {
+		return kc, nil
+	}
+
+	cluster, err := statemanager.GetCluster(state)
+	if err != nil {
+		return "", fmt.Errorf("failed to get cluster from state: %w", err)
+	}
+
+	config, err := getConfig(state)
+	if err != nil {
+		return "", err
+	}
+
+	// when updating existing cluster
+	existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", fmt.Errorf("failed to query cluster from database: %w", err)
+	}
+
+	if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
+		logger.GetLogger().Debug().Msgf("Using kubeconfig from DB for cluster %s", existingCluster.ProjectName)
+		return existingCluster.Kubeconfig, nil
+	}
+
+	var master kubedeployer.Node
+	if existingCluster.ID != 0 {
+		existingClusterResult, err := existingCluster.GetClusterResult()
+		if err != nil {
+			return "", fmt.Errorf("failed to get cluster result: %w", err)
+		}
+		master, err = existingClusterResult.GetLeaderNode()
+		if err != nil {
+			return "", fmt.Errorf("failed to get leader node: %w", err)
+		}
+	} else {
+		master, err = cluster.GetLeaderNode()
+		if err != nil {
+			return "", fmt.Errorf("failed to get leader node: %w", err)
+		}
+	}
+
+	privateKeyBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read SSH private key: %w", err)
+	}
+
+	logger.GetLogger().Debug().Msg("Fetching kubeconfig from leader node via SSH")
+	return internal.GetKubeconfigViaSSH(string(privateKeyBytes), &master)
+}
+
 func FetchKubeconfigStep(db models.DB, privateKeyPath string) ewf.StepFn {
 	return func(ctx context.Context, state ewf.State) error {
-		if kubeconfig, ok := state["kubeconfig"].(string); ok && kubeconfig != "" {
-			return nil
-		}
-
-		cluster, err := statemanager.GetCluster(state)
-		if err != nil {
-			return fmt.Errorf("failed to get cluster from state: %w", err)
-		}
-
-		config, err := getConfig(state)
+		kubeconfig, err := retrieveKubeconfig(state, db, privateKeyPath)
 		if err != nil {
 			return err
 		}
-
-		// when updating existing cluster
-		existingCluster, err := db.GetClusterByName(config.UserID, cluster.Name)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("failed to query cluster from database: %w", err)
-		}
-
-		if existingCluster.ID != 0 && existingCluster.Kubeconfig != "" {
-			state["kubeconfig"] = existingCluster.Kubeconfig
-			return nil
-		}
-
-		var master kubedeployer.Node
-		if existingCluster.ID != 0 {
-			existingClusterResult, err := existingCluster.GetClusterResult()
-			if err != nil {
-				return fmt.Errorf("failed to get cluster result from existing cluster: %w", err)
-			}
-			master, err = existingClusterResult.GetLeaderNode()
-			if err != nil {
-				return fmt.Errorf("failed to get leader node from existing cluster: %w", err)
-			}
-
-		} else {
-			master, err = cluster.GetLeaderNode()
-			if err != nil {
-				return fmt.Errorf("failed to get leader node from existing cluster: %w", err)
-			}
-
-		}
-
-		privateKeyBytes, err := os.ReadFile(privateKeyPath)
-		if err != nil {
-			return fmt.Errorf("failed to read SSH private key: %w", err)
-		}
-
-		kubeconfig, err := internal.GetKubeconfigViaSSH(string(privateKeyBytes), &master)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve kubeconfig via SSH: %w", err)
-		}
-
 		state["kubeconfig"] = kubeconfig
+		return nil
+	}
+}
+
+func VerifyAddedNodeStep(db models.DB, privateKeyPath string) ewf.StepFn {
+	return func(ctx context.Context, state ewf.State) error {
+		node, ok := state["node"].(kubedeployer.Node)
+		if !ok {
+			return fmt.Errorf("missing or invalid 'node' in state for verification")
+		}
+
+		kubeconfig, err := retrieveKubeconfig(state, db, privateKeyPath)
+		if err != nil {
+			return err
+		}
+		state["kubeconfig"] = kubeconfig
+
+		restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
+		if err != nil {
+			return fmt.Errorf("failed to parse kubeconfig: %w", err)
+		}
+
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create kubernetes client: %w", err)
+		}
+
+		n, err := clientset.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get node %s from cluster: %w", node.Name, err)
+		}
+
+		ready := false
+		for _, cond := range n.Status.Conditions {
+			if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
+				ready = true
+				break
+			}
+		}
+
+		if !ready {
+			return fmt.Errorf("new node %s is not ready", node.Name)
+		}
+
+		logger.GetLogger().Info().
+			Str("node", node.Name).
+			Msg("New node is Ready")
+
 		return nil
 	}
 }
