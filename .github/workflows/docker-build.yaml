@@ -87,8 +87,8 @@ jobs:
       - name: Build & Push (amd64 only)
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          context: ${{ github.workspace }}/${{ matrix.context }}
+          file: ${{ github.workspace }}/${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -101,4 +101,5 @@ jobs:
         run: |
           echo "Built ghcr.io/${OWNER_LC}/${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
           echo "Tags:" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" | sed 's/,/\n/g' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/,/
+/g' >> $GITHUB_STEP_SUMMARY
