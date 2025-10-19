@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	K3S_FLIST      = "https://hub.threefold.me/omarabdulaziz.3bot/omarabdul3ziz-k3s-latest.flist"
+	K3S_FLIST      = "https://hub.threefold.me/omarabdulaziz.3bot/omarabdul3ziz-k3s-opt_crypto.flist"
 	K3S_ENTRYPOINT = "/sbin/zinit init"
 	K3S_DATA_DIR   = "/mnt/data"
 	K3S_IFACE      = "flannel-br"
@@ -89,15 +89,16 @@ func deploymentFromNode(
 	vm.EnvVars["K3S_URL"] = ""
 	vm.EnvVars["K3S_TOKEN"] = token
 
+	vm.EnvVars["TOKEN"] = token
+	vm.EnvVars["MNEMONIC"] = encryptedMnemonic
+	vm.EnvVars["NETWORK"] = gridNet
+
 	if node.Type == NodeTypeMaster || node.Type == NodeTypeLeader {
 		vm.EnvVars["MASTER"] = "true"
 		vm.EnvVars["HA"] = "true"
 	}
 	if node.Type != NodeTypeLeader {
 		vm.EnvVars["K3S_URL"] = fmt.Sprintf("https://%s:6443", leaderIP)
-	} else {
-		vm.EnvVars["MNEMONIC"] = encryptedMnemonic
-		vm.EnvVars["NETWORK"] = gridNet
 	}
 	if vm.EnvVars["K3S_FLANNEL_IFACE"] == "" {
 		vm.EnvVars["K3S_FLANNEL_IFACE"] = K3S_IFACE
