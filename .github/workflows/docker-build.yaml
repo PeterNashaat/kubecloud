@@ -101,5 +101,4 @@ jobs:
         run: |
           echo "Built ghcr.io/${OWNER_LC}/${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
           echo "Tags:" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" | sed 's/,/
-/g' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/,//g' >> $GITHUB_STEP_SUMMARY
