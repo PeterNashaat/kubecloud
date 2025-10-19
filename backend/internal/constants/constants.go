@@ -16,6 +16,7 @@ const (
 	WorkflowSendNotification         = "send-notification"
 	WorkflowRollbackFailedDeployment = "rollback-failed-deployment"
 	WorkflowTrackClusterHealth       = "track-cluster-health"
+	WorkflowRollbackFailedAddNode    = "rollback-add-node"
 
 	// Step names
 	StepCreatePaymentIntent     = "create_payment_intent"
@@ -45,6 +46,7 @@ const (
 	StepDeployNetwork           = "deploy-network"
 	StepFetchKubeconfig         = "fetch_kubeconfig"
 	StepVerifyClusterReady      = "verify-cluster-ready"
+	StepVerifyNewNodes          = "prepare-verify-new-nodes"
 	StepSendEmailNotification   = "send-email-notification"
 	StepSendUINotification      = "send-ui-notification"
 	StepVerifyNodeState         = "verify-node-state"
